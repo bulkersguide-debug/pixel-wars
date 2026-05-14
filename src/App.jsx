@@ -58,6 +58,9 @@ const POWERUPS=[
   {id:"double",icon:"✨",name:"DOUBLE OR NOTHING",desc:"Gamble — 2× or 0×",price:5,color:"#BB88FF",rarity:"UNCOMMON"},
 ];
 const RARITY_COLOR={COMMON:"#aaa",UNCOMMON:"#00CC44",RARE:"#0088FF",EPIC:"#AA00FF",LEGENDARY:"#FFD700"};
+const DISCORD_ID="1504550947295072328";
+const DISCORD_WIDGET=`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`;
+const DISCORD_INVITE=`https://discord.com/invite/${DISCORD_ID}`;
 const EVENTS=[
   {icon:"⚡",label:"CHAOS HOUR",desc:"RAIDS 50% OFF!",duration:600,color:"#FF4400"},
   {icon:"💎",label:"MEGA BONUS",desc:"Buy 10px → get 5 FREE!",duration:300,color:"#FFD700"},
@@ -607,6 +610,7 @@ export default function App(){
             <span style={{color:"rgba(0,255,136,.5)"}}>· 🟢 {onlineCount} online</span>
           </div>
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 ALL FANDOMS</button>
+          <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{marginTop:3,display:"inline-block",background:"rgba(88,101,242,.12)",border:"1px solid rgba(88,101,242,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#7289DA",letterSpacing:1,textDecoration:"none"}}>💬 DISCORD</a>
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
           {freePixels>0&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:7,padding:"4px 9px",cursor:"pointer"}} onClick={openDailyModal}>
@@ -788,7 +792,7 @@ export default function App(){
         {/* ── RIGHT PANEL ── */}
         <div style={{width:194,borderLeft:"1px solid #1a1a30",background:"#05050d",flexShrink:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{display:"flex",borderBottom:"1px solid #1a1a30",flexShrink:0}}>
-            {[["WAR","⚔"],["FEED","📡"],["CHAT","💬"],["WARS","🔥"]].map(([t,icon])=>{const on=tab===t;return(<button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"5px 0",background:on?"#08081a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,letterSpacing:.5,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",transition:"all .1s"}}>{icon}<br/>{t}</button>);})}
+            {[["WAR","⚔"],["FEED","📡"],["CHAT","💬"],["WARS","🔥"],["DISC","🎮"]].map(([t,icon])=>{const on=tab===t;return(<button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"5px 0",background:on?"#08081a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,letterSpacing:.5,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",transition:"all .1s"}}>{icon}<br/>{t}</button>);})}
           </div>
 
           {/* Season mini stats */}
@@ -921,6 +925,19 @@ export default function App(){
               </div>
             );})}
           </div>}
+
+          {/* DISCORD TAB */}
+          {tab==="DISC"&&<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div style={{padding:"8px 8px 6px",borderBottom:"1px solid #1a1a30",flexShrink:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
+                <svg width="16" height="12" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
+                <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#5865F2",letterSpacing:1}}>WAR COUNCIL</span>
+              </div>
+              <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{display:"block",padding:"7px",background:"linear-gradient(90deg,#5865F2,#7289DA)",borderRadius:7,textAlign:"center",textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#fff",letterSpacing:1}}>JOIN SERVER →</a>
+            </div>
+            <iframe src={DISCORD_WIDGET} width="100%" style={{border:"none",flex:1,minHeight:0,background:"#36393f"}} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" title="Discord"/>
+          </div>}
+
         </div>
       </div>
 
