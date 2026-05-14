@@ -449,8 +449,20 @@ export default function App(){
   };
   const onMD=(e)=>{if(!active||mode==="SHOP")return;const g=mouseToGrid(e);if(!g)return;const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);if(!unlockedSet.has(sectorKey(sx,sy))){pushToast("🔒 Locked! Fill the center sectors first.","#FF4400",3000);return;}const now=Date.now(),isShielded=shields[g.idx]&&shields[g.idx]>now;setDrag(true);setOrig({x:g.gx,y:g.gy});const ok=mode==="BUILD"?!pixels[g.idx]:(pixels[g.idx]&&pixels[g.idx].t!==active&&!isShielded);setPending(ok?new Set([g.idx]):new Set());};
   const onMM_h=(e)=>{const g=mouseToGrid(e);if(g){setHov(pixels[g.idx]?TM[pixels[g.idx].t]:null);const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);setHovSector({sx,sy,unlocked:unlockedSet.has(sectorKey(sx,sy)),fill:sectorFills[sectorKey(sx,sy)]||0});}if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}};
-  const onMU=()=>{setDrag(false);if(pending.size>0)handleClaim();};
-  const onML=()=>{setHov(null);setHovSector(null);if(drag){setDrag(false);if(pending.size>0)handleClaim();}};
+  const [showConfirm,setShowConfirm]=useState(false);
+  const [confirmPayload,setConfirmPayload]=useState(null);
+
+  const requestClaim=()=>{
+    if(!active||pending.size===0)return;
+    const t=TM[active];const isRaid=mode==="RAID";
+    const cost=calcCost(pending);
+    const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;
+    const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;
+    setConfirmPayload({count:pending.size,cost,freeUsed,isRaid,bonus,teamName:t.name,teamColor:t.color,modeLabel:isRaid?"⚔️ RAID":"🏴 CLAIM"});
+    setShowConfirm(true);
+  };
+  const onMU=()=>{setDrag(false);if(pending.size>0)requestClaim();};
+  const onML=()=>{setHov(null);setHovSector(null);if(drag){setDrag(false);if(pending.size>0)requestClaim();}};
   const triggerFlash=(color,shake=false)=>{setFlashColor(color);setTimeout(()=>setFlashColor(null),300);if(shake){setShakeCanvas(true);setTimeout(()=>setShakeCanvas(false),500);}};
 
   // ── DYNAMIC PRICING ─────────────────────────────────────────────────────────
@@ -609,6 +621,37 @@ export default function App(){
         </div>
       </div>}
 
+      {/* CONFIRM CLAIM MODAL */}
+      {showConfirm&&confirmPayload&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}} onClick={e=>e.target===e.currentTarget&&(setShowConfirm(false),setPending(new Set()))}>
+        <div style={{background:"#09091c",border:`1px solid ${rgba(confirmPayload.teamColor,.4)}`,borderRadius:16,padding:"28px 26px",width:380,maxWidth:"94vw",textAlign:"center",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>
+          <div style={{fontSize:36,marginBottom:10}}>{confirmPayload.isRaid?"⚔️":"🏴"}</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:15,fontWeight:900,color:confirmPayload.teamColor,letterSpacing:2,marginBottom:4}}>{confirmPayload.modeLabel}</div>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.35)",marginBottom:18,letterSpacing:1}}>for {confirmPayload.teamName}</div>
+          <div style={{background:rgba(confirmPayload.teamColor,.08),border:`1px solid ${rgba(confirmPayload.teamColor,.2)}`,borderRadius:10,padding:"16px",marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Pixels</span>
+              <span style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:confirmPayload.teamColor}}>{confirmPayload.count}px</span>
+            </div>
+            {confirmPayload.freeUsed>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Free pixels used</span>
+              <span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700"}}>-{confirmPayload.freeUsed} 🎁</span>
+            </div>}
+            {confirmPayload.bonus>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Combo bonus</span>
+              <span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700"}}>+{confirmPayload.bonus} 🔥</span>
+            </div>}
+            <div style={{borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:8,display:"flex",justifyContent:"space-between"}}>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Total cost</span>
+              <span style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#C8FF00"}}>€{(confirmPayload.cost-confirmPayload.freeUsed).toFixed(2)}</span>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{setShowConfirm(false);setPending(new Set());}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid #1a1a2e",color:"#5a5a7a",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:700,fontSize:10}}>CANCEL</button>
+            <button onClick={()=>{setShowConfirm(false);handleClaim();}} style={{flex:2,padding:"11px",background:`linear-gradient(90deg,${confirmPayload.isRaid?"#FF4400,#FF0000":"#00F5FF,"+confirmPayload.teamColor})`,border:"none",color:"#040408",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:11,letterSpacing:1}}>{confirmPayload.modeLabel} →</button>
+          </div>
+        </div>
+      </div>}
+
       {/* RESET MODAL */}
       {showReset&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}} onClick={e=>e.target===e.currentTarget&&setShowReset(false)}>
         <div style={{background:"#09091c",border:"1px solid rgba(255,60,60,.4)",borderRadius:16,padding:"28px 26px",width:360,maxWidth:"94vw",textAlign:"center",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>
@@ -753,7 +796,7 @@ export default function App(){
               {pending.size>0&&<>
                 {freeUsedPreview>0&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700"}}>🎁{freeUsedPreview}FREE+</span>}
                 <span style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#C8FF00"}}>€{(pendingCost-freeUsedPreview).toFixed(2)}</span>
-                <button onClick={handleClaim} style={{padding:"4px 11px",background:`linear-gradient(90deg,${modeColor},${at.color})`,color:"#040408",border:"none",borderRadius:4,fontWeight:900,cursor:"pointer",fontSize:9,fontFamily:"'Orbitron',monospace",letterSpacing:1}}>{mode==="RAID"?"⚔ RAID!":"🏴 CLAIM!"}</button>
+                <button onClick={requestClaim} style={{padding:"4px 11px",background:`linear-gradient(90deg,${modeColor},${at.color})`,color:"#040408",border:"none",borderRadius:4,fontWeight:900,cursor:"pointer",fontSize:9,fontFamily:"'Orbitron',monospace",letterSpacing:1}}>{mode==="RAID"?"⚔ RAID!":"🏴 CLAIM!"}</button>
                 <button onClick={()=>setPending(new Set())} style={{background:"none",border:"none",color:"#3a3a5a",cursor:"pointer",fontSize:12}}>✕</button>
               </>}
               <button onClick={()=>{setActive(null);setPending(new Set());}} style={{padding:"3px 9px",background:"rgba(255,60,60,.08)",border:"1px solid rgba(255,60,60,.3)",borderRadius:4,color:"#ff6b6b",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:1,fontWeight:700}}>✕ DESELECT</button>
@@ -866,7 +909,7 @@ export default function App(){
       </div>
 
       {/* RESET FIXED BUTTON */}
-      
+      <button onClick={()=>setShowReset(true)} style={{position:"fixed",bottom:12,left:12,zIndex:500,background:"rgba(10,5,5,.92)",border:"1px solid rgba(255,60,60,.3)",borderRadius:7,padding:"6px 12px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#ff6b6b",letterSpacing:1,backdropFilter:"blur(6px)"}}>🔄 RESET GRID</button>
     </div>
   );
-} 
+}
