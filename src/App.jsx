@@ -456,11 +456,8 @@ export default function App(){
                 <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#3a3a5a",textAlign:"center",padding:"2px 0",letterSpacing:1}}>MINIMAP · CLICK</div>
               </div>
               {hov&&<div style={{position:"absolute",bottom:6,right:112,background:rgba(hov.color,.15),border:`1px solid ${hov.color}`,borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:hov.color,pointerEvents:"none"}}>{hov.name}</div>}
-              {!active&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(4,4,8,.7)",pointerEvents:"none",borderRadius:4}}>
-                <div style={{textAlign:"center"}}>
-                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,letterSpacing:3,color:"#1a1a3a"}}>⚔ SELECT YOUR FANDOM BELOW</div>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#111130",marginTop:3}}>2,000×2,000 GRID · 🛡 ALL PURCHASES AUTO-SHIELDED 24H</div>
-                </div>
+              {!active&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(4,4,8,.85))",padding:"16px 12px 8px",pointerEvents:"none",borderRadius:"0 0 4px 4px",textAlign:"center"}}>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,letterSpacing:3,color:"rgba(0,245,255,.5)"}}>⚔ SELECT A FANDOM BELOW TO CLAIM PIXELS</div>
               </div>}
             </div>
           </div>
