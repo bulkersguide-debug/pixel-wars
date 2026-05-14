@@ -309,8 +309,8 @@ export default function App(){
 
           {/* CANVAS */}
           <div style={{padding:"6px 6px 0",flexShrink:0,position:"relative"}}>
-            <div style={{border:`2px solid ${rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"default",position:"relative",animation:shakeCanvas?"shake .5s ease":undefined,boxShadow:`0 0 28px ${rgba(modeColor,.1)}`}}>
-              <canvas ref={cvs} width={CW} height={CH} style={{width:"100%",display:"block",imageRendering:"pixelated"}}
+            <div style={{border:`2px solid ${rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"default",position:"relative",animation:shakeCanvas?"shake .5s ease":undefined,boxShadow:`0 0 28px ${rgba(modeColor,.1)}`,maxHeight:"40vh"}}>
+              <canvas ref={cvs} width={CW} height={CH} style={{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"40vh",objectFit:"contain"}}
                 onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onML} onDragStart={e=>e.preventDefault()}/>
               <div style={{position:"absolute",top:6,left:6,background:rgba(modeColor,.12),border:`1px solid ${rgba(modeColor,.4)}`,borderRadius:4,padding:"2px 8px",fontFamily:"'Orbitron',monospace",fontSize:9,color:modeColor,pointerEvents:"none",letterSpacing:2}}>
                 {mode==="BUILD"?"🏗 BUILD":mode==="RAID"?"⚔️ RAID":"💥 SHOP"}
