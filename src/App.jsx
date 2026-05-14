@@ -455,7 +455,7 @@ export default function App(){
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#5a5a5a"}}>{myPixels}px</div>
             </div>
           </div>
-          <button onClick={()=>setShowReset(true)} style={{background:"rgba(255,50,50,.08)",border:"1px solid rgba(255,50,50,.25)",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#ff6b6b",letterSpacing:1}}>🔄 RESET</button>
+
         </div>
         <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
           {[["SOLD",totalSold.toLocaleString(),"#00F5FF"],["REVENUE",`€${totalSold}`,"#C8FF00"],["FANDOMS",board.length,"#FF2D78"]].map(([l,v,c])=>(
@@ -645,6 +645,10 @@ export default function App(){
           )}
         </div>
       </div>
+
+      {/* RESET — fixed bottom-left, always visible */}
+      <button onClick={()=>setShowReset(true)} style={{position:"fixed",bottom:14,left:14,zIndex:500,background:"rgba(10,5,5,.9)",border:"1px solid rgba(255,60,60,.35)",borderRadius:8,padding:"7px 13px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#ff6b6b",letterSpacing:1,backdropFilter:"blur(6px)",boxShadow:"0 2px 12px rgba(0,0,0,.5)"}}>🔄 RESET GRID</button>
+
     </div>
   );
 }
