@@ -59,8 +59,9 @@ const POWERUPS=[
 ];
 const RARITY_COLOR={COMMON:"#aaa",UNCOMMON:"#00CC44",RARE:"#0088FF",EPIC:"#AA00FF",LEGENDARY:"#FFD700"};
 const DISCORD_ID="1504550947295072328";
+const DISCORD_CHANNEL="1504550948541042819";
 const DISCORD_WIDGET=`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`;
-const DISCORD_INVITE="https://discord.gg/https://discord.gg/GbxBnr5D";
+const DISCORD_INVITE=`https://discord.com/invite/${DISCORD_ID}`;
 const EVENTS=[
   {icon:"⚡",label:"CHAOS HOUR",desc:"RAIDS 50% OFF!",duration:600,color:"#FF4400"},
   {icon:"💎",label:"MEGA BONUS",desc:"Buy 10px → get 5 FREE!",duration:300,color:"#FFD700"},
@@ -151,6 +152,7 @@ export default function App(){
   const [showPriceMap,setShowPriceMap]=useState(false);
   const [showConfirm,setShowConfirm]=useState(false);
   const [confirmPayload,setConfirmPayload]=useState(null);
+  const [showDiscord,setShowDiscord]=useState(false);
 
   const alreadyClaimedToday=streakData.last===todayStr();
   const currentSeasonNum=season.num;
@@ -927,18 +929,39 @@ export default function App(){
           </div>}
 
           {/* DISCORD TAB */}
-          {tab==="DISC"&&<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-            <div style={{padding:"8px 8px 6px",borderBottom:"1px solid #1a1a30",flexShrink:0}}>
-              <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
-                <svg width="16" height="12" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
-                <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#5865F2",letterSpacing:1}}>WAR COUNCIL</span>
-              </div>
-              <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{display:"block",padding:"7px",background:"linear-gradient(90deg,#5865F2,#7289DA)",borderRadius:7,textAlign:"center",textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#fff",letterSpacing:1}}>JOIN SERVER →</a>
-            </div>
-            <iframe src={DISCORD_WIDGET} width="100%" style={{border:"none",flex:1,minHeight:0,background:"#36393f"}} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" title="Discord"/>
+          {tab==="DISC"&&<div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16,gap:12,textAlign:"center"}}>
+            <svg width="40" height="30" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#5865F2",letterSpacing:2}}>WAR COUNCIL</div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",lineHeight:1.7}}>Chat opens as a<br/>floating panel →</div>
+            <button onClick={()=>setShowDiscord(s=>!s)} style={{padding:"10px 16px",background:"linear-gradient(90deg,#5865F2,#7289DA)",border:"none",color:"#fff",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,letterSpacing:1}}>{showDiscord?"CLOSE CHAT":"OPEN CHAT"}</button>
           </div>}
 
         </div>
+      </div>
+
+      {/* DISCORD FLOATING CHAT */}
+      <div style={{position:"fixed",bottom:56,right:12,zIndex:600,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
+        {showDiscord&&<div style={{width:340,height:480,background:"#36393f",borderRadius:12,overflow:"hidden",border:"2px solid #5865F2",boxShadow:"0 8px 40px rgba(88,101,242,.4),0 0 0 1px rgba(88,101,242,.2)",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)",display:"flex",flexDirection:"column"}}>
+          <div style={{background:"#202225",padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <svg width="18" height="14" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
+              <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#fff",letterSpacing:1}}>PIXELS OF WAR</span>
+            </div>
+            <button onClick={()=>setShowDiscord(false)} style={{background:"none",border:"none",color:"#72767d",cursor:"pointer",fontSize:16,lineHeight:1,padding:"2px 4px"}}>✕</button>
+          </div>
+          <iframe
+            src={`https://e.widgetbot.io/channels/${DISCORD_ID}/${DISCORD_CHANNEL}`}
+            style={{flex:1,border:"none",width:"100%"}}
+            sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
+            title="Discord Chat"
+          />
+        </div>}
+        <button onClick={()=>setShowDiscord(s=>!s)} style={{width:48,height:48,borderRadius:"50%",background:showDiscord?"#5865F2":"linear-gradient(135deg,#5865F2,#7289DA)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 20px rgba(88,101,242,${showDiscord?.6:.3})`,transition:"all .2s",transform:showDiscord?"scale(1.1)":"scale(1)"}}>
+          {showDiscord
+            ?<span style={{color:"#fff",fontSize:18,lineHeight:1}}>✕</span>
+            :<svg width="24" height="18" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="white"/></svg>
+          }
+        </button>
       </div>
 
       {/* RESET BUTTON */}
