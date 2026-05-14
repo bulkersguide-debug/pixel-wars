@@ -1,23 +1,24 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase, isOnline } from "./supabase";
 
-// ── GRID & SECTOR CONFIG ──────────────────────────────────────────────────────
+// ── GRID & SECTOR CONFIG ───────────────────────────────────────────────────────
 const GW=2000,GH=2000,CELL=5,VW=180,VH=117,CW=VW*CELL,CH=VH*CELL,MM=200,MMS=GW/MM;
-const SECTOR=100; // pixels per sector side (20×20 sectors total)
-const NS=GW/SECTOR; // 20 sectors per axis
+const SECTOR=100;
+const NS=GW/SECTOR;
 const SEASON_DAYS=90;
 const DECAY_WARN_DAYS=30;
 const DECAY_EXPIRE_DAYS=60;
 
-// ── SEASON THEMES ─────────────────────────────────────────────────────────────
+// ── SEASON THEMES ──────────────────────────────────────────────────────────────
 const THEMES=[
-  {num:1,name:"GAMING vs ANIME vs MUSIC",icon:"⚔️",desc:"The original culture war — three worlds collide",cats:["🎮 Gaming","🎌 Anime","🎵 Music"]},
-  {num:2,name:"WORLD CUP",icon:"🌍",desc:"Nation vs nation — which country dominates the grid?",cats:["🌍 Countries"]},
-  {num:3,name:"POP CULTURE",icon:"🎬",desc:"Movies, TV shows and streaming franchises battle it out",cats:["🎬 Movies","📺 TV","🎭 Franchises"]},
-  {num:4,name:"SPORTS EMPIRES",icon:"🏆",desc:"Football clubs, NBA teams and esports organisations go to war",cats:["⚽ Football","🏀 Basketball","🎮 Esports"]},
+  {num:1,name:"GAMING vs ANIME vs MUSIC",icon:"⚔️",desc:"The original culture war",cats:["🎮 Gaming","🎌 Anime","🎵 Music"]},
+  {num:2,name:"WORLD CUP",icon:"🌍",desc:"Nation vs nation — which country dominates?",cats:["🌍 Countries"]},
+  {num:3,name:"POP CULTURE",icon:"🎬",desc:"Movies, TV and streaming franchises battle",cats:["🎬 Movies","📺 TV","🎭 Franchises"]},
+  {num:4,name:"SPORTS EMPIRES",icon:"🏆",desc:"Clubs, teams and esports orgs go to war",cats:["⚽ Football","🏀 Basketball","🎮 Esports"]},
 ];
 
-// ── COLORS ────────────────────────────────────────────────────────────────────
+// ── COLORS ─────────────────────────────────────────────────────────────────────
 const hashColor=(n)=>{let h=0;for(let i=0;i<n.length;i++)h=(Math.imul(31,h)+n.charCodeAt(i))|0;const hue=Math.abs(h)%360,sat=65+(Math.abs(h>>8)%25),lit=50+(Math.abs(h>>16)%15),s=sat/100,l=lit/100,a=s*Math.min(l,1-l),f=x=>{const k=(x+hue/30)%12,c=l-a*Math.max(Math.min(k-3,9-k,1),-1);return Math.round(255*c).toString(16).padStart(2,"0")};return`#${f(0)}${f(8)}${f(4)}`;};
 const KC={"Fortnite":"#00B4F0","Minecraft":"#62B32F","Valorant":"#FF4655","Apex Legends":"#DA292A","League of Legends":"#0BC4E3","GTA V":"#00853E","Among Us":"#C51111","Rocket League":"#0092CF","Overwatch 2":"#F99E1A","Elden Ring":"#B0884A","Cyberpunk 2077":"#FCEE09","God of War":"#AA0000","Genshin Impact":"#0095FF","Pokémon":"#FFCB05","FIFA / EA FC 24":"#2980B9","Naruto":"#FF6B35","One Piece":"#E31E24","Dragon Ball Z":"#FF8C00","Bleach":"#3355BB","My Hero Academia":"#2E86C1","Demon Slayer":"#CC3355","Jujutsu Kaisen":"#6B21A8","Chainsaw Man":"#CC1122","Attack on Titan":"#7A6640","Death Note":"#CC0000","One Punch Man":"#FFD700","Haikyuu!!":"#FF6600","Blue Lock":"#1B3FA0","Spirited Away":"#CC6699","BTS":"#9747FF","BLACKPINK":"#FF1493","Stray Kids":"#CC0033","Aespa":"#00AAFF","NewJeans":"#FF6699","IVE":"#3355AA","TWICE":"#FF9EC4","NCT 127":"#00AACC","ENHYPEN":"#222255","TXT":"#5599FF","ATEEZ":"#CC4400","(G)I-DLE":"#CC0055","Drake":"#BF8E3B","Travis Scott":"#C7A444","Kendrick Lamar":"#CC0000","Eminem":"#5C8AFF","Tyler, the Creator":"#AACC00","Post Malone":"#CC8866","Taylor Swift":"#A855F7","Billie Eilish":"#00DD88","Ariana Grande":"#CC88BB","Dua Lipa":"#9900FF","Olivia Rodrigo":"#6622BB","The Weeknd":"#CC0000","Bruno Mars":"#CC8800","Bad Bunny":"#00CC44","Daft Punk":"#FFD700","Skrillex":"#00FF88","Martin Garrix":"#0066FF","Linkin Park":"#8C1C1C","My Chemical Romance":"#CC0000","Arctic Monkeys":"#885522","Twenty One Pilots":"#FFCC00","Tame Impala":"#FF9900","Metallica":"#777777"};
 const tc=(n)=>KC[n]||hashColor(n);
@@ -26,43 +27,16 @@ const rgba=(hex,a)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,
 const todayStr=()=>new Date().toISOString().split("T")[0];
 const yesterdayStr=()=>new Date(Date.now()-86400000).toISOString().split("T")[0];
 
-// ── SECTOR HELPERS ────────────────────────────────────────────────────────────
+// ── SECTOR HELPERS ─────────────────────────────────────────────────────────────
 const sectorOf=(idx)=>[Math.floor((idx%GW)/SECTOR),Math.floor(Math.floor(idx/GW)/SECTOR)];
 const sectorKey=(sx,sy)=>`${sx},${sy}`;
 const centerDist=(sx,sy)=>Math.max(Math.abs(sx-9.5),Math.abs(sy-9.5));
-
-// Base price by distance from center
-const sectorBasePrice=(sx,sy)=>{
-  const d=centerDist(sx,sy);
-  if(d<2)return 3; if(d<4)return 2; if(d<7)return 1.5; return 1;
-};
-
-// Price multiplier based on how full a sector is
-const fillMultiplier=(pct)=>{
-  if(pct<0.25)return 1;
-  if(pct<0.5)return 1.3;
-  if(pct<0.75)return 1.7;
-  if(pct<0.9)return 2.5;
-  return 4;
-};
-
-// Initial unlocked sectors — center 4
+const sectorBasePrice=(sx,sy)=>{const d=centerDist(sx,sy);if(d<2)return 3;if(d<4)return 2;if(d<7)return 1.5;return 1;};
+const fillMultiplier=(pct)=>{if(pct<0.25)return 1;if(pct<0.5)return 1.3;if(pct<0.75)return 1.7;if(pct<0.9)return 2.5;return 4;};
 const INIT_SECTORS=[[9,9],[9,10],[10,9],[10,10]];
+const adjacentSectors=(unlocked)=>{const set=new Set(unlocked.map(([x,y])=>sectorKey(x,y)));const adj=new Set();unlocked.forEach(([x,y])=>{[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dx,dy])=>{const nx=x+dx,ny=y+dy;if(nx>=0&&nx<NS&&ny>=0&&ny<NS&&!set.has(sectorKey(nx,ny)))adj.add(sectorKey(nx,ny));});});return[...adj].map(k=>k.split(",").map(Number));};
 
-// Get adjacent sectors to unlock next ring
-const adjacentSectors=(unlocked)=>{
-  const set=new Set(unlocked.map(([x,y])=>sectorKey(x,y)));
-  const adj=new Set();
-  unlocked.forEach(([x,y])=>{
-    [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dx,dy])=>{
-      const nx=x+dx,ny=y+dy;
-      if(nx>=0&&nx<NS&&ny>=0&&ny<NS&&!set.has(sectorKey(nx,ny)))adj.add(sectorKey(nx,ny));
-    });
-  });
-  return [...adj].map(k=>k.split(",").map(Number));
-};
-
-// ── CATALOG ───────────────────────────────────────────────────────────────────
+// ── CATALOG ────────────────────────────────────────────────────────────────────
 const CAT_ACCENT={"🎮 Gaming":"#00F5FF","🎌 Anime":"#FF2D78","🎵 Music":"#C8FF00"};
 const CAT=[
   {cat:"🎮 Gaming",sub:"Battle Royale",t:["Fortnite","Apex Legends","PUBG","Warzone","Fall Guys"]},
@@ -85,9 +59,7 @@ const ALL=[];
 CAT.forEach(e=>e.t.forEach(n=>ALL.push({id:`${e.cat}|${e.sub}|${n}`,name:n,color:tc(n),cat:e.cat,sub:e.sub})));
 const TM=Object.fromEntries(ALL.map(t=>[t.id,t]));
 const slugify=(n)=>n.toLowerCase().replace(/[^a-z0-9\s]/g,"").replace(/\s+/g,"-").replace(/-+/g,"-").trim();
-
 const streakReward=(d)=>{if(d===1)return{px:1,bonus:null};if(d===2)return{px:1,bonus:null};if(d===3)return{px:2,bonus:null};if(d===4)return{px:3,bonus:null};if(d===5)return{px:5,bonus:"🔥 5-Day Warrior!"};if(d===6)return{px:5,bonus:null};if(d===7)return{px:10,bonus:"🏆 Week Legend!"};if(d%30===0)return{px:30,bonus:"👑 Month Champion!"};if(d%14===0)return{px:15,bonus:"💎 Fortnight Fighter!"};if(d%7===0)return{px:10,bonus:"⚡ Weekly Veteran!"};return{px:5,bonus:null};};
-
 const POWERUPS=[
   {id:"bomb",icon:"💣",name:"CLUSTER BOMB",desc:"Destroy 8×8 unshielded enemy zone",price:10,color:"#FF4400",rarity:"RARE"},
   {id:"storm",icon:"⚡",name:"PIXEL STORM",desc:"Claim 50 random empty pixels + shields",price:15,color:"#FFCC00",rarity:"EPIC"},
@@ -95,7 +67,7 @@ const POWERUPS=[
   {id:"snipe",icon:"🎯",name:"SNIPER",desc:"Steal 1 unshielded enemy pixel",price:3,color:"#FF2D78",rarity:"COMMON"},
   {id:"airdrop",icon:"🪂",name:"AIRDROP",desc:"Claim 15×15 zone in viewport",price:25,color:"#C8FF00",rarity:"LEGENDARY"},
   {id:"nuke",icon:"☢️",name:"NUKE",desc:"Wipe 20×20 unshielded zone anywhere",price:50,color:"#FF0000",rarity:"LEGENDARY"},
-  {id:"renew",icon:"♻️",name:"RENEWAL SHIELD",desc:"Renew 50 decaying pixels — prevent expiry",price:5,color:"#00FFAA",rarity:"UNCOMMON"},
+  {id:"renew",icon:"♻️",name:"RENEWAL SHIELD",desc:"Renew 50 decaying pixels",price:5,color:"#00FFAA",rarity:"UNCOMMON"},
   {id:"double",icon:"✨",name:"DOUBLE OR NOTHING",desc:"Gamble last buy — 2× or 0×",price:5,color:"#BB88FF",rarity:"UNCOMMON"},
 ];
 const RARITY_COLOR={COMMON:"#aaaaaa",UNCOMMON:"#00CC44",RARE:"#0088FF",EPIC:"#AA00FF",LEGENDARY:"#FFD700"};
@@ -111,45 +83,89 @@ const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const RANKS=[{name:"BRONZE",min:0,max:49,icon:"🥉",color:"#CD7F32"},{name:"SILVER",min:50,max:199,icon:"🥈",color:"#C0C0C0"},{name:"GOLD",min:200,max:499,icon:"🥇",color:"#FFD700"},{name:"PLATINUM",min:500,max:999,icon:"💎",color:"#00EAFF"},{name:"DIAMOND",min:1000,max:2499,icon:"💠",color:"#BB88FF"},{name:"LEGEND",min:2500,max:Infinity,icon:"👑",color:"#FF2D78"}];
 const getRank=(px)=>RANKS.find(r=>px>=r.min&&px<=r.max)||RANKS[0];
 
+// ── SUPABASE HELPERS ───────────────────────────────────────────────────────────
+const dbRowToPixel=(row)=>({t:row.team_id,at:row.claimed_at});
+
+async function dbLoadPixels(seasonNum){
+  if(!supabase)return null;
+  const{data,error}=await supabase.from("pixels").select("idx,team_id,claimed_at").eq("season_num",seasonNum);
+  if(error){console.error("load pixels:",error);return null;}
+  const map={};
+  data.forEach(r=>{map[r.idx]=dbRowToPixel(r);});
+  return map;
+}
+
+async function dbUpsertPixels(pending,teamId,seasonNum){
+  if(!supabase)return;
+  const now=Date.now();
+  const rows=Array.from(pending).map(idx=>({idx,season_num:seasonNum,team_id:teamId,claimed_at:now}));
+  // Supabase has a 1000-row upsert limit; chunk if needed
+  for(let i=0;i<rows.length;i+=500){
+    await supabase.from("pixels").upsert(rows.slice(i,i+500),{onConflict:"idx,season_num"});
+  }
+}
+
+async function dbDeletePixels(idxArr,seasonNum){
+  if(!supabase||!idxArr.length)return;
+  for(let i=0;i<idxArr.length;i+=500){
+    await supabase.from("pixels").delete().in("idx",idxArr.slice(i,i+500)).eq("season_num",seasonNum);
+  }
+}
+
+async function dbLoadSeason(){
+  if(!supabase)return null;
+  const{data}=await supabase.from("seasons").select("*").order("num",{ascending:false}).limit(1);
+  return data?.[0]||null;
+}
+
+async function dbSaveSeason(s){
+  if(!supabase)return;
+  await supabase.from("seasons").upsert({num:s.num,start_date:s.startDate,theme_index:s.theme,winners:s.winners});
+}
+
+async function dbLoadSectors(seasonNum){
+  if(!supabase)return null;
+  const{data}=await supabase.from("sectors").select("sx,sy").eq("season_num",seasonNum);
+  return data?data.map(r=>[r.sx,r.sy]):null;
+}
+
+async function dbSaveSectors(sectors,seasonNum){
+  if(!supabase)return;
+  const rows=sectors.map(([sx,sy])=>({season_num:seasonNum,sx,sy}));
+  await supabase.from("sectors").upsert(rows,{onConflict:"season_num,sx,sy"});
+}
+
+async function dbClearSeason(seasonNum){
+  if(!supabase)return;
+  await supabase.from("pixels").delete().eq("season_num",seasonNum);
+  await supabase.from("sectors").delete().eq("season_num",seasonNum);
+}
+
+// ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 export default function App(){
   const cvs=useRef(null),mmCvs=useRef(null);
   const navigate=useNavigate();
+  const channelRef=useRef(null);
 
-  // ── Core state ─────────────────────────────────────────────────────────────
-  // pixels: {idx: {t:teamId, at:timestamp}} — NEW format with timestamps
-  const [pixels,setPixels]=useState(()=>{
-    try{
-      const s=localStorage.getItem("pw2k_v2");
-      if(s)return JSON.parse(s);
-      // Migrate old format
-      const old=localStorage.getItem("pw2k");
-      if(old){const o=JSON.parse(old),now=Date.now();return Object.fromEntries(Object.entries(o).map(([k,v])=>[k,{t:v,at:now}]));}
-      return{};
-    }catch{return{};}
-  });
+  // ── Core state (starts empty; loaded from Supabase / localStorage on mount) ─
+  const [pixels,setPixels]=useState({});
   const [shields,setShields]=useState(()=>{try{const s=JSON.parse(localStorage.getItem("pow_shields")||"{}");const now=Date.now();return Object.fromEntries(Object.entries(s).filter(([,e])=>e>now));}catch{return{};}});
   const [freePixels,setFreePixels]=useState(()=>{try{return parseInt(localStorage.getItem("pow_free")||"0");}catch{return 0;}});
   const [streakData,setStreakData]=useState(()=>{try{return JSON.parse(localStorage.getItem("pow_streak")||'{"days":0,"last":"","total":0}');}catch{return{days:0,last:"",total:0};}});
 
-  // ── Season state ───────────────────────────────────────────────────────────
-  const [season,setSeason]=useState(()=>{
-    try{return JSON.parse(localStorage.getItem("pow_season")||`{"num":1,"startDate":"${new Date().toISOString()}","theme":0,"winners":[]}`);}
-    catch{return{num:1,startDate:new Date().toISOString(),theme:0,winners:[]};}
-  });
+  // ── Season & sector state ───────────────────────────────────────────────────
+  const [season,setSeason]=useState({num:1,startDate:new Date().toISOString(),theme:0,winners:[]});
+  const [unlockedSectors,setUnlockedSectors]=useState(INIT_SECTORS);
+  const [loading,setLoading]=useState(true);
 
-  // ── Sector state ───────────────────────────────────────────────────────────
-  const [unlockedSectors,setUnlockedSectors]=useState(()=>{
-    try{return JSON.parse(localStorage.getItem("pow_sectors")||JSON.stringify(INIT_SECTORS));}
-    catch{return INIT_SECTORS;}
-  });
-
-  // UI state
-  const [vx,setVx]=useState(900);const [vy,setVy]=useState(900); // start near center
+  // ── UI state ────────────────────────────────────────────────────────────────
+  const [vx,setVx]=useState(900);const [vy,setVy]=useState(900);
   const [active,setActive]=useState(null);
   const [pending,setPending]=useState(new Set());
   const [drag,setDrag]=useState(false);
   const [orig,setOrig]=useState(null);
   const [hov,setHov]=useState(null);
+  const [hovSector,setHovSector]=useState(null);
   const [mode,setMode]=useState("BUILD");
   const [selCat,setSelCat]=useState("All");
   const [selSub,setSelSub]=useState("All");
@@ -169,76 +185,141 @@ export default function App(){
   const [showSeasonEnd,setShowSeasonEnd]=useState(false);
   const [newSectorAlert,setNewSectorAlert]=useState(null);
   const [showPriceMap,setShowPriceMap]=useState(false);
-  const [hovSector,setHovSector]=useState(null);
 
   const alreadyClaimedToday=streakData.last===todayStr();
+  const currentSeasonNum=season.num;
 
-  // Season countdown
+  const pushToast=useCallback((msg,color,dur=3000)=>{
+    const id=Date.now()+Math.random();
+    setToasts(t=>[...t,{id,msg,color}]);
+    setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),dur);
+  },[]);
+
+  // ── DATA LOAD (mount) ───────────────────────────────────────────────────────
+  useEffect(()=>{
+    async function load(){
+      setLoading(true);
+      if(isOnline){
+        // Load season
+        const dbSeason=await dbLoadSeason();
+        let sNum=1,sObj;
+        if(dbSeason){
+          sObj={num:dbSeason.num,startDate:dbSeason.start_date,theme:dbSeason.theme_index,winners:dbSeason.winners||[]};
+          setSeason(sObj);sNum=dbSeason.num;
+        }
+        // Load sectors
+        const dbSectors=await dbLoadSectors(sNum);
+        if(dbSectors&&dbSectors.length)setUnlockedSectors(dbSectors);
+        // Load pixels
+        const px=await dbLoadPixels(sNum);
+        if(px)setPixels(px);
+        // Subscribe realtime
+        setupRealtime(sNum);
+        pushToast("🌐 MULTIPLAYER ACTIVE — sharing grid with all players","#00F5FF",5000);
+      }else{
+        // Fallback: localStorage
+        try{
+          const px=JSON.parse(localStorage.getItem("pw2k_v2")||"{}");setPixels(px);
+          const se=JSON.parse(localStorage.getItem("pow_season")||`{"num":1,"startDate":"${new Date().toISOString()}","theme":0,"winners":[]}`);setSeason(se);
+          const sec=JSON.parse(localStorage.getItem("pow_sectors")||JSON.stringify(INIT_SECTORS));setUnlockedSectors(sec);
+        }catch{}
+        pushToast("⚠️ OFFLINE MODE — add Supabase env vars for multiplayer","#FF4400",6000);
+      }
+      setLoading(false);
+    }
+    load();
+    return()=>{if(channelRef.current)supabase?.removeChannel(channelRef.current);};
+  },[]);
+
+  // ── REALTIME SUBSCRIPTION ──────────────────────────────────────────────────
+  function setupRealtime(sNum){
+    if(!supabase)return;
+    if(channelRef.current)supabase.removeChannel(channelRef.current);
+    const ch=supabase.channel(`game-s${sNum}`)
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"pixels",filter:`season_num=eq.${sNum}`},(payload)=>{
+        setPixels(prev=>({...prev,[payload.new.idx]:dbRowToPixel(payload.new)}));
+      })
+      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"pixels",filter:`season_num=eq.${sNum}`},(payload)=>{
+        setPixels(prev=>({...prev,[payload.new.idx]:dbRowToPixel(payload.new)}));
+      })
+      .on("postgres_changes",{event:"DELETE",schema:"public",table:"pixels",filter:`season_num=eq.${sNum}`},(payload)=>{
+        setPixels(prev=>{const next={...prev};delete next[payload.old.idx];return next;});
+      })
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"sectors",filter:`season_num=eq.${sNum}`},(payload)=>{
+        setUnlockedSectors(prev=>{
+          const exists=prev.some(([x,y])=>x===payload.new.sx&&y===payload.new.sy);
+          return exists?prev:[...prev,[payload.new.sx,payload.new.sy]];
+        });
+      })
+      .subscribe();
+    channelRef.current=ch;
+  }
+
+  // ── SAVE to localStorage (fallback mode) ───────────────────────────────────
+  useEffect(()=>{
+    if(!isOnline&&!loading){
+      try{localStorage.setItem("pw2k_v2",JSON.stringify(pixels));}catch{}
+    }
+  },[pixels,loading]);
+
+  // ── INIT (URL fandom, streak) ───────────────────────────────────────────────
+  useEffect(()=>{
+    const lk=document.createElement("link");
+    lk.href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap";
+    lk.rel="stylesheet";document.head.appendChild(lk);
+    const p=new URLSearchParams(window.location.search).get("fandom");
+    if(p){const f=ALL.find(t=>slugify(t.name)===p);if(f)setTimeout(()=>setActive(f.id),600);}
+    const today=todayStr();
+    const saved=JSON.parse(localStorage.getItem("pow_streak")||'{"days":0,"last":"","total":0}');
+    if(saved.last!==today){
+      const nd=saved.last===yesterdayStr()?saved.days+1:1;
+      setDailyInfo({days:nd,reward:streakReward(nd)});
+      setTimeout(()=>setShowDaily(true),1400);
+    }
+  },[]);
+
+  // ── SEASON COUNTDOWN ────────────────────────────────────────────────────────
   const seasonDaysLeft=useMemo(()=>{
     const end=new Date(new Date(season.startDate).getTime()+SEASON_DAYS*86400000);
     return Math.max(0,Math.ceil((end-Date.now())/86400000));
   },[season]);
 
-  // Sector fill percentages
+  useEffect(()=>{if(seasonDaysLeft===0&&!showSeasonEnd&&!loading)setShowSeasonEnd(true);},[seasonDaysLeft,loading]);
+
+  // ── SECTOR FILL & AUTO-UNLOCK ───────────────────────────────────────────────
+  const unlockedSet=useMemo(()=>new Set(unlockedSectors.map(([x,y])=>sectorKey(x,y))),[unlockedSectors]);
+
   const sectorFills=useMemo(()=>{
     const fills={};
     unlockedSectors.forEach(([sx,sy])=>{
-      const key=sectorKey(sx,sy);
-      let count=0;
+      let cnt=0;
       for(let py=sy*SECTOR;py<(sy+1)*SECTOR;py++)
-        for(let px=sx*SECTOR;px<(px+1)*SECTOR;px++){
-          if(pixels[py*GW+px])count++;
-        }
-      fills[key]=count/(SECTOR*SECTOR);
+        for(let px=sx*SECTOR;px<(sx+1)*SECTOR;px++){if(pixels[py*GW+px])cnt++;}
+      fills[sectorKey(sx,sy)]=cnt/(SECTOR*SECTOR);
     });
     return fills;
   },[pixels,unlockedSectors]);
 
-  const unlockedSet=useMemo(()=>new Set(unlockedSectors.map(([x,y])=>sectorKey(x,y))),[unlockedSectors]);
-
-  // Check sector unlocks
   useEffect(()=>{
-    const totalFill=Object.values(sectorFills).reduce((a,b)=>a+b,0)/Math.max(1,unlockedSectors.length);
-    if(totalFill>=0.7){
-      const newSectors=adjacentSectors(unlockedSectors).slice(0,8);
-      if(newSectors.length>0){
-        const next=[...unlockedSectors,...newSectors];
-        setUnlockedSectors(next);
-        localStorage.setItem("pow_sectors",JSON.stringify(next));
-        setNewSectorAlert({count:newSectors.length,sectors:newSectors});
+    if(loading)return;
+    const avg=Object.values(sectorFills).reduce((a,b)=>a+b,0)/Math.max(1,unlockedSectors.length);
+    if(avg>=0.7){
+      const next=adjacentSectors(unlockedSectors).slice(0,8);
+      if(next.length>0){
+        const all=[...unlockedSectors,...next];
+        setUnlockedSectors(all);
+        if(isOnline)dbSaveSectors(next,currentSeasonNum);
+        else{try{localStorage.setItem("pow_sectors",JSON.stringify(all));}catch{}}
+        setNewSectorAlert({count:next.length});
         setTimeout(()=>setNewSectorAlert(null),8000);
-        pushToast(`🔓 ${newSectors.length} NEW SECTORS UNLOCKED! Grid expanding!`,"#C8FF00",6000);
+        pushToast(`🔓 ${next.length} NEW SECTORS UNLOCKED! Grid expanding!`,"#C8FF00",6000);
       }
     }
-  },[sectorFills]);
+  },[sectorFills,loading]);
 
-  // Check season end
-  useEffect(()=>{
-    if(seasonDaysLeft===0&&!showSeasonEnd)setShowSeasonEnd(true);
-  },[seasonDaysLeft]);
-
-  // ── Init ────────────────────────────────────────────────────────────────────
-  useEffect(()=>{
-    const lk=document.createElement("link");
-    lk.href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap";
-    lk.rel="stylesheet";document.head.appendChild(lk);
-    const urlParams=new URLSearchParams(window.location.search);
-    const fandomSlug=urlParams.get("fandom");
-    if(fandomSlug){const found=ALL.find(t=>slugify(t.name)===fandomSlug);if(found)setTimeout(()=>setActive(found.id),500);}
-    const today=todayStr();
-    const saved=JSON.parse(localStorage.getItem("pow_streak")||'{"days":0,"last":"","total":0}');
-    if(saved.last!==today){
-      const yesterday=yesterdayStr();
-      const newDays=saved.last===yesterday?saved.days+1:1;
-      const reward=streakReward(newDays);
-      setDailyInfo({days:newDays,reward});
-      setTimeout(()=>setShowDaily(true),1200);
-    }
-  },[]);
-
-  // ── Daily claim ─────────────────────────────────────────────────────────────
+  // ── DAILY CLAIM ─────────────────────────────────────────────────────────────
   const claimDaily=()=>{
-    if(!dailyInfo||streakData.last===todayStr())return;
+    if(!dailyInfo||alreadyClaimedToday)return;
     const today=todayStr();
     const ns={days:dailyInfo.days,last:today,total:(streakData.total||0)+1};
     setStreakData(ns);localStorage.setItem("pow_streak",JSON.stringify(ns));
@@ -247,45 +328,46 @@ export default function App(){
     if(dailyInfo.reward.bonus)setTimeout(()=>pushToast(dailyInfo.reward.bonus,"#FF2D78",4000),800);
     setDailyInfo(null);setShowDaily(false);
   };
-  const openDailyModal=()=>{if(alreadyClaimedToday)pushToast("✅ Already claimed today! Come back tomorrow 🔥","#FFD700",3000);else setShowDaily(true);};
+  const openDailyModal=()=>{if(alreadyClaimedToday)pushToast("✅ Already claimed! Come back tomorrow 🔥","#FFD700",3000);else setShowDaily(true);};
 
-  // ── Season end ──────────────────────────────────────────────────────────────
-  const startNewSeason=()=>{
-    const nextTheme=(season.theme+1)%THEMES.length;
-    // Find winner
+  // ── NEW SEASON ──────────────────────────────────────────────────────────────
+  const startNewSeason=async()=>{
     const cnt={};Object.values(pixels).forEach(p=>{if(p?.t)cnt[p.t]=(cnt[p.t]||0)+1;});
     const winner=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
     const winnerTeam=winner?TM[winner[0]]:null;
+    const nextTheme=(season.theme+1)%THEMES.length;
     const ns={num:season.num+1,startDate:new Date().toISOString(),theme:nextTheme,
       winners:[...season.winners,{season:season.num,team:winnerTeam?.name||"Unknown",pixels:winner?winner[1]:0,theme:THEMES[season.theme].name}]};
-    setSeason(ns);localStorage.setItem("pow_season",JSON.stringify(ns));
-    // Reset grid
-    setPixels({});setShields({});setMyPixels(0);
-    setUnlockedSectors(INIT_SECTORS);localStorage.setItem("pow_sectors",JSON.stringify(INIT_SECTORS));
-    localStorage.removeItem("pw2k_v2");localStorage.removeItem("pow_shields");
-    pushToast(`🎉 SEASON ${ns.num} STARTED! Theme: ${THEMES[nextTheme].name}`,"#FFD700",6000);
+    if(isOnline){
+      await dbClearSeason(season.num);
+      await dbSaveSeason(ns);
+      await dbSaveSectors(INIT_SECTORS,ns.num);
+    }else{
+      try{["pw2k_v2","pow_sectors"].forEach(k=>localStorage.removeItem(k));localStorage.setItem("pow_season",JSON.stringify(ns));localStorage.setItem("pow_sectors",JSON.stringify(INIT_SECTORS));}catch{}
+    }
+    setSeason(ns);setPixels({});setShields({});setMyPixels(0);setUnlockedSectors(INIT_SECTORS);
+    if(isOnline)setupRealtime(ns.num);
+    pushToast(`🎉 SEASON ${ns.num} STARTED! ${THEMES[nextTheme].icon} ${THEMES[nextTheme].name}`,"#FFD700",6000);
     setShowSeasonEnd(false);
   };
 
-  // ── Live feed ───────────────────────────────────────────────────────────────
+  // ── LIVE FEED ───────────────────────────────────────────────────────────────
   useEffect(()=>{
-    const add=()=>{
-      const t1=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];let t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];while(t2===t1)t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];
-      const acts=["claimed","raided","shielded","renewed"];const action=acts[randInt(0,acts.length-1)];
-      const px=randInt(1,60);const icon={"claimed":"🏴","raided":"⚔️","shielded":"🛡️","renewed":"♻️"}[action];
-      setFeed(f=>[{id:Date.now()+Math.random(),icon,team:t1,msg:action==="claimed"?`claimed ${px}px`:action==="raided"?`RAIDED ${t2}`:action==="renewed"?`renewed ${px}px`:action==="shielded"?`shielded territory`:"",color:tc(t1),ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"})},...f].slice(0,40));
-    };
+    const add=()=>{const t1=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];let t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];while(t2===t1)t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];const acts=["claimed","raided","shielded","renewed"];const action=acts[randInt(0,acts.length-1)];const px=randInt(1,60);const icon={"claimed":"🏴","raided":"⚔️","shielded":"🛡️","renewed":"♻️"}[action];setFeed(f=>[{id:Date.now()+Math.random(),icon,team:t1,msg:action==="claimed"?`claimed ${px}px`:action==="raided"?`RAIDED ${t2}`:action==="renewed"?`renewed ${px}px`:`shielded territory`,color:tc(t1),ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"})},...f].slice(0,40));};
     add();const iv=setInterval(add,randInt(2500,5500));return()=>clearInterval(iv);
   },[]);
 
-  // ── Events ──────────────────────────────────────────────────────────────────
+  // ── EVENTS ──────────────────────────────────────────────────────────────────
   useEffect(()=>{
     const start=()=>{const ev=EVENTS[randInt(0,EVENTS.length-1)];setEvent(ev);setEventTimer(ev.duration);pushToast(`${ev.icon} ${ev.label}! ${ev.desc}`,"#FFD700",4000);};
     const iv=setInterval(()=>setEventTimer(t=>{if(t<=1){setEvent(null);setTimeout(start,randInt(15000,30000));return 0;}return t-1;}),1000);
     setTimeout(start,6000);return()=>clearInterval(iv);
   },[]);
 
-  // ── Canvas draw ─────────────────────────────────────────────────────────────
+  // ── ESCAPE KEY ──────────────────────────────────────────────────────────────
+  useEffect(()=>{const f=(e)=>{if(e.key==="Escape"){setActive(null);setPending(new Set());}};window.addEventListener("keydown",f);return()=>window.removeEventListener("keydown",f);},[]);
+
+  // ── CANVAS DRAW ─────────────────────────────────────────────────────────────
   useEffect(()=>{
     const c=cvs.current;if(!c)return;
     const ctx=c.getContext("2d");
@@ -302,130 +384,81 @@ export default function App(){
         const age=px?now-px.at:0;
         const isDecaying=age>DECAY_WARN_DAYS*86400000;
         const isExpired=age>DECAY_EXPIRE_DAYS*86400000;
-
         if(!isUnlocked){
-          // Locked sector — dark with pattern
-          ctx.fillStyle=(dx+dy)%3===0?"#0a0a16":"#080810";
-          ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
-          if(dx%10===0&&dy%10===0){ctx.fillStyle="rgba(255,255,255,.04)";ctx.fillText("🔒",dx*CELL+2,dy*CELL+8);}
-        } else if(px){
+          ctx.fillStyle=(dx+dy)%3===0?"#0a0a16":"#080810";ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
+        }else if(px){
           const color=TM[px.t]?.color||"#888";
-          let alpha=isExpired?.4:isDecaying?.7:1;
-          if(isExpired){ctx.fillStyle=rgba(`#${cv(color)}`,alpha);ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);if((dx+dy)%2===0){ctx.fillStyle="rgba(255,0,0,.15)";ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);}}
-          else{ctx.fillStyle=`#${cv(color)}`;ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);}
+          ctx.fillStyle=`#${cv(color)}`;ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
+          if(isExpired){ctx.fillStyle="rgba(255,0,0,.15)";ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);}
           if(isShielded){ctx.fillStyle="rgba(0,245,255,0.22)";ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);if(dx%2===0&&dy%2===0){ctx.fillStyle="rgba(0,245,255,0.5)";ctx.fillRect(dx*CELL,dy*CELL,1,1);}}
           if(isDecaying&&!isExpired&&(dx+dy)%4===0){ctx.fillStyle="rgba(255,200,0,.3)";ctx.fillRect(dx*CELL,dy*CELL,1,1);}
-        } else if(pending.has(idx)){
-          ctx.fillStyle=rgba(active?TM[active]?.color||"#888":"#888",mode==="RAID"?.4:.6);
-          ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
-        } else {
-          ctx.fillStyle=(dx+dy)%2===0?"#0c0c1e":"#0a0a18";
-          ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
+        }else if(pending.has(idx)){
+          ctx.fillStyle=rgba(active?TM[active]?.color||"#888":"#888",mode==="RAID"?.4:.6);ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
+        }else{
+          ctx.fillStyle=(dx+dy)%2===0?"#0c0c1e":"#0a0a18";ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
         }
       }
     }
-    // Grid lines
     ctx.strokeStyle="rgba(255,255,255,.025)";ctx.lineWidth=1;
     for(let x=0;x<=CW;x+=CELL*10){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,CH);ctx.stroke();}
     for(let y=0;y<=CH;y+=CELL*10){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(CW,y);ctx.stroke();}
-    // Sector borders
     ctx.strokeStyle="rgba(0,245,255,.12)";ctx.lineWidth=1.5;
     for(let x=0;x<=CW;x+=CELL*SECTOR){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,CH);ctx.stroke();}
     for(let y=0;y<=CH;y+=CELL*SECTOR){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(CW,y);ctx.stroke();}
-    // Sector labels & prices
     if(showPriceMap){
       for(let dy=0;dy<VH;dy+=SECTOR){
         for(let dx=0;dx<VW;dx+=SECTOR){
-          const gx=vx+dx,gy=vy+dy;
-          const sx=Math.floor(gx/SECTOR),sy=Math.floor(gy/SECTOR);
-          const key=sectorKey(sx,sy);
-          const unlocked=unlockedSet.has(key);
-          const fill=sectorFills[key]||0;
+          const gx=vx+dx,gy=vy+dy;const sx=Math.floor(gx/SECTOR),sy=Math.floor(gy/SECTOR);
+          const key=sectorKey(sx,sy);const unlocked=unlockedSet.has(key);const fill=sectorFills[key]||0;
           const price=unlocked?sectorBasePrice(sx,sy)*fillMultiplier(fill):0;
-          if(unlocked){
-            ctx.fillStyle="rgba(0,0,0,.6)";ctx.fillRect(dx*CELL+2,dy*CELL+2,55,22);
-            ctx.fillStyle="#00F5FF";ctx.font="bold 9px monospace";ctx.textAlign="left";
-            ctx.fillText(`€${price.toFixed(1)}/px`,dx*CELL+4,dy*CELL+14);
-            ctx.fillText(`${(fill*100).toFixed(0)}% full`,dx*CELL+4,dy*CELL+23);
-          }else{
-            ctx.fillStyle="rgba(0,0,0,.5)";ctx.fillRect(dx*CELL+2,dy*CELL+2,40,14);
-            ctx.fillStyle="rgba(255,255,255,.3)";ctx.font="bold 8px monospace";ctx.textAlign="left";
-            ctx.fillText("LOCKED",dx*CELL+4,dy*CELL+12);
-          }
+          ctx.fillStyle="rgba(0,0,0,.6)";ctx.fillRect(dx*CELL+2,dy*CELL+2,55,22);
+          ctx.fillStyle=unlocked?"#00F5FF":"rgba(255,255,255,.2)";ctx.font="bold 9px monospace";ctx.textAlign="left";
+          ctx.fillText(unlocked?`€${price.toFixed(1)}/px`:"LOCKED",dx*CELL+4,dy*CELL+14);
+          if(unlocked)ctx.fillText(`${(fill*100).toFixed(0)}% full`,dx*CELL+4,dy*CELL+23);
         }
       }
     }
   },[pixels,shields,pending,active,mode,vx,vy,unlockedSet,sectorFills,showPriceMap]);
 
-  // ── Minimap ─────────────────────────────────────────────────────────────────
+  // ── MINIMAP ─────────────────────────────────────────────────────────────────
   useEffect(()=>{
     const mm=mmCvs.current;if(!mm)return;
-    const ctx=mm.getContext("2d");
-    ctx.fillStyle="#080818";ctx.fillRect(0,0,MM,MM);
-    // Locked sectors — darker
-    for(let sy=0;sy<NS;sy++)for(let sx=0;sx<NS;sx++){
-      if(!unlockedSet.has(sectorKey(sx,sy))){
-        ctx.fillStyle="rgba(0,0,0,.5)";
-        ctx.fillRect(sx*(MM/NS),sy*(MM/NS),MM/NS,MM/NS);
-      }
-    }
-    // Sector grid
+    const ctx=mm.getContext("2d");ctx.fillStyle="#080818";ctx.fillRect(0,0,MM,MM);
+    for(let sy=0;sy<NS;sy++)for(let sx=0;sx<NS;sx++){if(!unlockedSet.has(sectorKey(sx,sy))){ctx.fillStyle="rgba(0,0,0,.5)";ctx.fillRect(sx*(MM/NS),sy*(MM/NS),MM/NS,MM/NS);}}
     ctx.strokeStyle="rgba(0,245,255,.08)";ctx.lineWidth=1;
     for(let i=0;i<=NS;i++){const p=i*(MM/NS);ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,MM);ctx.stroke();ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(MM,p);ctx.stroke();}
-    // Pixels
-    Object.entries(pixels).forEach(([idxStr,px])=>{
-      if(!px?.t)return;
-      const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);
-      ctx.fillStyle=TM[px.t]?.color||"#888";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);
-    });
-    // Shields
-    const now=Date.now();
-    Object.entries(shields).forEach(([idxStr,exp])=>{if(exp<=now)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle="rgba(0,245,255,0.4)";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
-    // Viewport
+    Object.entries(pixels).forEach(([idxStr,px])=>{if(!px?.t)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle=TM[px.t]?.color||"#888";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
+    const now=Date.now();Object.entries(shields).forEach(([idxStr,exp])=>{if(exp<=now)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle="rgba(0,245,255,0.4)";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
     ctx.strokeStyle="#00F5FF";ctx.lineWidth=1.5;ctx.strokeRect(Math.floor(vx/MMS),Math.floor(vy/MMS),Math.ceil(VW/MMS),Math.ceil(VH/MMS));
   },[pixels,shields,unlockedSet,vx,vy]);
 
-  // ── Escape key ──────────────────────────────────────────────────────────────
-  useEffect(()=>{
-    const onKey=(e)=>{if(e.key==="Escape"){setActive(null);setPending(new Set());}};
-    window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
-  },[]);
-
-  // ── Mouse ────────────────────────────────────────────────────────────────────
+  // ── MOUSE HELPERS ───────────────────────────────────────────────────────────
   const mouseToGrid=(e)=>{const rc=cvs.current.getBoundingClientRect(),cx=(e.clientX-rc.left)*CW/rc.width,cy=(e.clientY-rc.top)*CH/rc.height,gx=vx+Math.floor(cx/CELL),gy=vy+Math.floor(cy/CELL);if(gx<0||gx>=GW||gy<0||gy>=GH)return null;return{gx,gy,idx:gy*GW+gx};};
   const pan=(dx,dy)=>{setVx(x=>Math.max(0,Math.min(GW-VW,x+dx)));setVy(y=>Math.max(0,Math.min(GH-VH,y+dy)));};
   const onMmClick=(e)=>{const rc=mmCvs.current.getBoundingClientRect(),mx=Math.floor((e.clientX-rc.left)*MM/rc.width),my=Math.floor((e.clientY-rc.top)*MM/rc.height);setVx(Math.max(0,Math.min(GW-VW,mx*MMS-Math.floor(VW/2))));setVy(Math.max(0,Math.min(GH-VH,my*MMS-Math.floor(VH/2))));};
-
   const rs=(x1,y1,x2,y2)=>{
     const s=new Set(),now=Date.now();
     for(let gy=Math.min(y1,y2);gy<=Math.max(y1,y2);gy++)
       for(let gx=Math.min(x1,x2);gx<=Math.max(x1,x2);gx++){
-        const idx=gy*GW+gx;
-        const sx=Math.floor(gx/SECTOR),sy=Math.floor(gy/SECTOR);
+        const idx=gy*GW+gx;const sx=Math.floor(gx/SECTOR),sy=Math.floor(gy/SECTOR);
         if(!unlockedSet.has(sectorKey(sx,sy)))continue;
         const isShielded=shields[idx]&&shields[idx]>now;
         if(mode==="BUILD"?!pixels[idx]:(pixels[idx]&&pixels[idx].t!==active&&!isShielded))s.add(idx);
       }
     return s;
   };
-
-  const onMD=(e)=>{if(!active||mode==="SHOP")return;const g=mouseToGrid(e);if(!g)return;const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);if(!unlockedSet.has(sectorKey(sx,sy))){pushToast("🔒 This sector is locked! Fill the center first.","#FF4400",3000);return;}const now=Date.now(),isShielded=shields[g.idx]&&shields[g.idx]>now;setDrag(true);setOrig({x:g.gx,y:g.gy});const ok=mode==="BUILD"?!pixels[g.idx]:(pixels[g.idx]&&pixels[g.idx].t!==active&&!isShielded);setPending(ok?new Set([g.idx]):new Set());};
+  const onMD=(e)=>{if(!active||mode==="SHOP")return;const g=mouseToGrid(e);if(!g)return;const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);if(!unlockedSet.has(sectorKey(sx,sy))){pushToast("🔒 Locked! Fill the center sectors first.","#FF4400",3000);return;}const now=Date.now(),isShielded=shields[g.idx]&&shields[g.idx]>now;setDrag(true);setOrig({x:g.gx,y:g.gy});const ok=mode==="BUILD"?!pixels[g.idx]:(pixels[g.idx]&&pixels[g.idx].t!==active&&!isShielded);setPending(ok?new Set([g.idx]):new Set());};
   const onMM_h=(e)=>{const g=mouseToGrid(e);if(g){setHov(pixels[g.idx]?TM[pixels[g.idx].t]:null);const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);setHovSector({sx,sy,unlocked:unlockedSet.has(sectorKey(sx,sy)),fill:sectorFills[sectorKey(sx,sy)]||0});}if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}};
   const onMU=()=>{setDrag(false);if(pending.size>0)handleClaim();};
   const onML=()=>{setHov(null);setHovSector(null);if(drag){setDrag(false);if(pending.size>0)handleClaim();}};
-
   const triggerFlash=(color,shake=false)=>{setFlashColor(color);setTimeout(()=>setFlashColor(null),300);if(shake){setShakeCanvas(true);setTimeout(()=>setShakeCanvas(false),500);}};
-  const pushToast=useCallback((msg,color,dur=3000)=>{const id=Date.now()+Math.random();setToasts(t=>[...t,{id,msg,color}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),dur);},[]);
 
-  // ── Dynamic price calculation ────────────────────────────────────────────────
+  // ── DYNAMIC PRICING ─────────────────────────────────────────────────────────
   const calcCost=(pendingSet)=>{
-    if(!pendingSet.size)return 0;
-    let total=0;
-    const sectorGroups={};
-    pendingSet.forEach(idx=>{const[sx,sy]=sectorOf(idx);const k=sectorKey(sx,sy);if(!sectorGroups[k])sectorGroups[k]=[];sectorGroups[k].push(idx);});
-    Object.entries(sectorGroups).forEach(([k,idxs])=>{
-      const[sx,sy]=k.split(",").map(Number);
-      const fill=sectorFills[k]||0;
+    if(!pendingSet.size)return 0;let total=0;
+    const groups={};pendingSet.forEach(idx=>{const[sx,sy]=sectorOf(idx);const k=sectorKey(sx,sy);if(!groups[k])groups[k]=[];groups[k].push(idx);});
+    Object.entries(groups).forEach(([k,idxs])=>{
+      const[sx,sy]=k.split(",").map(Number);const fill=sectorFills[k]||0;
       let price=sectorBasePrice(sx,sy)*fillMultiplier(fill);
       if(mode==="RAID")price*=2;
       if(event?.label==="CHAOS HOUR"&&mode==="RAID")price*=0.5;
@@ -435,56 +468,66 @@ export default function App(){
     return Math.round(total*100)/100;
   };
 
-  // ── Claim ────────────────────────────────────────────────────────────────────
-  const handleClaim=()=>{
+  // ── CLAIM ────────────────────────────────────────────────────────────────────
+  const handleClaim=async()=>{
     if(!active||pending.size===0)return;
     const t=TM[active];const isRaid=mode==="RAID";
     const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;
-    const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(calcCost(pending))):0;
-    const now=Date.now();
-    const next={...pixels};
-    pending.forEach(idx=>{next[idx]={t:active,at:now};});
-    if(bonus>0){let added=0;for(let dy=0;dy<VH&&added<bonus;dy++)for(let dx=0;dx<VW&&added<bonus;dx++){const idx=(vy+dy)*GW+(vx+dx);const sx=Math.floor((vx+dx)/SECTOR),sy=Math.floor((vy+dy)/SECTOR);if(unlockedSet.has(sectorKey(sx,sy))&&!next[idx]){next[idx]={t:active,at:now};added++;}}}
-    setPixels(next);setMyPixels(p=>p+pending.size+bonus);
-    const newShields={...shields};pending.forEach(idx=>{newShields[idx]=now+24*60*60*1000;});
-    setShields(newShields);
-    if(freeUsed>0){const nf=freePixels-freeUsed;setFreePixels(nf);localStorage.setItem("pow_free",String(nf));}
-    try{localStorage.setItem("pw2k_v2",JSON.stringify(next));localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
     const cost=calcCost(pending);
-    if(isRaid){triggerFlash("#FF0000",true);pushToast(`⚔️ RAID! ${pending.size}px conquered! 🛡 24h protected`,"#FF4400",4000);}
-    else triggerFlash(t.color);
-    if(freeUsed>0)pushToast(`🎁 ${freeUsed} free pixels used! Saved €${freeUsed}`,"#FFD700",3000);
-    if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
-    else pushToast(`🏴 ${pending.size}px for ${t.name}! Cost: €${cost}`,"#00F5FF",3000);
-    setFeed(f=>[{id:Date.now(),icon:isRaid?"⚔️":"🏴",team:t.name,msg:`${isRaid?"RAIDED":"claimed"} ${pending.size}px (€${cost})${bonus>0?` +${bonus} free`:""}`,color:t.color,ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isMe:true},...f].slice(0,40));
+    const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;
+    const now=Date.now();
+    // Optimistic update
+    const next={...pixels};const newShields={...shields};
+    pending.forEach(idx=>{next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;});
+    if(bonus>0){let added=0;for(let dy=0;dy<VH&&added<bonus;dy++)for(let dx=0;dx<VW&&added<bonus;dx++){const idx=(vy+dy)*GW+(vx+dx);const sx=Math.floor((vx+dx)/SECTOR),sy=Math.floor((vy+dy)/SECTOR);if(unlockedSet.has(sectorKey(sx,sy))&&!next[idx]){next[idx]={t:active,at:now};added++;}}}
+    setPixels(next);setMyPixels(p=>p+pending.size+bonus);setShields(newShields);
+    try{localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
+    if(freeUsed>0){const nf=freePixels-freeUsed;setFreePixels(nf);localStorage.setItem("pow_free",String(nf));}
+    // Async DB write
+    const toClaim=new Set(pending);
     setPending(new Set());
+    if(isOnline)await dbUpsertPixels(toClaim,active,currentSeasonNum);
+    if(!isOnline){try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
+    if(isRaid){triggerFlash("#FF0000",true);pushToast(`⚔️ RAID! ${toClaim.size}px conquered!`,"#FF4400",4000);}
+    else triggerFlash(t.color);
+    if(freeUsed>0)pushToast(`🎁 ${freeUsed} free pixels used!`,"#FFD700",3000);
+    if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
+    else pushToast(`🏴 ${toClaim.size}px for ${t.name}! €${(cost-freeUsed).toFixed(2)}`,"#00F5FF",3000);
+    setFeed(f=>[{id:Date.now(),icon:isRaid?"⚔️":"🏴",team:t.name,msg:`${isRaid?"RAIDED":"claimed"} ${toClaim.size}px (€${cost.toFixed(2)})`,color:t.color,ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isMe:true},...f].slice(0,40));
   };
 
-  // ── Power-ups ────────────────────────────────────────────────────────────────
-  const usePowerup=(pu)=>{
+  // ── POWER-UPS ─────────────────────────────────────────────────────────────────
+  const usePowerup=async(pu)=>{
     const next={...pixels};const newShields={...shields};const now=Date.now();
-    if(pu.id==="bomb"){const ex=randInt(vx,vx+100),ey=randInt(vy,vy+60);let d=0;for(let dy=0;dy<8;dy++)for(let dx=0;dx<8;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)){delete next[idx];delete newShields[idx];d++;}}triggerFlash("#FF4400",true);pushToast(`💣 BOMB! Destroyed ${d} pixels!`,"#FF4400",5000);}
-    else if(pu.id==="storm"){let cl=0;for(let dy=0;dy<VH&&cl<50;dy++)for(let dx=0;dx<VW&&cl<50;dx++){const idx=(vy+dy)*GW+(vx+dx);const sx=Math.floor((vx+dx)/SECTOR),sy=Math.floor((vy+dy)/SECTOR);if(unlockedSet.has(sectorKey(sx,sy))&&!next[idx]){next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;cl++;}}triggerFlash("#FFCC00");pushToast(`⚡ STORM! ${cl}px claimed!`,"#FFCC00",5000);}
-    else if(pu.id==="fortress"){const fp=now+60*60*1000;const myPx=Object.entries(pixels).filter(([,v])=>v?.t===active).map(([k])=>parseInt(k)).slice(-30);myPx.forEach(idx=>{newShields[idx]=Math.max(newShields[idx]||0,fp);});triggerFlash("#00AAFF");pushToast(`🛡️ FORTRESS! ${myPx.length}px shielded 1 hour!`,"#00AAFF",6000);}
-    else if(pu.id==="snipe"){const enemy=Object.entries(next).find(([k,v])=>v?.t&&v.t!==active&&!(shields[k]&&shields[k]>now));if(enemy){const victim=TM[next[enemy[0]].t];next[enemy[0]]={t:active,at:now};newShields[parseInt(enemy[0])]=now+24*60*60*1000;pushToast(`🎯 SNIPED from ${victim?.name}!`,"#FF2D78",5000);triggerFlash("#FF2D78");}else pushToast("🎯 No unshielded targets!","#FF2D78",3000);}
-    else if(pu.id==="airdrop"){const sx=vx+randInt(0,VW-16),sy=vy+randInt(0,VH-16);let cl=0;for(let dy=0;dy<15;dy++)for(let dx=0;dx<15;dx++){const idx=(sy+dy)*GW+(sx+dx);const ssX=Math.floor((sx+dx)/SECTOR),ssY=Math.floor((sy+dy)/SECTOR);if(unlockedSet.has(sectorKey(ssX,ssY))&&!next[idx]){next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;cl++;}}triggerFlash("#C8FF00");pushToast(`🪂 AIRDROP! ${cl}px claimed!`,"#C8FF00",5000);}
-    else if(pu.id==="nuke"){const ex=randInt(0,GW-21),ey=randInt(0,GH-21);let d=0;for(let dy=0;dy<20;dy++)for(let dx=0;dx<20;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)){delete next[idx];delete newShields[idx];d++;}}triggerFlash("#FF0000",true);pushToast(`☢️ NUKE! Obliterated ${d} pixels!`,"#FF0000",6000);}
-    else if(pu.id==="renew"){let renewed=0;const myPx=Object.entries(next).filter(([,v])=>v?.t===active).sort((a,b)=>a[1].at-b[1].at).slice(0,50);myPx.forEach(([k])=>{if(next[k])next[k]={...next[k],at:now};renewed++;});pushToast(`♻️ RENEWED ${renewed} oldest pixels — decay reset!`,"#00FFAA",5000);triggerFlash("#00FFAA");}
-    else if(pu.id==="double"){const win=Math.random()>.5;if(win)pushToast("✨ WIN! Bonus territory!","#BB88FF",6000);else pushToast("✨ LOST 💀","#BB88FF",5000);triggerFlash("#BB88FF",win);}
+    const toDelete=[];const toUpsert=[];
+    if(pu.id==="bomb"){const ex=randInt(vx,vx+100),ey=randInt(vy,vy+60);let d=0;for(let dy=0;dy<8;dy++)for(let dx=0;dx<8;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)){toDelete.push(idx);delete next[idx];delete newShields[idx];d++;}}triggerFlash("#FF4400",true);pushToast(`💣 BOMB! Destroyed ${d} pixels!`,"#FF4400",5000);}
+    else if(pu.id==="storm"){let cl=0;for(let dy=0;dy<VH&&cl<50;dy++)for(let dx=0;dx<VW&&cl<50;dx++){const idx=(vy+dy)*GW+(vx+dx);const sx=Math.floor((vx+dx)/SECTOR),sy=Math.floor((vy+dy)/SECTOR);if(unlockedSet.has(sectorKey(sx,sy))&&!next[idx]){next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;toUpsert.push(idx);cl++;}}triggerFlash("#FFCC00");pushToast(`⚡ STORM! ${cl}px claimed!`,"#FFCC00",5000);}
+    else if(pu.id==="fortress"){const fp=now+60*60*1000;const myPx=Object.entries(pixels).filter(([,v])=>v?.t===active).map(([k])=>parseInt(k)).slice(-30);myPx.forEach(idx=>{newShields[idx]=Math.max(newShields[idx]||0,fp);});triggerFlash("#00AAFF");pushToast(`🛡️ FORTRESS! ${myPx.length}px shielded!`,"#00AAFF",6000);}
+    else if(pu.id==="snipe"){const e=Object.entries(next).find(([k,v])=>v?.t&&v.t!==active&&!(shields[k]&&shields[k]>now));if(e){const victim=TM[next[e[0]].t];toDelete.push(parseInt(e[0]));const ni={t:active,at:now};next[parseInt(e[0])]=ni;toUpsert.push(parseInt(e[0]));newShields[parseInt(e[0])]=now+24*60*60*1000;pushToast(`🎯 SNIPED from ${victim?.name}!`,"#FF2D78",5000);triggerFlash("#FF2D78");}else pushToast("🎯 No unshielded targets!","#FF2D78",3000);}
+    else if(pu.id==="airdrop"){const sx=vx+randInt(0,VW-16),sy=vy+randInt(0,VH-16);let cl=0;for(let dy=0;dy<15;dy++)for(let dx=0;dx<15;dx++){const idx=(sy+dy)*GW+(sx+dx);const ssX=Math.floor((sx+dx)/SECTOR),ssY=Math.floor((sy+dy)/SECTOR);if(unlockedSet.has(sectorKey(ssX,ssY))&&!next[idx]){next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;toUpsert.push(idx);cl++;}}triggerFlash("#C8FF00");pushToast(`🪂 AIRDROP! ${cl}px claimed!`,"#C8FF00",5000);}
+    else if(pu.id==="nuke"){const ex=randInt(0,GW-21),ey=randInt(0,GH-21);let d=0;for(let dy=0;dy<20;dy++)for(let dx=0;dx<20;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)){toDelete.push(idx);delete next[idx];delete newShields[idx];d++;}}triggerFlash("#FF0000",true);pushToast(`☢️ NUKE! Obliterated ${d} pixels!`,"#FF0000",6000);}
+    else if(pu.id==="renew"){let r=0;const myPx=Object.entries(next).filter(([,v])=>v?.t===active).sort((a,b)=>a[1].at-b[1].at).slice(0,50);myPx.forEach(([k])=>{if(next[k]){next[k]={...next[k],at:now};toUpsert.push(parseInt(k));r++;}});pushToast(`♻️ RENEWED ${r} pixels!`,"#00FFAA",5000);triggerFlash("#00FFAA");}
+    else if(pu.id==="double"){const win=Math.random()>.5;pushToast(win?"✨ WIN! Bonus territory!":"✨ LOST 💀","#BB88FF",5000);triggerFlash("#BB88FF",win);}
     setPixels(next);setShields(newShields);
-    try{localStorage.setItem("pw2k_v2",JSON.stringify(next));localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
+    try{localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
+    if(isOnline){if(toDelete.length)await dbDeletePixels(toDelete,currentSeasonNum);if(toUpsert.length)await dbUpsertPixels(new Set(toUpsert),active,currentSeasonNum);}
+    else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
   };
 
-  // ── Reset ───────────────────────────────────────────────────────────────────
-  const resetGrid=()=>{setPixels({});setShields({});setMyPixels(0);setFreePixels(0);setStreakData({days:0,last:"",total:0});setDailyInfo(null);setPending(new Set());setActive(null);setUnlockedSectors(INIT_SECTORS);try{["pw2k","pw2k_v2","pow_shields","pow_free","pow_streak","pow_sectors"].forEach(k=>localStorage.removeItem(k));}catch{}pushToast("🔄 Grid reset!","#00F5FF",3000);setShowReset(false);};
+  // ── RESET ────────────────────────────────────────────────────────────────────
+  const resetGrid=async()=>{
+    if(isOnline)await dbClearSeason(currentSeasonNum);
+    setPixels({});setShields({});setMyPixels(0);setFreePixels(0);setStreakData({days:0,last:"",total:0});setDailyInfo(null);setPending(new Set());setActive(null);setUnlockedSectors(INIT_SECTORS);
+    try{["pw2k","pw2k_v2","pow_shields","pow_free","pow_streak","pow_sectors"].forEach(k=>localStorage.removeItem(k));}catch{}
+    pushToast("🔄 Grid reset!","#00F5FF",3000);setShowReset(false);
+  };
 
+  // ── DERIVED ─────────────────────────────────────────────────────────────────
   const subArrFull=useMemo(()=>{const subs=selCat==="All"?[...new Set(CAT.map(e=>e.sub))]:CAT.filter(e=>e.cat===selCat).map(e=>e.sub);return["All",...subs];},[selCat]);
   useEffect(()=>setSelSub("All"),[selCat]);
   const vis=useMemo(()=>{if(q.trim().length>1){const lq=q.toLowerCase();return ALL.filter(t=>t.name.toLowerCase().includes(lq)||t.sub.toLowerCase().includes(lq));}return ALL.filter(t=>{if(selCat!=="All"&&t.cat!==selCat)return false;if(selSub!=="All"&&t.sub!==selSub)return false;return true;});},[selCat,selSub,q]);
   const board=useMemo(()=>{const cnt={};Object.values(pixels).forEach(p=>{if(p?.t)cnt[p.t]=(cnt[p.t]||0)+1;});return Object.entries(cnt).map(([id,count])=>({...(TM[id]||{}),count})).filter(t=>t.name).sort((a,b)=>b.count-a.count).slice(0,20);},[pixels]);
-
   const totalSold=Object.keys(pixels).length;
-  const totalAvailable=unlockedSectors.length*SECTOR*SECTOR;
   const at=active?TM[active]:null;
   const accent=at?(CAT_ACCENT[at.cat]||"#00F5FF"):"#00F5FF";
   const modeColor=mode==="BUILD"?"#00F5FF":mode==="RAID"?"#FF4400":"#C8FF00";
@@ -493,15 +536,9 @@ export default function App(){
   const pendingCost=calcCost(pending);
   const freeUsedPreview=mode==="BUILD"?Math.min(freePixels,Math.floor(pendingCost)):0;
   const currentTheme=THEMES[season.theme]||THEMES[0];
+  const decayStats=useMemo(()=>{const now=Date.now();let warn=0,expired=0;Object.values(pixels).forEach(p=>{if(!p?.at)return;const age=now-p.at;if(age>DECAY_EXPIRE_DAYS*86400000)expired++;else if(age>DECAY_WARN_DAYS*86400000)warn++;});return{warn,expired};},[pixels]);
 
-  // Decay stats
-  const decayStats=useMemo(()=>{
-    const now=Date.now();
-    let warn=0,expired=0;
-    Object.values(pixels).forEach(p=>{if(!p?.at)return;const age=now-p.at;if(age>DECAY_EXPIRE_DAYS*86400000)expired++;else if(age>DECAY_WARN_DAYS*86400000)warn++;});
-    return{warn,expired};
-  },[pixels]);
-
+  // ── RENDER ───────────────────────────────────────────────────────────────────
   return(
     <div style={{background:"#040408",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif",color:"#e0e8ff",userSelect:"none",position:"relative",overflow:"hidden"}}>
       <style>{`
@@ -509,10 +546,10 @@ export default function App(){
         @keyframes pop{0%{transform:scale(.85);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
         @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-        @keyframes glow{0%,100%{box-shadow:0 0 8px currentColor}50%{box-shadow:0 0 24px currentColor}}
         @keyframes shimmer{0%,100%{opacity:.5}50%{opacity:1}}
         @keyframes raid{0%{background:rgba(255,50,0,.25)}100%{background:transparent}}
         @keyframes sectorPop{0%{transform:scale(0);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+        @keyframes spin{to{transform:rotate(360deg)}}
         .chip:hover{filter:brightness(1.4)!important}
         .tbtn:hover{filter:brightness(1.15);transform:translateY(-1px)}
         .pubtn:hover{filter:brightness(1.2);transform:scale(1.02)}
@@ -525,6 +562,13 @@ export default function App(){
 
       {flashColor&&<div style={{position:"fixed",inset:0,background:rgba(flashColor,.22),zIndex:50,pointerEvents:"none",animation:"raid .3s ease forwards"}}/>}
 
+      {/* LOADING */}
+      {loading&&<div style={{position:"fixed",inset:0,background:"rgba(4,4,8,.95)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:1000}}>
+        <div style={{width:36,height:36,border:"3px solid #1a1a30",borderTop:"3px solid #00F5FF",borderRadius:"50%",animation:"spin .8s linear infinite",marginBottom:16}}/>
+        <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#00F5FF",letterSpacing:3}}>{isOnline?"CONNECTING TO SUPABASE…":"LOADING…"}</div>
+        {isOnline&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#2a2a4a",marginTop:8,letterSpacing:1}}>syncing shared grid</div>}
+      </div>}
+
       {/* TOASTS */}
       <div style={{position:"fixed",top:68,right:12,zIndex:200,display:"flex",flexDirection:"column",gap:6,pointerEvents:"none",maxWidth:300}}>
         {toasts.map(t=><div key={t.id} style={{background:rgba(t.color,.12),border:`1px solid ${rgba(t.color,.5)}`,borderRadius:8,padding:"7px 12px",fontSize:11,fontWeight:700,color:t.color,fontFamily:"'Orbitron',monospace",animation:"slideDown .25s ease",lineHeight:1.4}}>{t.msg}</div>)}
@@ -533,27 +577,13 @@ export default function App(){
       {/* COMBO */}
       {lastCombo&&<div style={{position:"fixed",top:"36%",left:"50%",transform:"translateX(-50%)",zIndex:300,textAlign:"center",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",pointerEvents:"none"}}>
         <div style={{fontFamily:"'Orbitron',monospace",fontSize:34,fontWeight:900,color:lastCombo.color,textShadow:`0 0 30px ${lastCombo.color}`,letterSpacing:3}}>🔥 COMBO!</div>
-        <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,color:"#FFD700",marginTop:4}}>FREE PIXELS!</div>
       </div>}
 
       {/* NEW SECTOR ALERT */}
-      {newSectorAlert&&<div style={{position:"fixed",top:"30%",left:"50%",transform:"translateX(-50%)",zIndex:301,textAlign:"center",animation:"sectorPop .5s cubic-bezier(.34,1.56,.64,1)",pointerEvents:"none",background:"rgba(4,4,12,.9)",border:"2px solid #C8FF00",borderRadius:16,padding:"24px 36px",boxShadow:"0 0 60px rgba(200,255,0,.3)"}}>
+      {newSectorAlert&&<div style={{position:"fixed",top:"30%",left:"50%",transform:"translateX(-50%)",zIndex:301,textAlign:"center",animation:"sectorPop .5s cubic-bezier(.34,1.56,.64,1)",pointerEvents:"none",background:"rgba(4,4,12,.92)",border:"2px solid #C8FF00",borderRadius:16,padding:"24px 36px",boxShadow:"0 0 60px rgba(200,255,0,.3)"}}>
         <div style={{fontSize:48,marginBottom:8}}>🔓</div>
         <div style={{fontFamily:"'Orbitron',monospace",fontSize:20,fontWeight:900,color:"#C8FF00",letterSpacing:3}}>{newSectorAlert.count} NEW SECTORS UNLOCKED!</div>
-        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.5)",marginTop:6}}>The grid is expanding — claim new territory now!</div>
-      </div>}
-
-      {/* RESET MODAL */}
-      {showReset&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}} onClick={e=>e.target===e.currentTarget&&setShowReset(false)}>
-        <div style={{background:"#09091c",border:"1px solid rgba(255,60,60,.4)",borderRadius:16,padding:"28px 26px",width:360,maxWidth:"94vw",textAlign:"center",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>
-          <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
-          <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#ff6b6b",letterSpacing:2,marginBottom:8}}>RESET GRID?</div>
-          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#5a5a7a",marginBottom:16,lineHeight:1.6}}>Erases all pixels, shields, free pixels and streak. In demo mode this is fine — no real payments made.</div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>setShowReset(false)} style={{flex:1,padding:"10px",background:"transparent",border:"1px solid #1a1a2e",color:"#5a5a7a",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:700,fontSize:10}}>CANCEL</button>
-            <button onClick={resetGrid} style={{flex:2,padding:"10px",background:"linear-gradient(90deg,#ff4444,#ff6b6b)",border:"none",color:"#fff",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:10,letterSpacing:1}}>🔄 RESET EVERYTHING</button>
-          </div>
-        </div>
+        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)",marginTop:6}}>The grid is expanding</div>
       </div>}
 
       {/* DAILY MODAL */}
@@ -575,6 +605,20 @@ export default function App(){
             {dailyInfo.reward.bonus&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"#FF2D78",animation:"shimmer 1.2s infinite"}}>{dailyInfo.reward.bonus}</div>}
           </div>
           <button onClick={claimDaily} style={{width:"100%",padding:"13px",background:"linear-gradient(90deg,#FFD700,#FF9900)",border:"none",color:"#040408",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:13,letterSpacing:2}}>CLAIM +{dailyInfo.reward.px} FREE PIXELS →</button>
+          <button onClick={()=>setShowDaily(false)} style={{marginTop:8,background:"none",border:"none",color:"#3a3a5a",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,width:"100%"}}>remind me later</button>
+        </div>
+      </div>}
+
+      {/* RESET MODAL */}
+      {showReset&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}} onClick={e=>e.target===e.currentTarget&&setShowReset(false)}>
+        <div style={{background:"#09091c",border:"1px solid rgba(255,60,60,.4)",borderRadius:16,padding:"28px 26px",width:360,maxWidth:"94vw",textAlign:"center",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>
+          <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#ff6b6b",letterSpacing:2,marginBottom:8}}>RESET GRID?</div>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#5a5a7a",marginBottom:16,lineHeight:1.6}}>{isOnline?"This deletes ALL pixels from Supabase for this season. Every player sees the reset.":"Erases local demo data only."}</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setShowReset(false)} style={{flex:1,padding:"10px",background:"transparent",border:"1px solid #1a1a2e",color:"#5a5a7a",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:700,fontSize:10}}>CANCEL</button>
+            <button onClick={resetGrid} style={{flex:2,padding:"10px",background:"linear-gradient(90deg,#ff4444,#ff6b6b)",border:"none",color:"#fff",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:10,letterSpacing:1}}>🔄 RESET EVERYTHING</button>
+          </div>
         </div>
       </div>}
 
@@ -582,16 +626,12 @@ export default function App(){
       {showSeasonEnd&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:998,backdropFilter:"blur(12px)"}}>
         <div style={{background:"#09091c",border:"1px solid rgba(255,215,0,.5)",borderRadius:20,padding:"36px 32px",width:440,maxWidth:"94vw",animation:"pop .5s cubic-bezier(.34,1.56,.64,1)",textAlign:"center"}}>
           <div style={{fontSize:56,marginBottom:12}}>🏆</div>
-          <div style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:3,marginBottom:4}}>SEASON {season.num} OVER!</div>
-          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#5a5a7a",marginBottom:20}}>{currentTheme.name}</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:3,marginBottom:20}}>SEASON {season.num} OVER!</div>
           {board[0]&&<div style={{background:rgba(board[0].color,.1),border:`1px solid ${rgba(board[0].color,.4)}`,borderRadius:12,padding:"16px",marginBottom:20}}>
             <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)",marginBottom:6}}>SEASON CHAMPION 👑</div>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:board[0].color}}>{board[0].name}</div>
-            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)",marginTop:4}}>{board[0].count.toLocaleString()} pixels · €{board[0].count}</div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)",marginTop:4}}>{board[0].count.toLocaleString()} pixels</div>
           </div>}
-          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.35)",marginBottom:20,lineHeight:1.6}}>
-            The grid resets. Champions keep their badge. Season {season.num+1} starts now:
-          </div>
           <div style={{background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:10,padding:"12px 16px",marginBottom:20,display:"flex",gap:12,alignItems:"center"}}>
             <span style={{fontSize:24}}>{THEMES[(season.theme+1)%THEMES.length].icon}</span>
             <div style={{textAlign:"left"}}>
@@ -599,9 +639,7 @@ export default function App(){
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginTop:2}}>{THEMES[(season.theme+1)%THEMES.length].desc}</div>
             </div>
           </div>
-          <button onClick={startNewSeason} style={{width:"100%",padding:"14px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",color:"#040408",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:13,letterSpacing:2}}>
-            🚀 START SEASON {season.num+1} →
-          </button>
+          <button onClick={startNewSeason} style={{width:"100%",padding:"14px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",color:"#040408",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:13,letterSpacing:2}}>🚀 START SEASON {season.num+1} →</button>
         </div>
       </div>}
 
@@ -610,7 +648,11 @@ export default function App(){
         <div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,rgba(0,245,255,.05),transparent 30%,rgba(255,68,0,.03) 70%,transparent)",pointerEvents:"none"}}/>
         <div>
           <div style={{fontFamily:"'Orbitron',monospace",fontSize:20,fontWeight:900,letterSpacing:4,background:"linear-gradient(90deg,#00F5FF,#FF4400,#C8FF00)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>⚔ PIXELS OF WAR</div>
-          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",letterSpacing:1.5}}>S{season.num} · {currentTheme.icon} {currentTheme.name} · {seasonDaysLeft}d left · {unlockedSectors.length} sectors open</div>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",letterSpacing:1.5,display:"flex",alignItems:"center",gap:6}}>
+            S{season.num} · {currentTheme.icon} {currentTheme.name} · {seasonDaysLeft}d left
+            <span style={{width:5,height:5,borderRadius:"50%",background:isOnline?"#00FF88":"#FF4400",display:"inline-block",animation:isOnline?"pulse 2s infinite":undefined}}/>
+            <span style={{color:isOnline?"#00FF88":"#FF4400"}}>{isOnline?"LIVE":"OFFLINE"}</span>
+          </div>
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 ALL FANDOMS</button>
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
@@ -639,42 +681,32 @@ export default function App(){
 
       {/* SEASON BANNER */}
       <div style={{background:"linear-gradient(90deg,rgba(255,215,0,.06),rgba(200,255,0,.03),transparent)",borderBottom:"1px solid rgba(255,215,0,.12)",padding:"5px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:14}}>{currentTheme.icon}</span>
-          <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#FFD700",letterSpacing:2}}>SEASON {season.num}</span>
-          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.35)"}}>· {currentTheme.name}</span>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span>{currentTheme.icon}</span>
+          <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#FFD700"}}>SEASON {season.num}</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)"}}>· {currentTheme.name}</span>
           {decayStats.warn>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700",background:"rgba(255,200,0,.1)",border:"1px solid rgba(255,200,0,.25)",borderRadius:4,padding:"1px 6px"}}>⚠️ {decayStats.warn}px fading</span>}
           {decayStats.expired>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.25)",borderRadius:4,padding:"1px 6px"}}>❌ {decayStats.expired}px expired</span>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)"}}>ENDS IN</div>
-          <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:900,color:seasonDaysLeft<10?"#FF4400":"#FFD700",animation:seasonDaysLeft<10?"pulse 1s infinite":undefined}}>{seasonDaysLeft} DAYS</div>
-          <button onClick={()=>setShowPriceMap(s=>!s)} style={{background:showPriceMap?"rgba(0,245,255,.15)":"rgba(0,245,255,.05)",border:`1px solid ${showPriceMap?"rgba(0,245,255,.5)":"rgba(0,245,255,.15)"}`,borderRadius:5,padding:"3px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00F5FF",letterSpacing:1}}>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:900,color:seasonDaysLeft<10?"#FF4400":"#FFD700",animation:seasonDaysLeft<10?"pulse 1s infinite":undefined}}>{seasonDaysLeft}d left</div>
+          <button onClick={()=>setShowPriceMap(s=>!s)} style={{background:showPriceMap?"rgba(0,245,255,.15)":"rgba(0,245,255,.05)",border:`1px solid ${showPriceMap?"rgba(0,245,255,.5)":"rgba(0,245,255,.15)"}`,borderRadius:5,padding:"3px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00F5FF"}}>
             {showPriceMap?"HIDE":"💰 PRICES"}
           </button>
         </div>
       </div>
 
-      {/* EVENT BANNER */}
-      {event&&<div style={{background:`linear-gradient(90deg,${rgba(event.color,.14)},transparent)`,borderBottom:`1px solid ${rgba(event.color,.35)}`,padding:"4px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",animation:"slideDown .3s ease"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:15,animation:"pulse 1s infinite"}}>{event.icon}</span>
-          <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:event.color,letterSpacing:2}}>{event.label} </span>
-          <span style={{fontSize:10,color:"#c0c8e8"}}>— {event.desc}</span>
-        </div>
-        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:event.color,fontWeight:700,animation:"pulse 1s infinite"}}>{Math.floor(eventTimer/60)}:{String(eventTimer%60).padStart(2,"0")}</div>
+      {/* EVENT */}
+      {event&&<div style={{background:`linear-gradient(90deg,${rgba(event.color,.14)},transparent)`,borderBottom:`1px solid ${rgba(event.color,.35)}`,padding:"4px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:15,animation:"pulse 1s infinite"}}>{event.icon}</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:event.color,letterSpacing:2}}>{event.label}</span><span style={{fontSize:10,color:"#c0c8e8"}}>— {event.desc}</span></div>
+        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:event.color,animation:"pulse 1s infinite"}}>{Math.floor(eventTimer/60)}:{String(eventTimer%60).padStart(2,"0")}</div>
       </div>}
 
-      {freePixels>0&&!active&&<div style={{background:"rgba(255,215,0,.04)",borderBottom:"1px solid rgba(255,215,0,.12)",padding:"4px 14px",display:"flex",alignItems:"center",gap:8}}>
-        <span style={{fontSize:12}}>🎁</span>
-        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FFD700"}}>You have <strong>{freePixels} free pixels</strong> — select a fandom below!</span>
-      </div>}
-
-      <div style={{display:"flex",height:`calc(100vh - ${130+(event?28:0)+(freePixels>0&&!active?22:0)}px)`,overflow:"hidden"}}>
+      <div style={{display:"flex",height:`calc(100vh - ${140+(event?28:0)}px)`,overflow:"hidden"}}>
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
 
           {/* CANVAS */}
-          <div style={{padding:"5px 5px 0",flexShrink:0,position:"relative"}}>
+          <div style={{padding:"5px 5px 0",flexShrink:0}}>
             <div style={{border:`2px solid ${rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"default",position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 24px ${rgba(modeColor,.08)}`}}>
               <canvas ref={cvs} width={CW} height={CH} style={{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"38vh"}}
                 onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onDragStart={e=>e.preventDefault()}/>
@@ -682,7 +714,7 @@ export default function App(){
                 {mode==="BUILD"?"🏗 BUILD":mode==="RAID"?"⚔️ RAID":"💥 SHOP"}
               </div>
               {hovSector&&<div style={{position:"absolute",top:5,left:80,background:"rgba(0,0,0,.8)",border:"1px solid rgba(255,255,255,.15)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.6)",pointerEvents:"none"}}>
-                {hovSector.unlocked?`Sector ${hovSector.sx+1}-${hovSector.sy+1} · €${(sectorBasePrice(hovSector.sx,hovSector.sy)*fillMultiplier(hovSector.fill)).toFixed(1)}/px · ${(hovSector.fill*100).toFixed(0)}% full`:`🔒 Sector ${hovSector.sx+1}-${hovSector.sy+1} · LOCKED`}
+                {hovSector.unlocked?`S${hovSector.sx+1}-${hovSector.sy+1} · €${(sectorBasePrice(hovSector.sx,hovSector.sy)*fillMultiplier(hovSector.fill)).toFixed(1)}/px · ${(hovSector.fill*100).toFixed(0)}% full`:`🔒 S${hovSector.sx+1}-${hovSector.sy+1} LOCKED`}
               </div>}
               <div style={{position:"absolute",bottom:5,left:5,fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)",pointerEvents:"none"}}>SECTOR {Math.floor(vx/100)+1}-{Math.floor(vy/100)+1}</div>
               <div style={{position:"absolute",top:5,right:5,background:"rgba(4,4,12,.85)",borderRadius:5,border:"1px solid rgba(0,245,255,.2)",overflow:"hidden",cursor:"crosshair"}} onClick={onMmClick}>
@@ -691,25 +723,21 @@ export default function App(){
               </div>
               {hov&&<div style={{position:"absolute",bottom:5,right:102,background:rgba(hov.color,.15),border:`1px solid ${hov.color}`,borderRadius:4,padding:"2px 7px",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:hov.color,pointerEvents:"none"}}>{hov.name}</div>}
               {!active&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(4,4,8,.85))",padding:"16px 12px 6px",pointerEvents:"none",textAlign:"center"}}>
-                <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,letterSpacing:3,color:"rgba(0,245,255,.4)"}}>⚔ SELECT A FANDOM BELOW · SEASON {season.num} · {seasonDaysLeft} DAYS LEFT</div>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,letterSpacing:3,color:"rgba(0,245,255,.4)"}}>⚔ SELECT A FANDOM BELOW</div>
               </div>}
             </div>
           </div>
 
-          {/* NAV + MODES */}
+          {/* MODES + NAV */}
           <div style={{display:"flex",alignItems:"center",gap:4,padding:"3px 5px 0",flexShrink:0,flexWrap:"wrap"}}>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,22px)",gridTemplateRows:"repeat(3,22px)",gap:2}}>
               {[["↖","-100,-100"],["↑","0,-50"],["↗","100,-100"],["←","-50,0"],["",""],["→","50,0"],["↙","-100,100"],["↓","0,50"],["↘","100,100"]].map(([lbl,delta],i)=>{
-                if(i===4)return<div key={i}/>;
-                const[dx,dy]=delta.split(",").map(Number);
+                if(i===4)return<div key={i}/>;const[dx,dy]=delta.split(",").map(Number);
                 return(<button key={i} className="nav-btn" onClick={()=>pan(dx,dy)} style={{background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.08)",borderRadius:3,color:"#6070a0",cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .1s"}}>{lbl}</button>);
               })}
             </div>
             <div style={{display:"flex",gap:3,marginLeft:"auto"}}>
-              {[{m:"BUILD",icon:"🏗",c:"#00F5FF"},{m:"RAID",icon:"⚔️",c:"#FF4400"},{m:"SHOP",icon:"💥",c:"#C8FF00"}].map(({m,icon,c})=>{
-                const on=mode===m;
-                return(<button key={m} className="chip" onClick={()=>setMode(m)} style={{padding:"5px 9px",background:on?rgba(c,.15):"transparent",border:`1px solid ${on?c:rgba(c,.22)}`,borderRadius:5,color:on?c:rgba(c,.45),cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,letterSpacing:.5,transition:"all .12s",boxShadow:on?`0 0 14px ${rgba(c,.2)}`:"none"}}>{icon} {m}</button>);
-              })}
+              {[{m:"BUILD",icon:"🏗",c:"#00F5FF"},{m:"RAID",icon:"⚔️",c:"#FF4400"},{m:"SHOP",icon:"💥",c:"#C8FF00"}].map(({m,icon,c})=>{const on=mode===m;return(<button key={m} className="chip" onClick={()=>setMode(m)} style={{padding:"5px 9px",background:on?rgba(c,.15):"transparent",border:`1px solid ${on?c:rgba(c,.22)}`,borderRadius:5,color:on?c:rgba(c,.45),cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,letterSpacing:.5,transition:"all .12s",boxShadow:on?`0 0 14px ${rgba(c,.2)}`:"none"}}>{icon} {m}</button>);})}
             </div>
           </div>
 
@@ -725,7 +753,6 @@ export default function App(){
               {pending.size>0&&<>
                 {freeUsedPreview>0&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700"}}>🎁{freeUsedPreview}FREE+</span>}
                 <span style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#C8FF00"}}>€{(pendingCost-freeUsedPreview).toFixed(2)}</span>
-                {hovSector?.unlocked&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)"}}>€{sectorBasePrice(hovSector.sx,hovSector.sy).toFixed(1)}/px</span>}
                 <button onClick={handleClaim} style={{padding:"4px 11px",background:`linear-gradient(90deg,${modeColor},${at.color})`,color:"#040408",border:"none",borderRadius:4,fontWeight:900,cursor:"pointer",fontSize:9,fontFamily:"'Orbitron',monospace",letterSpacing:1}}>{mode==="RAID"?"⚔ RAID!":"🏴 CLAIM!"}</button>
                 <button onClick={()=>setPending(new Set())} style={{background:"none",border:"none",color:"#3a3a5a",cursor:"pointer",fontSize:12}}>✕</button>
               </>}
@@ -752,8 +779,7 @@ export default function App(){
               </>
             ):(
               <>
-                <input value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 Search ${ALL.length} fandoms…`}
-                  style={{width:"100%",background:"#0c0c1c",border:`1px solid ${rgba(selAccent,.2)}`,borderRadius:5,padding:"5px 10px",color:"#b0b8e0",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:4}}/>
+                <input value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 Search ${ALL.length} fandoms…`} style={{width:"100%",background:"#0c0c1c",border:`1px solid ${rgba(selAccent,.2)}`,borderRadius:5,padding:"5px 10px",color:"#b0b8e0",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:4}}/>
                 <div style={{display:"flex",gap:3,marginBottom:3,flexWrap:"wrap"}}>
                   {["All","🎮 Gaming","🎌 Anime","🎵 Music"].map(c=>{const acc=c==="All"?"#5566AA":CAT_ACCENT[c],on=selCat===c;return(<button key={c} className="chip" onClick={()=>setSelCat(c)} style={{padding:"3px 8px",borderRadius:4,border:`1px solid ${on?acc:acc+"33"}`,background:on?rgba(acc,.15):"transparent",color:on?acc:acc+"77",fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:"'Orbitron',monospace",letterSpacing:.5,transition:"all .1s"}}>{c}</button>);})}
                 </div>
@@ -783,7 +809,6 @@ export default function App(){
           <div style={{display:"flex",borderBottom:"1px solid #1a1a30",flexShrink:0}}>
             {[["WAR","⚔ WAR"],["FEED","📡 FEED"]].map(([t,label])=>{const on=tab===t;return(<button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"6px 0",background:on?"#08081a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,letterSpacing:1,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",transition:"all .1s"}}>{label}</button>);})}</div>
 
-          {/* Season progress */}
           <div style={{margin:"5px 5px 0",padding:"6px 8px",background:"rgba(255,215,0,.05)",border:"1px solid rgba(255,215,0,.12)",borderRadius:7}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
               <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#FFD700"}}>S{season.num} · {seasonDaysLeft}d</span>
@@ -792,16 +817,12 @@ export default function App(){
             <div style={{height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden",marginBottom:4}}>
               <div style={{height:"100%",width:`${(1-seasonDaysLeft/SEASON_DAYS)*100}%`,background:"linear-gradient(90deg,#FFD700,#FF4400)",borderRadius:2}}/>
             </div>
-            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.25)"}}>{unlockedSectors.length}/400 sectors · {totalSold.toLocaleString()}px sold</div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.25)"}}>{unlockedSectors.length}/400 sectors · {totalSold.toLocaleString()}px</div>
           </div>
 
-          {/* Streak card */}
           <div onClick={openDailyModal} style={{margin:"4px 5px 0",padding:"5px 8px",background:"rgba(255,215,0,.04)",border:"1px solid rgba(255,215,0,.12)",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",gap:7}}>
             <span style={{fontSize:14}}>🔥</span>
-            <div>
-              <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#FFD700"}}>{streakData.days}d streak</div>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{alreadyClaimedToday?"✅ Claimed":"🎁 "+freePixels+"px free"}</div>
-            </div>
+            <div><div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#FFD700"}}>{streakData.days}d streak</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{alreadyClaimedToday?"✅ Claimed":"🎁 "+freePixels+"px free"}</div></div>
           </div>
 
           {tab==="WAR"?(
@@ -815,10 +836,10 @@ export default function App(){
                     <span style={{fontSize:8,fontWeight:700,color:t.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:100}}>{rank.icon} {t.name}</span>
                     <span style={{fontSize:7,color:"#C8FF00",fontFamily:"'Orbitron',monospace"}}>€{t.count}</span>
                   </div>
-                  <div style={{height:2,background:"#1a1a2e",borderRadius:2,overflow:"hidden",marginBottom:1,marginLeft:5}}>
-                    <div style={{height:"100%",width:`${(t.count/board[0].count)*100}%`,background:`linear-gradient(90deg,${t.color},${acc})`,borderRadius:2,transition:"width .5s"}}/>
+                  <div style={{height:2,background:"#1a1a2e",borderRadius:2,overflow:"hidden",marginLeft:5}}>
+                    <div style={{height:"100%",width:`${(t.count/board[0].count)*100}%`,background:`linear-gradient(90deg,${t.color},${acc})`,borderRadius:2}}/>
                   </div>
-                  <div style={{fontSize:6,color:"#2a2a3a",marginLeft:5,fontFamily:"'Share Tech Mono',monospace"}}>{rank.name} · {t.count}px</div>
+                  <div style={{fontSize:6,color:"#2a2a3a",marginLeft:5,fontFamily:"'Share Tech Mono',monospace",marginTop:1}}>{rank.name} · {t.count}px</div>
                 </div>
               );})}
             </div>
