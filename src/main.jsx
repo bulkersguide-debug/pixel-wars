@@ -12,6 +12,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/" element={<App />} />
         <Route path="/fandoms" element={<FandomDirectory />} />
         <Route path="/fandom/:slug" element={<FandomPage />} />
+        <Route path="/fandoms/:slug" element={<FandomPage />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
