@@ -866,7 +866,7 @@ export default function App(){
       </div>
 
       {/* RESET FIXED BUTTON */}
-      <button onClick={()=>setShowReset(true)} style={{position:"fixed",bottom:12,left:12,zIndex:500,background:"rgba(10,5,5,.92)",border:"1px solid rgba(255,60,60,.3)",borderRadius:7,padding:"6px 12px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#ff6b6b",letterSpacing:1,backdropFilter:"blur(6px)"}}>🔄 RESET GRID</button>
+      
     </div>
   );
 } 
