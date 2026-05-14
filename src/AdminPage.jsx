@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import { supabase, isOnline } from "./supabase";
 
-const ADMIN_PIN = "POW2024"; // ← CHANGE THIS before going live
+const ADMIN_PIN = "StamMike2009@@1"; // ← CHANGE THIS before going live
 
 const rgba=(hex,a)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;};
 
