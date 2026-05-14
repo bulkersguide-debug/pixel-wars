@@ -60,7 +60,7 @@ const POWERUPS=[
 const RARITY_COLOR={COMMON:"#aaa",UNCOMMON:"#00CC44",RARE:"#0088FF",EPIC:"#AA00FF",LEGENDARY:"#FFD700"};
 const DISCORD_ID="1504550947295072328";
 const DISCORD_WIDGET=`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`;
-const DISCORD_INVITE="https://discord.gg/YOUR_CODE_HERE";
+const DISCORD_INVITE="https://discord.gg/https://discord.gg/GbxBnr5D";
 const EVENTS=[
   {icon:"⚡",label:"CHAOS HOUR",desc:"RAIDS 50% OFF!",duration:600,color:"#FF4400"},
   {icon:"💎",label:"MEGA BONUS",desc:"Buy 10px → get 5 FREE!",duration:300,color:"#FFD700"},
