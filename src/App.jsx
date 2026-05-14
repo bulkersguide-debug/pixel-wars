@@ -32,7 +32,6 @@ const ALL=[];
 CAT.forEach(e=>e.t.forEach(n=>ALL.push({id:`${e.cat}|${e.sub}|${n}`,name:n,color:tc(n),cat:e.cat,sub:e.sub})));
 const TM=Object.fromEntries(ALL.map(t=>[t.id,t]));
 
-// Streak reward table
 const streakReward=(day)=>{
   if(day===1)return{px:1,bonus:null};
   if(day===2)return{px:1,bonus:null};
@@ -80,17 +79,11 @@ export default function App(){
   const mmCvs=useRef(null);
 
   const [pixels,setPixels]=useState(()=>{try{const s=localStorage.getItem("pw2k");return s?JSON.parse(s):{};}catch{return{};}});
-  // shields: {pixelIdx: expiryTimestamp}  (24h grace + fortress)
   const [shields,setShields]=useState(()=>{
-    try{
-      const s=JSON.parse(localStorage.getItem("pow_shields")||"{}");
-      const now=Date.now();
-      return Object.fromEntries(Object.entries(s).filter(([,exp])=>exp>now));
-    }catch{return{};}
+    try{const s=JSON.parse(localStorage.getItem("pow_shields")||"{}");const now=Date.now();return Object.fromEntries(Object.entries(s).filter(([,exp])=>exp>now));}
+    catch{return{};}
   });
-  // Free pixel balance earned from daily streaks
   const [freePixels,setFreePixels]=useState(()=>{try{return parseInt(localStorage.getItem("pow_free")||"0");}catch{return 0;}});
-  // Streak data
   const [streakData,setStreakData]=useState(()=>{
     try{return JSON.parse(localStorage.getItem("pow_streak")||'{"days":0,"last":"","total":0}');}
     catch{return{days:0,last:"",total:0};}
@@ -116,30 +109,39 @@ export default function App(){
   const [shakeCanvas,setShakeCanvas]=useState(false);
   const [myPixels,setMyPixels]=useState(0);
   const [lastCombo,setLastCombo]=useState(null);
-  // Daily reward modal
   const [showDaily,setShowDaily]=useState(false);
   const [dailyInfo,setDailyInfo]=useState(null);
+  // ── FIX: track whether already claimed today ──────────────────────────────
+  const alreadyClaimedToday = streakData.last === todayStr();
 
-  // ── Init + Daily check ──────────────────────────────────────────────────────
+  // ── Init + daily check ──────────────────────────────────────────────────────
   useEffect(()=>{
     const lk=document.createElement("link");
     lk.href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap";
     lk.rel="stylesheet";document.head.appendChild(lk);
 
-    // Daily reward check
+    // Only show daily modal if NOT already claimed today
     const today=todayStr();
-    if(streakData.last!==today){
+    const saved=JSON.parse(localStorage.getItem("pow_streak")||'{"days":0,"last":"","total":0}');
+    if(saved.last!==today){
       const yesterday=yesterdayStr();
-      const newDays=streakData.last===yesterday?streakData.days+1:1;
+      const newDays=saved.last===yesterday?saved.days+1:1;
       const reward=streakReward(newDays);
       setDailyInfo({days:newDays,reward});
       setTimeout(()=>setShowDaily(true),1200);
     }
   },[]);
 
+  // ── FIX: claim daily — one time only ───────────────────────────────────────
   const claimDaily=()=>{
     if(!dailyInfo)return;
     const today=todayStr();
+    // Double-guard: abort if already claimed today
+    if(streakData.last===today){
+      setShowDaily(false);
+      setDailyInfo(null);
+      return;
+    }
     const newStreak={days:dailyInfo.days,last:today,total:(streakData.total||0)+1};
     setStreakData(newStreak);
     localStorage.setItem("pow_streak",JSON.stringify(newStreak));
@@ -147,11 +149,22 @@ export default function App(){
     setFreePixels(newFree);
     localStorage.setItem("pow_free",String(newFree));
     pushToast(`🎁 +${dailyInfo.reward.px} FREE PIXELS! Day ${dailyInfo.days} streak!`,"#FFD700",5000);
-    if(dailyInfo.reward.bonus)pushToast(`${dailyInfo.reward.bonus}`,"#FF2D78",5000);
+    if(dailyInfo.reward.bonus)setTimeout(()=>pushToast(`${dailyInfo.reward.bonus}`,"#FF2D78",4000),800);
+    // FIX: clear dailyInfo so the modal can never re-award
+    setDailyInfo(null);
     setShowDaily(false);
   };
 
-  // ── Simulated feed ──────────────────────────────────────────────────────────
+  // ── FIX: open daily modal safely ───────────────────────────────────────────
+  const openDailyModal=()=>{
+    if(alreadyClaimedToday){
+      pushToast("✅ Already claimed today! Come back tomorrow 🔥","#FFD700",3000);
+    } else {
+      setShowDaily(true);
+    }
+  };
+
+  // ── Simulated live feed ─────────────────────────────────────────────────────
   useEffect(()=>{
     const add=()=>{
       const t1=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];
@@ -173,7 +186,7 @@ export default function App(){
     setTimeout(start,6000);return()=>clearInterval(iv);
   },[]);
 
-  // ── Draw canvas ─────────────────────────────────────────────────────────────
+  // ── Canvas draw ─────────────────────────────────────────────────────────────
   useEffect(()=>{
     const c=cvs.current;if(!c)return;
     const ctx=c.getContext("2d");
@@ -190,11 +203,9 @@ export default function App(){
         else if(pending.has(idx))ctx.fillStyle=rgba(active?TM[active]?.color||"#888":"#888",mode==="RAID"?.4:.6);
         else ctx.fillStyle=(dx+dy)%2===0?"#0c0c1e":"#0a0a18";
         ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
-        // Shield glow overlay
         if(isShielded&&teamId){
           ctx.fillStyle="rgba(0,245,255,0.22)";
           ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
-          // Shield border dots
           if(dx%2===0&&dy%2===0){ctx.fillStyle="rgba(0,245,255,0.5)";ctx.fillRect(dx*CELL,dy*CELL,1,1);}
         }
       }
@@ -204,57 +215,33 @@ export default function App(){
     for(let y=0;y<=CH;y+=CELL*10){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(CW,y);ctx.stroke();}
     ctx.fillStyle="rgba(255,255,255,.04)";ctx.font="bold 11px monospace";ctx.textAlign="center";
     for(let sy=0;sy<20;sy++)for(let sx=0;sx<20;sx++){
-      const sectionX=sx*100,sectionY=sy*100;
-      const screenX=(sectionX-vx)*CELL+50*CELL,screenY=(sectionY-vy)*CELL+50*CELL;
+      const screenX=(sx*100-vx)*CELL+50*CELL,screenY=(sy*100-vy)*CELL+50*CELL;
       if(screenX>0&&screenX<CW&&screenY>0&&screenY<CH)ctx.fillText(`${sx+1}-${sy+1}`,screenX,screenY);
     }
   },[pixels,shields,pending,active,mode,vx,vy]);
 
-  // ── Draw minimap ────────────────────────────────────────────────────────────
+  // ── Minimap ─────────────────────────────────────────────────────────────────
   useEffect(()=>{
     const mm=mmCvs.current;if(!mm)return;
     const ctx=mm.getContext("2d");
     ctx.fillStyle="#080818";ctx.fillRect(0,0,MM,MM);
     ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=1;
     for(let i=0;i<=20;i++){const p=i*10;ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,MM);ctx.stroke();ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(MM,p);ctx.stroke();}
-    Object.entries(pixels).forEach(([idxStr,teamId])=>{
-      const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);
-      ctx.fillStyle=TM[teamId]?.color||"#888";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);
-    });
-    // Show shields on minimap (cyan dots)
+    Object.entries(pixels).forEach(([idxStr,teamId])=>{const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle=TM[teamId]?.color||"#888";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
     const now=Date.now();
-    Object.entries(shields).forEach(([idxStr,exp])=>{
-      if(exp<=now)return;
-      const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);
-      ctx.fillStyle="rgba(0,245,255,0.5)";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);
-    });
+    Object.entries(shields).forEach(([idxStr,exp])=>{if(exp<=now)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle="rgba(0,245,255,0.5)";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
     ctx.strokeStyle="#00F5FF";ctx.lineWidth=1.5;
     ctx.strokeRect(Math.floor(vx/MMS),Math.floor(vy/MMS),Math.ceil(VW/MMS),Math.ceil(VH/MMS));
   },[pixels,shields,vx,vy]);
 
-  // ── Navigation ──────────────────────────────────────────────────────────────
+  // ── Nav ─────────────────────────────────────────────────────────────────────
   const pan=(dx,dy)=>{setVx(x=>Math.max(0,Math.min(GW-VW,x+dx)));setVy(y=>Math.max(0,Math.min(GH-VH,y+dy)));};
   const onMmClick=(e)=>{const rc=mmCvs.current.getBoundingClientRect(),mx=Math.floor((e.clientX-rc.left)*MM/rc.width),my=Math.floor((e.clientY-rc.top)*MM/rc.height);setVx(Math.max(0,Math.min(GW-VW,mx*MMS-Math.floor(VW/2))));setVy(Math.max(0,Math.min(GH-VH,my*MMS-Math.floor(VH/2))));};
 
   // ── Mouse ───────────────────────────────────────────────────────────────────
   const mouseToGrid=(e)=>{const rc=cvs.current.getBoundingClientRect(),cx=(e.clientX-rc.left)*CW/rc.width,cy=(e.clientY-rc.top)*CH/rc.height,gx=vx+Math.floor(cx/CELL),gy=vy+Math.floor(cy/CELL);if(gx<0||gx>=GW||gy<0||gy>=GH)return null;return{gx,gy,idx:gy*GW+gx};};
-  const rs=(x1,y1,x2,y2)=>{
-    const s=new Set(),now=Date.now();
-    for(let gy=Math.min(y1,y2);gy<=Math.max(y1,y2);gy++)
-      for(let gx=Math.min(x1,x2);gx<=Math.max(x1,x2);gx++){
-        const idx=gy*GW+gx;
-        const isShielded=shields[idx]&&shields[idx]>now;
-        if(mode==="BUILD"?!pixels[idx]:(pixels[idx]&&pixels[idx]!==active&&!isShielded))s.add(idx);
-      }
-    return s;
-  };
-  const onMD=(e)=>{
-    if(!active||mode==="SHOP")return;const g=mouseToGrid(e);if(!g)return;
-    const now=Date.now(),isShielded=shields[g.idx]&&shields[g.idx]>now;
-    setDrag(true);setOrig({x:g.gx,y:g.gy});
-    const ok=mode==="BUILD"?!pixels[g.idx]:(pixels[g.idx]&&pixels[g.idx]!==active&&!isShielded);
-    setPending(ok?new Set([g.idx]):new Set());
-  };
+  const rs=(x1,y1,x2,y2)=>{const s=new Set(),now=Date.now();for(let gy=Math.min(y1,y2);gy<=Math.max(y1,y2);gy++)for(let gx=Math.min(x1,x2);gx<=Math.max(x1,x2);gx++){const idx=gy*GW+gx;const isShielded=shields[idx]&&shields[idx]>now;if(mode==="BUILD"?!pixels[idx]:(pixels[idx]&&pixels[idx]!==active&&!isShielded))s.add(idx);}return s;};
+  const onMD=(e)=>{if(!active||mode==="SHOP")return;const g=mouseToGrid(e);if(!g)return;const now=Date.now(),isShielded=shields[g.idx]&&shields[g.idx]>now;setDrag(true);setOrig({x:g.gx,y:g.gy});const ok=mode==="BUILD"?!pixels[g.idx]:(pixels[g.idx]&&pixels[g.idx]!==active&&!isShielded);setPending(ok?new Set([g.idx]):new Set());};
   const onMM_h=(e)=>{const g=mouseToGrid(e);if(g)setHov(pixels[g.idx]?TM[pixels[g.idx]]:null);if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}};
   const onMU=()=>{setDrag(false);if(pending.size>0)handleClaim();};
   const onML=()=>{setHov(null);if(drag){setDrag(false);if(pending.size>0)handleClaim();}};
@@ -262,40 +249,27 @@ export default function App(){
   const triggerFlash=(color,shake=false)=>{setFlashColor(color);setTimeout(()=>setFlashColor(null),300);if(shake){setShakeCanvas(true);setTimeout(()=>setShakeCanvas(false),500);}};
   const pushToast=useCallback((msg,color,dur=3000)=>{const id=Date.now()+Math.random();setToasts(t=>[...t,{id,msg,color}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),dur);},[]);
 
-  // ── Claim pixels ─────────────────────────────────────────────────────────────
+  // ── Claim ───────────────────────────────────────────────────────────────────
   const handleClaim=()=>{
     if(!active||pending.size===0)return;
-    const t=TM[active];
-    const isRaid=mode==="RAID";
+    const t=TM[active];const isRaid=mode==="RAID";
     const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;
-
-    // Use free pixels first (BUILD mode only)
     const freeUsed=(!isRaid)?Math.min(freePixels,pending.size):0;
-    const paid=pending.size-freeUsed;
-
     const next={...pixels};
     pending.forEach(idx=>{next[idx]=active;});
     if(bonus>0){let added=0;for(let dy=0;dy<VH&&added<bonus;dy++)for(let dx=0;dx<VW&&added<bonus;dx++){const idx=(vy+dy)*GW+(vx+dx);if(!next[idx]){next[idx]=active;added++;}}}
     setPixels(next);setMyPixels(p=>p+pending.size+bonus);
-
-    // Add 24h grace shields to newly claimed pixels
     const now=Date.now();
-    const graceExpiry=now+24*60*60*1000;
     const newShields={...shields};
-    pending.forEach(idx=>{newShields[idx]=graceExpiry;});
+    pending.forEach(idx=>{newShields[idx]=now+24*60*60*1000;});
     setShields(newShields);
     localStorage.setItem("pow_shields",JSON.stringify(newShields));
-
-    // Deduct free pixels used
     if(freeUsed>0){const nf=freePixels-freeUsed;setFreePixels(nf);localStorage.setItem("pow_free",String(nf));}
-
     try{localStorage.setItem("pw2k",JSON.stringify(next));}catch{}
-
     if(isRaid){triggerFlash("#FF0000",true);pushToast(`⚔️ RAID! ${pending.size}px conquered!`,"#FF4400",4000);}else{triggerFlash(t.color);}
     if(freeUsed>0)pushToast(`🎁 Used ${freeUsed} FREE pixels! Saved €${freeUsed}!`,"#FFD700",3000);
     if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
     else pushToast(`${isRaid?"⚔️":"🏴"} ${pending.size}px for ${t.name}! 🛡️ 24h protected`,"#00F5FF",3000);
-
     setFeed(f=>[{id:Date.now(),icon:isRaid?"⚔️":"🏴",team:t.name,msg:`${isRaid?"RAIDED":"claimed"} ${pending.size}px${bonus>0?` (+${bonus})`:""}${freeUsed>0?` (${freeUsed} free)`:""}`,color:t.color,ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isMe:true},...f].slice(0,40));
     setPending(new Set());
   };
@@ -303,35 +277,13 @@ export default function App(){
   // ── Power-ups ────────────────────────────────────────────────────────────────
   const usePowerup=(pu)=>{
     const next={...pixels};const newShields={...shields};const now=Date.now();
-    if(pu.id==="bomb"){
-      const ex=randInt(vx,vx+100),ey=randInt(vy,vy+60);let d=0;
-      for(let dy=0;dy<8;dy++)for(let dx=0;dx<8;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx]!==active&&!(shields[idx]&&shields[idx]>now)){delete next[idx];delete newShields[idx];d++;}}
-      triggerFlash("#FF4400",true);pushToast(`💣 BOMB! Destroyed ${d} unshielded pixels!`,"#FF4400",5000);
-    }else if(pu.id==="storm"){
-      let cl=0;for(let dy=0;dy<VH&&cl<50;dy++)for(let dx=0;dx<VW&&cl<50;dx++){const idx=(vy+dy)*GW+(vx+dx);if(!next[idx]){next[idx]=active;newShields[idx]=now+24*60*60*1000;cl++;}}
-      triggerFlash("#FFCC00");pushToast(`⚡ STORM! Claimed ${cl} pixels — all 24h shielded!`,"#FFCC00",5000);
-    }else if(pu.id==="fortress"){
-      // Shield last 30 owned pixels for 1 hour
-      const fortressExpiry=now+60*60*1000;
-      const myPx=Object.entries(pixels).filter(([,v])=>v===active).map(([k])=>parseInt(k)).slice(-30);
-      myPx.forEach(idx=>{newShields[idx]=Math.max(newShields[idx]||0,fortressExpiry);});
-      triggerFlash("#00AAFF");
-      pushToast(`🛡️ FORTRESS! ${myPx.length} pixels shielded for 1 HOUR — unraidable!`,"#00AAFF",6000);
-    }else if(pu.id==="snipe"){
-      const enemy=Object.entries(next).find(([k,v])=>v!==active&&!(shields[k]&&shields[k]>now));
-      if(enemy){const victim=TM[next[enemy[0]]];next[enemy[0]]=active;newShields[parseInt(enemy[0])]=now+24*60*60*1000;pushToast(`🎯 SNIPED from ${victim?.name||"enemy"}! Now yours + shielded.`,"#FF2D78",5000);triggerFlash("#FF2D78");}
-      else pushToast(`🎯 All enemy pixels are shielded! Try again later.`,"#FF2D78",3000);
-    }else if(pu.id==="airdrop"){
-      const sx=vx+randInt(0,VW-16),sy=vy+randInt(0,VH-16);let cl=0;
-      for(let dy=0;dy<15;dy++)for(let dx=0;dx<15;dx++){const idx=(sy+dy)*GW+(sx+dx);if(!next[idx]){next[idx]=active;newShields[idx]=now+24*60*60*1000;cl++;}}
-      triggerFlash("#C8FF00");pushToast(`🪂 AIRDROP! ${cl}px in 15×15 zone — 24h shielded!`,"#C8FF00",5000);
-    }else if(pu.id==="nuke"){
-      const ex=randInt(0,GW-21),ey=randInt(0,GH-21);let d=0;
-      for(let dy=0;dy<20;dy++)for(let dx=0;dx<20;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx]!==active&&!(shields[idx]&&shields[idx]>now)){delete next[idx];delete newShields[idx];d++;}}
-      triggerFlash("#FF0000",true);pushToast(`☢️ NUKE! Obliterated ${d} unshielded pixels!`,"#FF0000",6000);
-    }else if(pu.id==="double"){
-      const win=Math.random()>.5;if(win)pushToast(`✨ WIN! Bonus territory incoming!`,"#BB88FF",6000);else pushToast(`✨ YOU LOST 💀 Better luck!`,"#BB88FF",5000);triggerFlash("#BB88FF",win);
-    }
+    if(pu.id==="bomb"){const ex=randInt(vx,vx+100),ey=randInt(vy,vy+60);let d=0;for(let dy=0;dy<8;dy++)for(let dx=0;dx<8;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx]!==active&&!(shields[idx]&&shields[idx]>now)){delete next[idx];delete newShields[idx];d++;}}triggerFlash("#FF4400",true);pushToast(`💣 BOMB! Destroyed ${d} unshielded pixels!`,"#FF4400",5000);}
+    else if(pu.id==="storm"){let cl=0;for(let dy=0;dy<VH&&cl<50;dy++)for(let dx=0;dx<VW&&cl<50;dx++){const idx=(vy+dy)*GW+(vx+dx);if(!next[idx]){next[idx]=active;newShields[idx]=now+24*60*60*1000;cl++;}}triggerFlash("#FFCC00");pushToast(`⚡ STORM! ${cl}px claimed — all 24h shielded!`,"#FFCC00",5000);}
+    else if(pu.id==="fortress"){const fortressExpiry=now+60*60*1000;const myPx=Object.entries(pixels).filter(([,v])=>v===active).map(([k])=>parseInt(k)).slice(-30);myPx.forEach(idx=>{newShields[idx]=Math.max(newShields[idx]||0,fortressExpiry);});triggerFlash("#00AAFF");pushToast(`🛡️ FORTRESS! ${myPx.length}px shielded for 1 HOUR!`,"#00AAFF",6000);}
+    else if(pu.id==="snipe"){const enemy=Object.entries(next).find(([k,v])=>v!==active&&!(shields[k]&&shields[k]>now));if(enemy){const victim=TM[next[enemy[0]]];next[enemy[0]]=active;newShields[parseInt(enemy[0])]=now+24*60*60*1000;pushToast(`🎯 SNIPED from ${victim?.name||"enemy"}!`,"#FF2D78",5000);triggerFlash("#FF2D78");}else pushToast(`🎯 All enemy pixels are shielded!`,"#FF2D78",3000);}
+    else if(pu.id==="airdrop"){const sx=vx+randInt(0,VW-16),sy=vy+randInt(0,VH-16);let cl=0;for(let dy=0;dy<15;dy++)for(let dx=0;dx<15;dx++){const idx=(sy+dy)*GW+(sx+dx);if(!next[idx]){next[idx]=active;newShields[idx]=now+24*60*60*1000;cl++;}}triggerFlash("#C8FF00");pushToast(`🪂 AIRDROP! ${cl}px — 24h shielded!`,"#C8FF00",5000);}
+    else if(pu.id==="nuke"){const ex=randInt(0,GW-21),ey=randInt(0,GH-21);let d=0;for(let dy=0;dy<20;dy++)for(let dx=0;dx<20;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx]!==active&&!(shields[idx]&&shields[idx]>now)){delete next[idx];delete newShields[idx];d++;}}triggerFlash("#FF0000",true);pushToast(`☢️ NUKE! Obliterated ${d} pixels!`,"#FF0000",6000);}
+    else if(pu.id==="double"){const win=Math.random()>.5;if(win)pushToast(`✨ YOU WIN! Bonus territory!`,"#BB88FF",6000);else pushToast(`✨ YOU LOST 💀`,"#BB88FF",5000);triggerFlash("#BB88FF",win);}
     setPixels(next);setShields(newShields);
     try{localStorage.setItem("pw2k",JSON.stringify(next));localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
   };
@@ -347,8 +299,6 @@ export default function App(){
   const modeColor=mode==="BUILD"?"#00F5FF":mode==="RAID"?"#FF4400":"#C8FF00";
   const selAccent=selCat!=="All"?CAT_ACCENT[selCat]:"#00F5FF";
   const myRank=getRank(myPixels);
-
-  // Cost display in claim bar
   const freeUsedPreview=mode==="BUILD"?Math.min(freePixels,pending.size):0;
   const paidPreview=mode==="RAID"?pending.size*2:pending.size-freeUsedPreview;
 
@@ -359,9 +309,8 @@ export default function App(){
         @keyframes pop{0%{transform:scale(.85);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
         @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-        @keyframes shimmer{0%{opacity:.4}50%{opacity:1}100%{opacity:.4}}
+        @keyframes shimmer{0%,100%{opacity:.5}50%{opacity:1}}
         @keyframes raid{0%{background:rgba(255,50,0,.25)}100%{background:transparent}}
-        @keyframes streakPop{0%{transform:scale(0);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
         .chip:hover{filter:brightness(1.4)!important}
         .tbtn:hover{filter:brightness(1.15);transform:translateY(-1px)}
         .pubtn:hover{filter:brightness(1.2);transform:scale(1.02)}
@@ -385,42 +334,33 @@ export default function App(){
         <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,color:"#FFD700",marginTop:4}}>FREE PIXELS!</div>
       </div>}
 
-      {/* ── DAILY REWARD MODAL ─────────────────────────────────────────────────── */}
-      {showDaily&&dailyInfo&&(
+      {/* ── DAILY REWARD MODAL ── */}
+      {showDaily&&dailyInfo&&!alreadyClaimedToday&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}}>
           <div style={{background:"#09091c",border:"1px solid rgba(255,215,0,.4)",borderRadius:16,padding:"32px 28px",width:380,maxWidth:"94vw",boxShadow:"0 0 80px rgba(255,215,0,.12),0 24px 60px rgba(0,0,0,.7)",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",textAlign:"center"}}>
-            <div style={{fontSize:48,marginBottom:10,animation:"streakPop .5s ease"}}>🎁</div>
+            <div style={{fontSize:48,marginBottom:10}}>🎁</div>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:2,marginBottom:4}}>DAILY REWARD</div>
             <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#5a5a7a",marginBottom:20,letterSpacing:1}}>DAY {dailyInfo.days} STREAK</div>
-
-            {/* Streak progress — 7 day view */}
+            {/* 7-day calendar */}
             <div style={{display:"flex",justifyContent:"center",gap:6,marginBottom:20}}>
               {[1,2,3,4,5,6,7].map(d=>{
-                const isDone=d<dailyInfo.days;
-                const isToday=d===dailyInfo.days;
-                const isFuture=d>dailyInfo.days;
-                const r=streakReward(d);
+                const isDone=d<dailyInfo.days,isToday=d===dailyInfo.days,r=streakReward(d);
                 return(
                   <div key={d} style={{textAlign:"center"}}>
                     <div style={{width:36,height:36,borderRadius:8,border:`1px solid ${isDone?"#FFD70066":isToday?"#FFD700":"rgba(255,255,255,.1)"}`,background:isDone?"rgba(255,215,0,.15)":isToday?"rgba(255,215,0,.25)":"rgba(255,255,255,.03)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,marginBottom:3,boxShadow:isToday?"0 0 12px rgba(255,215,0,.4)":"none"}}>
-                      {isDone?"✓":isToday?"⭐":isFuture?"🔒":""}
+                      {isDone?"✓":isToday?"⭐":"🔒"}
                     </div>
-                    <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:isDone?"#FFD700":isToday?"#FFD700":"#3a3a5a"}}>+{r.px}px</div>
+                    <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:isDone||isToday?"#FFD700":"#3a3a5a"}}>+{r.px}px</div>
                   </div>
                 );
               })}
             </div>
-
             <div style={{background:"rgba(255,215,0,.07)",border:"1px solid rgba(255,215,0,.2)",borderRadius:10,padding:"14px 18px",marginBottom:16}}>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:24,fontWeight:900,color:"#FFD700",marginBottom:4}}>+{dailyInfo.reward.px} FREE PIXELS</div>
-              {dailyInfo.reward.bonus&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"#FF2D78",letterSpacing:1,animation:"shimmer 1s infinite"}}>{dailyInfo.reward.bonus}</div>}
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#5a5a7a",marginTop:6}}>Total free pixel balance after: {freePixels+dailyInfo.reward.px}px</div>
+              {dailyInfo.reward.bonus&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"#FF2D78",letterSpacing:1,animation:"shimmer 1.2s infinite"}}>{dailyInfo.reward.bonus}</div>}
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#5a5a7a",marginTop:6}}>Balance after: {freePixels+dailyInfo.reward.px}px free</div>
             </div>
-
-            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#3a3a5a",marginBottom:16,lineHeight:1.5}}>
-              Free pixels can be used to claim territory without paying — they apply automatically when you drag & claim in BUILD mode.
-            </div>
-
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#3a3a5a",marginBottom:16,lineHeight:1.5}}>Free pixels auto-apply in BUILD mode — no payment needed.</div>
             <button onClick={claimDaily} style={{width:"100%",padding:"13px",background:"linear-gradient(90deg,#FFD700,#FF9900)",border:"none",color:"#040408",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:13,letterSpacing:2}}>
               CLAIM +{dailyInfo.reward.px} FREE PIXELS →
             </button>
@@ -436,26 +376,21 @@ export default function App(){
           <div style={{fontFamily:"'Orbitron',monospace",fontSize:20,fontWeight:900,letterSpacing:4,background:"linear-gradient(90deg,#00F5FF,#FF4400,#C8FF00)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>⚔ PIXELS OF WAR</div>
           <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#2a2a4a",letterSpacing:2}}>2000×2000 · {(4000000-totalSold).toLocaleString()} FREE · €4,000,000 GRID</div>
         </div>
-
-        {/* Streak + Free pixels badge */}
-        <div style={{display:"flex",gap:6}}>
-          {/* Free pixel balance */}
-          {freePixels>0&&<div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:8,padding:"4px 10px",cursor:"pointer"}} onClick={()=>setShowDaily(true)}>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {freePixels>0&&<div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:8,padding:"4px 10px",cursor:"pointer"}} onClick={openDailyModal}>
             <span style={{fontSize:14}}>🎁</span>
             <div>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#FFD700"}}>{freePixels} FREE</div>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#5a5a5a"}}>PIXELS AVAILABLE</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#5a5a5a"}}>{alreadyClaimedToday?"CLAIMED TODAY":"CLAIM REWARD"}</div>
             </div>
           </div>}
-          {/* Streak indicator */}
-          <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,45,120,.07)",border:"1px solid rgba(255,45,120,.25)",borderRadius:8,padding:"4px 10px",cursor:"pointer"}} onClick={()=>setShowDaily(true)}>
+          <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,45,120,.07)",border:"1px solid rgba(255,45,120,.25)",borderRadius:8,padding:"4px 10px",cursor:"pointer"}} onClick={openDailyModal}>
             <span style={{fontSize:14}}>🔥</span>
             <div>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#FF2D78"}}>{streakData.days} DAY{streakData.days!==1?"S":""}</div>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#5a5a5a"}}>DAILY STREAK</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#5a5a5a"}}>{alreadyClaimedToday?"✅ CLAIMED":"TAP TO CLAIM"}</div>
             </div>
           </div>
-          {/* Rank */}
           <div style={{display:"flex",alignItems:"center",gap:6,background:rgba(myRank.color,.07),border:`1px solid ${rgba(myRank.color,.25)}`,borderRadius:8,padding:"4px 10px"}}>
             <span style={{fontSize:14}}>{myRank.icon}</span>
             <div>
@@ -464,7 +399,6 @@ export default function App(){
             </div>
           </div>
         </div>
-
         <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
           {[["SOLD",totalSold.toLocaleString(),"#00F5FF"],["REVENUE",`€${totalSold}`,"#C8FF00"],["FANDOMS",board.length,"#FF2D78"]].map(([l,v,c])=>(
             <div key={l} style={{textAlign:"right"}}>
@@ -485,13 +419,13 @@ export default function App(){
         <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:12,color:event.color,fontWeight:700,animation:"pulse 1s infinite"}}>{Math.floor(eventTimer/60)}:{String(eventTimer%60).padStart(2,"0")}</div>
       </div>}
 
-      {/* FREE PIXELS BANNER — show if player has free pixels and no active team */}
-      {freePixels>0&&!active&&<div style={{background:"rgba(255,215,0,.06)",borderBottom:"1px solid rgba(255,215,0,.2)",padding:"5px 14px",display:"flex",alignItems:"center",gap:10,animation:"slideDown .3s ease"}}>
-        <span style={{fontSize:14}}>🎁</span>
-        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#FFD700"}}>You have <strong>{freePixels} free pixels</strong> from your daily streak — select a fandom below to use them!</span>
+      {/* FREE PIXELS BANNER */}
+      {freePixels>0&&!active&&<div style={{background:"rgba(255,215,0,.05)",borderBottom:"1px solid rgba(255,215,0,.15)",padding:"5px 14px",display:"flex",alignItems:"center",gap:10}}>
+        <span style={{fontSize:13}}>🎁</span>
+        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#FFD700"}}>You have <strong>{freePixels} free pixels</strong> — select a fandom below to use them!</span>
       </div>}
 
-      <div style={{display:"flex",height:`calc(100vh - ${event?100:freePixels>0&&!active?88:60}px)`,overflow:"hidden"}}>
+      <div style={{display:"flex",height:`calc(100vh - ${event?100:freePixels>0&&!active?86:60}px)`,overflow:"hidden"}}>
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
 
           {/* CANVAS */}
@@ -502,13 +436,8 @@ export default function App(){
               <div style={{position:"absolute",top:6,left:6,background:rgba(modeColor,.12),border:`1px solid ${rgba(modeColor,.4)}`,borderRadius:4,padding:"2px 8px",fontFamily:"'Orbitron',monospace",fontSize:8,color:modeColor,pointerEvents:"none",letterSpacing:2}}>
                 {mode==="BUILD"?"🏗 BUILD":mode==="RAID"?"⚔️ RAID":"💥 SHOP"}
               </div>
-              {/* Shield legend */}
-              <div style={{position:"absolute",top:6,left:80,background:"rgba(0,245,255,.1)",border:"1px solid rgba(0,245,255,.25)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",pointerEvents:"none",letterSpacing:1}}>
-                🛡 CYAN = SHIELDED (raid-proof)
-              </div>
-              <div style={{position:"absolute",bottom:6,left:6,fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.2)",pointerEvents:"none"}}>
-                SECTOR {Math.floor(vx/100)+1}-{Math.floor(vy/100)+1} · ({vx},{vy})
-              </div>
+              <div style={{position:"absolute",top:6,left:90,background:"rgba(0,245,255,.08)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 7px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",pointerEvents:"none"}}>🛡 CYAN = SHIELDED</div>
+              <div style={{position:"absolute",bottom:6,left:6,fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.2)",pointerEvents:"none"}}>SECTOR {Math.floor(vx/100)+1}-{Math.floor(vy/100)+1} · ({vx},{vy})</div>
               <div style={{position:"absolute",top:6,right:6,background:"rgba(4,4,12,.85)",borderRadius:5,border:"1px solid rgba(0,245,255,.25)",overflow:"hidden",cursor:"crosshair"}} onClick={onMmClick}>
                 <canvas ref={mmCvs} width={MM} height={MM} style={{display:"block",width:100,height:100}}/>
                 <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#3a3a5a",textAlign:"center",padding:"2px 0",letterSpacing:1}}>MINIMAP · CLICK</div>
@@ -517,13 +446,13 @@ export default function App(){
               {!active&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(4,4,8,.7)",pointerEvents:"none",borderRadius:4}}>
                 <div style={{textAlign:"center"}}>
                   <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,letterSpacing:3,color:"#1a1a3a"}}>⚔ SELECT YOUR FANDOM BELOW</div>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#111130",marginTop:3}}>2,000×2,000 GRID · 🛡 PIXELS PROTECTED 24H AFTER PURCHASE</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#111130",marginTop:3}}>2,000×2,000 GRID · 🛡 ALL PURCHASES AUTO-SHIELDED 24H</div>
                 </div>
               </div>}
             </div>
           </div>
 
-          {/* NAV + MODE */}
+          {/* NAV + MODES */}
           <div style={{display:"flex",alignItems:"center",gap:4,padding:"4px 6px 0",flexShrink:0,flexWrap:"wrap"}}>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,24px)",gridTemplateRows:"repeat(3,24px)",gap:2}}>
               {[["↖","-100,-100"],["↑","0,-50"],["↗","100,-100"],["←","-50,0"],["","0,0"],["→","50,0"],["↙","-100,100"],["↓","0,50"],["↘","100,100"]].map(([lbl,delta],i)=>{
@@ -540,7 +469,7 @@ export default function App(){
             </div>
           </div>
 
-          {/* PENDING / CLAIM BAR */}
+          {/* PENDING BAR */}
           {at&&pending.size>0&&(
             <div style={{margin:"4px 6px 0",padding:"6px 11px",background:rgba(modeColor,.06),border:`1px solid ${rgba(modeColor,.3)}`,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0,animation:"slideDown .2s ease"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -549,7 +478,7 @@ export default function App(){
                 {pending.size>=10&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700",animation:"pulse 1s infinite"}}>🔥 COMBO!</span>}
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
-                {freeUsedPreview>0&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FFD700"}}>🎁{freeUsedPreview}FREE</span>}
+                {freeUsedPreview>0&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FFD700"}}>🎁{freeUsedPreview}FREE+</span>}
                 <span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>€{paidPreview}</span>
                 <button onClick={handleClaim} style={{padding:"4px 12px",background:`linear-gradient(90deg,${modeColor},${at.color})`,color:"#040408",border:"none",borderRadius:4,fontWeight:900,cursor:"pointer",fontSize:10,fontFamily:"'Orbitron',monospace",letterSpacing:1}}>{mode==="RAID"?"⚔ RAID!":"🏴 CLAIM!"}</button>
                 <button onClick={()=>setPending(new Set())} style={{background:"none",border:"none",color:"#3a3a5a",cursor:"pointer",fontSize:13}}>✕</button>
@@ -562,8 +491,8 @@ export default function App(){
             {mode==="SHOP"?(
               <>
                 <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,letterSpacing:3,color:"#C8FF00",marginBottom:8}}>💥 POWER-UP SHOP</div>
-                <div style={{background:"rgba(0,170,255,.06)",border:"1px solid rgba(0,170,255,.2)",borderRadius:7,padding:"8px 12px",marginBottom:10,fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#00AAFF",lineHeight:1.6}}>
-                  🛡️ <strong>FORTRESS</strong> now actually works — it shields your last 30 pixels for 1 hour. Shielded pixels show cyan on the grid and <strong>cannot be raided or bombed</strong>. All purchases are also auto-shielded for 24 hours.
+                <div style={{background:"rgba(0,170,255,.05)",border:"1px solid rgba(0,170,255,.15)",borderRadius:7,padding:"7px 11px",marginBottom:8,fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#00AAFF",lineHeight:1.6}}>
+                  🛡️ Shielded pixels (cyan) cannot be raided, bombed or nuked by anyone. All purchases auto-shielded 24h. Fortress extends to 1 hour.
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:5}}>
                   {POWERUPS.map(pu=>(
@@ -610,12 +539,12 @@ export default function App(){
           <div style={{display:"flex",borderBottom:"1px solid #1a1a30",flexShrink:0}}>
             {[["WAR","⚔ WAR"],["FEED","📡 FEED"]].map(([t,label])=>{const on=tab===t;return(<button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"7px 0",background:on?"#08081a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,letterSpacing:1,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",transition:"all .1s"}}>{label}</button>);})}</div>
 
-          {/* Daily streak mini-card */}
-          <div onClick={()=>setShowDaily(true)} style={{margin:"6px 6px 0",padding:"7px 8px",background:"rgba(255,215,0,.05)",border:"1px solid rgba(255,215,0,.15)",borderRadius:7,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
+          {/* Streak mini card — uses openDailyModal safely */}
+          <div onClick={openDailyModal} style={{margin:"6px 6px 0",padding:"7px 8px",background:"rgba(255,215,0,.05)",border:"1px solid rgba(255,215,0,.15)",borderRadius:7,cursor:"pointer",display:"flex",alignItems:"center",gap:8}}>
             <span style={{fontSize:16}}>🔥</span>
             <div>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#FFD700"}}>{streakData.days} DAY STREAK</div>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#5a5a5a"}}>{freePixels}px free · tap to claim</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#5a5a5a"}}>{alreadyClaimedToday?"✅ Claimed today":"🎁 "+freePixels+"px free · tap"}</div>
             </div>
           </div>
 
