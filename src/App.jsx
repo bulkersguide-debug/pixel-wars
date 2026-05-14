@@ -482,20 +482,21 @@ export default function App(){
             </div>
           </div>
 
-          {/* PENDING BAR */}
-          {at&&pending.size>0&&(
+          {/* ACTIVE TEAM BAR — always visible when fandom selected */}
+          {at&&(
             <div style={{margin:"4px 6px 0",padding:"6px 11px",background:rgba(modeColor,.06),border:`1px solid ${rgba(modeColor,.3)}`,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0,animation:"slideDown .2s ease"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:8,height:8,borderRadius:1,background:at.color,boxShadow:`0 0 7px ${at.color}`}}/>
                 <span style={{fontWeight:700,fontSize:11,color:at.color,fontFamily:"'Orbitron',monospace"}}>{at.name}</span>
+                {pending.size===0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>drag pixels on the grid to select</span>}
                 {pending.size>=10&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700",animation:"pulse 1s infinite"}}>🔥 COMBO!</span>}
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
-                {freeUsedPreview>0&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FFD700"}}>🎁{freeUsedPreview}FREE+</span>}
-                <span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>€{paidPreview}</span>
-                <button onClick={handleClaim} style={{padding:"4px 12px",background:`linear-gradient(90deg,${modeColor},${at.color})`,color:"#040408",border:"none",borderRadius:4,fontWeight:900,cursor:"pointer",fontSize:10,fontFamily:"'Orbitron',monospace",letterSpacing:1}}>{mode==="RAID"?"⚔ RAID!":"🏴 CLAIM!"}</button>
-                <button onClick={()=>setPending(new Set())} style={{background:"none",border:"none",color:"#3a3a5a",cursor:"pointer",fontSize:13}}>✕</button>
-                <button onClick={()=>{setActive(null);setPending(new Set());}} style={{padding:"4px 9px",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.12)",borderRadius:4,color:"rgba(255,255,255,.4)",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,letterSpacing:1}}>DESELECT</button>
+                {pending.size>0&&freeUsedPreview>0&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FFD700"}}>🎁{freeUsedPreview}FREE+</span>}
+                {pending.size>0&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>€{paidPreview}</span>}
+                {pending.size>0&&<button onClick={handleClaim} style={{padding:"4px 12px",background:`linear-gradient(90deg,${modeColor},${at.color})`,color:"#040408",border:"none",borderRadius:4,fontWeight:900,cursor:"pointer",fontSize:10,fontFamily:"'Orbitron',monospace",letterSpacing:1}}>{mode==="RAID"?"⚔ RAID!":"🏴 CLAIM!"}</button>}
+                {pending.size>0&&<button onClick={()=>setPending(new Set())} style={{background:"none",border:"none",color:"#3a3a5a",cursor:"pointer",fontSize:13}}>✕</button>}
+                <button onClick={()=>{setActive(null);setPending(new Set());}} style={{padding:"4px 10px",background:"rgba(255,60,60,.08)",border:"1px solid rgba(255,60,60,.3)",borderRadius:4,color:"#ff6b6b",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,letterSpacing:1,fontWeight:700}}>✕ DESELECT</button>
               </div>
             </div>
           )}
