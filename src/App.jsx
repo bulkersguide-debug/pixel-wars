@@ -312,7 +312,7 @@ export default function App(){
       <div style={{background:"#06060e",borderBottom:"1px solid #1a1a30",padding:"7px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,rgba(0,245,255,.05),transparent 30%,rgba(255,68,0,.03) 70%,transparent)",pointerEvents:"none"}}/>
         <div>
-          <div style={{fontFamily:"'Orbitron',monospace",fontSize:20,fontWeight:900,letterSpacing:4,background:"linear-gradient(90deg,#00F5FF,#FF4400,#C8FF00)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>⚔ PIXEL OF WARS</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:20,fontWeight:900,letterSpacing:4,background:"linear-gradient(90deg,#00F5FF,#FF4400,#C8FF00)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>⚔ PIXELS OF WARS</div>
           <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#2a2a4a",letterSpacing:2}}>2000×2000 · {(4000000-totalSold).toLocaleString()} PIXELS FREE · €4,000,000 GRID</div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,background:rgba(myRank.color,.08),border:`1px solid ${rgba(myRank.color,.3)}`,borderRadius:8,padding:"4px 10px"}}>
