@@ -110,6 +110,7 @@ export default function App(){
   const [myPixels,setMyPixels]=useState(0);
   const [lastCombo,setLastCombo]=useState(null);
   const [showDaily,setShowDaily]=useState(false);
+  const [showReset,setShowReset]=useState(false);
   const [dailyInfo,setDailyInfo]=useState(null);
   // ── FIX: track whether already claimed today ──────────────────────────────
   const alreadyClaimedToday = streakData.last === todayStr();
@@ -186,6 +187,27 @@ export default function App(){
     setTimeout(start,6000);return()=>clearInterval(iv);
   },[]);
 
+
+
+  // ── Reset grid ──────────────────────────────────────────────────────────────
+  const resetGrid=()=>{
+    setPixels({});
+    setShields({});
+    setMyPixels(0);
+    setFreePixels(0);
+    setStreakData({days:0,last:"",total:0});
+    setDailyInfo(null);
+    setPending(new Set());
+    setActive(null);
+    try{
+      localStorage.removeItem("pw2k");
+      localStorage.removeItem("pow_shields");
+      localStorage.removeItem("pow_free");
+      localStorage.removeItem("pow_streak");
+    }catch{}
+    pushToast("🔄 Grid reset! Fresh start.","#00F5FF",4000);
+    setShowReset(false);
+  };
 
   // ── Escape key to deselect ──────────────────────────────────────────────────
   useEffect(()=>{
@@ -347,6 +369,28 @@ export default function App(){
         <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,color:"#FFD700",marginTop:4}}>FREE PIXELS!</div>
       </div>}
 
+
+      {/* RESET CONFIRMATION MODAL */}
+      {showReset&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}}
+          onClick={e=>e.target===e.currentTarget&&setShowReset(false)}>
+          <div style={{background:"#09091c",border:"1px solid rgba(255,60,60,.4)",borderRadius:16,padding:"28px 26px",width:360,maxWidth:"94vw",boxShadow:"0 0 60px rgba(255,60,60,.1),0 24px 60px rgba(0,0,0,.7)",textAlign:"center",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>
+            <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#ff6b6b",letterSpacing:2,marginBottom:8}}>RESET GRID?</div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"#5a5a7a",marginBottom:6,lineHeight:1.6}}>
+              This will erase ALL pixels, shields, free pixel balance and daily streak from this browser.
+            </div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,215,0,.6)",marginBottom:20,padding:"8px 12px",background:"rgba(255,215,0,.05)",border:"1px solid rgba(255,215,0,.15)",borderRadius:6,lineHeight:1.5}}>
+              ℹ️ In demo mode this is fine — no real payments were made. Once Stripe is live, only reset with caution.
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setShowReset(false)} style={{flex:1,padding:"10px",background:"transparent",border:"1px solid #1a1a2e",color:"#5a5a7a",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:700,fontSize:11}}>CANCEL</button>
+              <button onClick={resetGrid} style={{flex:2,padding:"10px",background:"linear-gradient(90deg,#ff4444,#ff6b6b)",border:"none",color:"#fff",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:11,letterSpacing:1}}>🔄 RESET EVERYTHING</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── DAILY REWARD MODAL ── */}
       {showDaily&&dailyInfo&&!alreadyClaimedToday&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}}>
@@ -411,6 +455,7 @@ export default function App(){
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#5a5a5a"}}>{myPixels}px</div>
             </div>
           </div>
+          <button onClick={()=>setShowReset(true)} style={{background:"rgba(255,50,50,.08)",border:"1px solid rgba(255,50,50,.25)",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#ff6b6b",letterSpacing:1}}>🔄 RESET</button>
         </div>
         <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
           {[["SOLD",totalSold.toLocaleString(),"#00F5FF"],["REVENUE",`€${totalSold}`,"#C8FF00"],["FANDOMS",board.length,"#FF2D78"]].map(([l,v,c])=>(
