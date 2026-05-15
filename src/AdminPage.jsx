@@ -10,6 +10,48 @@ const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || "";
 
 const rgba=(hex,a)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;};
 
+function AdminBannerForm({onCreated,addLog}){
+  const [msg,setMsg]=useState("");
+  const [hours,setHours]=useState("24");
+  const [loading,setLoading]=useState(false);
+
+  const create=async()=>{
+    if(!msg.trim()||msg.trim().length<5){addLog("Message too short","#FF4400");return;}
+    setLoading(true);
+    try{
+      const now=new Date();
+      const end=new Date(now.getTime()+parseInt(hours)*3600000);
+      const{data,error}=await supabase.from("sponsored_banners").insert({
+        message:msg.trim(),contact_email:"admin@pixelsofwar.com",
+        duration_type:"hours",duration_amount:parseInt(hours),
+        price_eur:0,status:"active",
+        start_at:now.toISOString(),end_at:end.toISOString()
+      }).select().single();
+      if(error)throw error;
+      setMsg("");onCreated(data);
+    }catch(e){addLog("Error: "+e.message,"#FF4400");}
+    setLoading(false);
+  };
+
+  return(
+    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+      <input value={msg} onChange={e=>setMsg(e.target.value)} placeholder="Your banner message..." maxLength={120}
+        style={{flex:2,minWidth:160,background:"#0c0c1c",border:"1px solid rgba(255,215,0,.3)",borderRadius:5,padding:"7px 10px",color:"#e0e8ff",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
+      <select value={hours} onChange={e=>setHours(e.target.value)} style={{background:"#0c0c1c",border:"1px solid rgba(255,215,0,.3)",borderRadius:5,padding:"7px 8px",color:"#FFD700",fontSize:10,fontFamily:"'Share Tech Mono',monospace",outline:"none"}}>
+        <option value="1">1 hour</option>
+        <option value="6">6 hours</option>
+        <option value="12">12 hours</option>
+        <option value="24">24 hours</option>
+        <option value="48">2 days</option>
+        <option value="168">7 days</option>
+      </select>
+      <button onClick={create} disabled={loading||msg.trim().length<5} style={{padding:"7px 14px",background:"linear-gradient(90deg,#FFD700,#FF9900)",border:"none",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#040408"}}>
+        {loading?"...":"▶ GO LIVE"}
+      </button>
+    </div>
+  );
+}
+
 export default function AdminPage(){
   // URL secret check
   const urlSecret = new URLSearchParams(window.location.search).get("s")||"";
@@ -346,6 +388,13 @@ export default function AdminPage(){
                 {banners.filter(b=>b.status==="pending").length} pending
               </span>
             </div>
+
+            {/* Admin create banner */}
+            <div style={{marginBottom:14,padding:"12px",background:"rgba(255,215,0,.04)",border:"1px solid rgba(255,215,0,.15)",borderRadius:8}}>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700",letterSpacing:1,marginBottom:8}}>CREATE YOUR OWN BANNER</div>
+              <AdminBannerForm onCreated={(b)=>{setBanners(r=>[b,...r]);addLog(`✅ Banner created: "${b.message.slice(0,30)}"`, "#FFD700");}} addLog={addLog}/>
+            </div>
+
             {loadingBanners&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>Loading...</div>}
             {!loadingBanners&&banners.length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>No banner requests yet</div>}
             {banners.map(b=>(
