@@ -1028,7 +1028,7 @@ export default function App(){
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 FANDOMS</button>
           <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
           <a href="/rivalries" style={{marginTop:3,display:"inline-block",background:"rgba(255,68,0,.06)",border:"1px solid rgba(255,68,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",letterSpacing:1,textDecoration:"none"}}>⚔️ RIVALRIES</a>
-          <a href="/request-fandom" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.5)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900,textDecoration:"none"}}>➕ REQUEST FANDOM</a>
+          <button onClick={()=>navigate("/request-fandom")} style={{marginTop:3,background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.5)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST FANDOM</button>
           <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{marginTop:3,display:"inline-block",background:"rgba(88,101,242,.12)",border:"1px solid rgba(88,101,242,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#7289DA",letterSpacing:1,textDecoration:"none"}}>💬 DISCORD</a>
           <div style={{display:"flex",gap:6,marginTop:3,flexWrap:"wrap"}}>
             <a href="/contact" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#4a4a6a",textDecoration:"none",letterSpacing:1,border:"1px solid #1a1a30",borderRadius:3,padding:"1px 5px"}}>CONTACT</a>
@@ -1503,10 +1503,10 @@ export default function App(){
             <span style={{fontSize:12}}>🔥</span>
             <div><div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#FFD700"}}>{streakData.days}d streak</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{alreadyClaimedToday?"✅ Claimed":`🎁 ${freePixels}px free`}</div></div>
           </div>
-          <a href="/request-fandom" style={{margin:"4px 5px 0",padding:"6px 8px",background:"rgba(200,255,0,.08)",border:"2px solid rgba(200,255,0,.4)",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,flexShrink:0,textDecoration:"none"}}>
+          <div onClick={()=>navigate("/request-fandom")} style={{margin:"4px 5px 0",padding:"6px 8px",background:"rgba(200,255,0,.08)",border:"2px solid rgba(200,255,0,.4)",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,flexShrink:0}}>
             <span style={{fontSize:11}}>➕</span>
             <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#C8FF00",letterSpacing:1}}>REQUEST A FANDOM</span>
-          </a>
+          </div>
 
           {/* WAR TAB — Territory Leaderboard with Trend */}
           {tab==="WAR"&&<div style={{flex:1,overflowY:"auto",padding:"5px 5px"}}>
