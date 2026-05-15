@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase, isOnline } from "./supabase";
 import ShareModal from "./ShareModal";
 import MissionsModal, { MISSIONS } from "./MissionsModal";
+import OnboardingModal from "./OnboardingModal";
 
 // ── GRID ──────────────────────────────────────────────────────────────────────
 const GW=2000,GH=2000,CELL=5,VW=180,VH=117,CW=VW*CELL,CH=VH*CELL,MM=200,MMS=GW/MM;
@@ -170,6 +171,7 @@ export default function App(){
   const [referralCount,setReferralCount]=useState(0);
   const [isMobile,setIsMobile]=useState(()=>typeof window!=="undefined"&&window.innerWidth<768);
   const [mobileTab,setMobileTab]=useState("GAME");
+  const [showOnboarding,setShowOnboarding]=useState(()=>!localStorage.getItem("pow_onboarded"));
 
   const alreadyClaimedToday=streakData.last===todayStr();
   const currentSeasonNum=season.num;
@@ -841,6 +843,11 @@ export default function App(){
 
       {showShare&&at&&<ShareModal fandom={at} pixelCount={Object.values(pixels).filter(p=>p?.t===active).length} rank={(board.findIndex(b=>b.id===active)+1)||"?"} referralBonus={10} onClose={()=>setShowShare(false)} pushToast={pushToast}/>}
       {showMissions&&<MissionsModal progress={missionProgress} onClaim={claimMission} streakDays={streakData.days} onClose={()=>setShowMissions(false)} accentColor={at?.color||"#00F5FF"}/>}
+      {showOnboarding&&<OnboardingModal
+        allFandoms={ALL}
+        onComplete={(fandom)=>{setShowOnboarding(false);if(fandom)setTimeout(()=>setActive(fandom.id),300);pushToast(`⚔️ Welcome to the war, ${fandom?.name||"warrior"}!`,"#00F5FF",5000);}}
+        onSkip={()=>setShowOnboarding(false)}
+      />}
 
       {/* NOTIFICATION PERMISSION BANNER */}
       {showNotifBanner&&notifPermission==="default"&&<div style={{background:"linear-gradient(90deg,rgba(0,255,136,.1),rgba(0,245,255,.06),transparent)",borderBottom:"1px solid rgba(0,255,136,.25)",padding:"6px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",animation:"slideDown .3s ease"}}>
