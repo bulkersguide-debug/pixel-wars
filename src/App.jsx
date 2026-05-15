@@ -172,6 +172,7 @@ export default function App(){
   const [isMobile,setIsMobile]=useState(()=>typeof window!=="undefined"&&window.innerWidth<768);
   const [mobileTab,setMobileTab]=useState("GAME");
   const [showOnboarding,setShowOnboarding]=useState(()=>!localStorage.getItem("pow_onboarded"));
+  const [countdownStr,setCountdownStr]=useState("");
 
   const alreadyClaimedToday=streakData.last===todayStr();
   const currentSeasonNum=season.num;
@@ -295,6 +296,24 @@ export default function App(){
 
   const seasonDaysLeft=useMemo(()=>{const end=new Date(new Date(season.startDate).getTime()+SEASON_DAYS*86400000);return Math.max(0,Math.ceil((end-Date.now())/86400000));},[season]);
   useEffect(()=>{if(seasonDaysLeft===0&&!showSeasonEnd&&!loading)setShowSeasonEnd(true);},[seasonDaysLeft,loading]);
+
+  // Live countdown timer
+  useEffect(()=>{
+    const tick=()=>{
+      const end=new Date(new Date(season.startDate).getTime()+SEASON_DAYS*86400000);
+      const diff=Math.max(0,end-Date.now());
+      const d=Math.floor(diff/86400000);
+      const h=Math.floor((diff%86400000)/3600000);
+      const m=Math.floor((diff%3600000)/60000);
+      const s=Math.floor((diff%60000)/1000);
+      if(d>2)setCountdownStr(`${d}d ${h}h left`);
+      else if(d>0)setCountdownStr(`${d}d ${h}h ${m}m`);
+      else setCountdownStr(`⚡ ${h}h ${m}m ${s}s`);
+    };
+    tick();
+    const iv=setInterval(tick,1000);
+    return()=>clearInterval(iv);
+  },[season]);
 
   const unlockedSet=useMemo(()=>new Set(unlockedSectors.map(([x,y])=>sectorKey(x,y))),[unlockedSectors]);
   const sectorFills=useMemo(()=>{const fills={};unlockedSectors.forEach(([sx,sy])=>{let cnt=0;for(let py=sy*SECTOR;py<(sy+1)*SECTOR;py++)for(let px=sx*SECTOR;px<(sx+1)*SECTOR;px++){if(pixels[py*GW+px])cnt++;}fills[sectorKey(sx,sy)]=cnt/(SECTOR*SECTOR);});return fills;},[pixels,unlockedSectors]);
@@ -758,9 +777,25 @@ export default function App(){
       </div>}
 
       {/* LOADING */}
-      {loading&&<div style={{position:"fixed",inset:0,background:"rgba(4,4,8,.95)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:1000}}>
-        <div style={{width:36,height:36,border:"3px solid #1a1a30",borderTop:"3px solid #00F5FF",borderRadius:"50%",animation:"spin .8s linear infinite",marginBottom:16}}/>
-        <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#00F5FF",letterSpacing:3}}>{isOnline?"CONNECTING…":"LOADING…"}</div>
+      {loading&&<div style={{position:"fixed",inset:0,background:"#040408",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:1000,gap:0}}>
+        {/* Animated pixel grid background */}
+        <div style={{position:"absolute",inset:0,overflow:"hidden",opacity:.4}}>
+          {Array.from({length:40}).map((_,i)=>(
+            <div key={i} style={{position:"absolute",width:14,height:14,borderRadius:2,background:["#00B4F0","#9747FF","#FF4655","#62B32F","#FF6B35","#FF1493","#FFD700"][i%7],left:`${(i*37)%97}%`,top:`${(i*53)%97}%`,animation:`pulse ${1.5+i*.15}s ease-in-out infinite`,animationDelay:`${(i*.2)%2}s`,opacity:.6}}/>
+          ))}
+        </div>
+        {/* Logo */}
+        <div style={{position:"relative",textAlign:"center",marginBottom:32}}>
+          <div style={{fontSize:52,marginBottom:12,filter:"drop-shadow(0 0 20px rgba(0,245,255,.5))"}}>⚔️</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:32,fontWeight:900,letterSpacing:6,background:"linear-gradient(90deg,#00F5FF,#C8FF00,#FF4400)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1,marginBottom:6}}>PIXELS OF WAR</div>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.25)",letterSpacing:4}}>FANDOMS · TERRITORY · WAR</div>
+        </div>
+        {/* Loading bar */}
+        <div style={{width:200,height:3,background:"rgba(255,255,255,.08)",borderRadius:2,overflow:"hidden",marginBottom:14}}>
+          <div style={{height:"100%",background:"linear-gradient(90deg,#00F5FF,#C8FF00,#FF4400)",borderRadius:2,animation:"loadingBar 1.8s ease-in-out infinite"}}/>
+        </div>
+        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(0,245,255,.5)",letterSpacing:3,animation:"pulse 1.2s infinite"}}>{isOnline?"CONNECTING TO WAR SERVERS…":"LOADING…"}</div>
+        <style>{`@keyframes loadingBar{0%{width:0%;margin-left:0}50%{width:100%;margin-left:0}100%{width:0%;margin-left:100%}}`}</style>
       </div>}
 
       {/* ── HEADER ── */}
@@ -800,12 +835,21 @@ export default function App(){
         </div>
       </div>
 
+      {/* SUPABASE ERROR STATE */}
+      {!loading&&!isOnline&&<div style={{background:"rgba(255,68,0,.08)",borderBottom:"1px solid rgba(255,68,0,.3)",padding:"5px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{animation:"pulse .8s infinite",fontSize:14}}>⚠️</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FF4400"}}>War servers offline — playing in local mode. Progress may not sync.</span>
+        </div>
+        <button onClick={()=>window.location.reload()} style={{padding:"3px 10px",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.4)",borderRadius:4,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400",letterSpacing:1}}>RETRY</button>
+      </div>}
+
       {/* SEASON BANNER */}
       <div style={{background:"linear-gradient(90deg,rgba(255,215,0,.06),rgba(200,255,0,.03),transparent)",borderBottom:"1px solid rgba(255,215,0,.12)",padding:"4px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           <span>{currentTheme.icon}</span>
           <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#FFD700"}}>SEASON {season.num}</span>
-          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)"}}>· {seasonDaysLeft}d left</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:seasonDaysLeft<=2?"#FF4400":seasonDaysLeft<=7?"#FFD700":"rgba(255,255,255,.3)",animation:seasonDaysLeft<=2?"pulse 1s infinite":undefined}}>· {countdownStr}</span>
           {decayStats.warn>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700",background:"rgba(255,200,0,.1)",border:"1px solid rgba(255,200,0,.25)",borderRadius:4,padding:"1px 6px"}}>⚠️ {decayStats.warn}px fading</span>}
           {decayStats.expired>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.25)",borderRadius:4,padding:"1px 6px"}}>❌ {decayStats.expired}px expired</span>}
         </div>
