@@ -32,10 +32,23 @@ export default function AdminPage(){
   // Fandom requests
   const [fandomRequests,setFandomRequests]=useState([]);
   const [loadingRequests,setLoadingRequests]=useState(false);
+  // Sponsored banners
+  const [banners,setBanners]=useState([]);
+  const [loadingBanners,setLoadingBanners]=useState(false);
 
   const addLog=(msg,color="#00F5FF")=>setLog(l=>[{id:Date.now(),msg,color,ts:new Date().toLocaleTimeString()},...l].slice(0,50));
 
-  const approveFandom=async(req)=>{
+  const approveBanner=async(b)=>{
+    const now=new Date();
+    const end=new Date(now.getTime()+(b.duration_type==="hours"?b.duration_amount*3600000:b.duration_amount*86400000));
+    const{error}=await supabase.from("sponsored_banners").update({status:"active",start_at:now.toISOString(),end_at:end.toISOString()}).eq("id",b.id);
+    if(!error){setBanners(r=>r.map(x=>x.id===b.id?{...x,status:"active"}:x));addLog(`✅ Banner activated: "${b.message.slice(0,30)}..."`,  "#00FF88");}
+    else addLog("Error: "+error.message,"#FF4400");
+  };
+  const rejectBanner=async(b)=>{
+    const{error}=await supabase.from("sponsored_banners").update({status:"rejected"}).eq("id",b.id);
+    if(!error){setBanners(r=>r.map(x=>x.id===b.id?{...x,status:"rejected"}:x));addLog(`❌ Banner rejected`,"#FF4400");}
+  };
     const{error}=await supabase.from("fandom_requests").update({status:"approved",reviewed_at:new Date().toISOString()}).eq("id",req.id);
     if(!error){setFandomRequests(r=>r.map(x=>x.id===req.id?{...x,status:"approved"}:x));addLog(`✅ Approved: ${req.name}`,"#00FF88");}
     else addLog("Error approving: "+error.message,"#FF4400");
@@ -54,6 +67,9 @@ export default function AdminPage(){
     setLoadingRequests(true);
     supabase.from("fandom_requests").select("*").order("created_at",{ascending:false})
       .then(({data})=>{setFandomRequests(data||[]);setLoadingRequests(false);});
+    setLoadingBanners(true);
+    supabase.from("sponsored_banners").select("*").order("created_at",{ascending:false})
+      .then(({data})=>{setBanners(data||[]);setLoadingBanners(false);});
   },[auth]);
 
   const loadStats=async()=>{
@@ -319,6 +335,35 @@ export default function AdminPage(){
               </div>
             ))}
           </div>}
+
+          {/* SPONSORED BANNERS */}
+          <div style={{background:"#09091a",border:"2px solid rgba(255,215,0,.3)",borderRadius:12,padding:"18px"}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#FFD700",letterSpacing:3,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span>📣 SPONSORED BANNERS</span>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FF4400",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.3)",borderRadius:4,padding:"2px 7px"}}>
+                {banners.filter(b=>b.status==="pending").length} pending
+              </span>
+            </div>
+            {loadingBanners&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>Loading...</div>}
+            {!loadingBanners&&banners.length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>No banner requests yet</div>}
+            {banners.map(b=>(
+              <div key={b.id} style={{marginBottom:8,padding:"10px 12px",background:b.status==="active"?"rgba(0,255,136,.04)":b.status==="pending"?"rgba(255,215,0,.04)":"rgba(255,68,0,.04)",border:`1px solid ${b.status==="active"?"rgba(0,255,136,.2)":b.status==="pending"?"rgba(255,215,0,.15)":"rgba(255,68,0,.15)"}`,borderRadius:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                  <div style={{fontWeight:700,fontSize:12,color:"#e0e8ff",flex:1,marginRight:8}}>"{b.message}"</div>
+                  <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:b.status==="active"?"#00FF88":b.status==="pending"?"#FFD700":"#FF4400",padding:"2px 6px",border:"1px solid currentColor",borderRadius:3,flexShrink:0}}>{b.status.toUpperCase()}</span>
+                </div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",marginBottom:6}}>
+                  {b.contact_email} · {b.duration_amount} {b.duration_type} · €{b.price_eur}
+                  {b.end_at&&` · ends ${new Date(b.end_at).toLocaleDateString()}`}
+                </div>
+                {b.status==="pending"&&<div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>approveBanner(b)} style={{flex:1,padding:"6px",background:"rgba(0,255,136,.1)",border:"1px solid rgba(0,255,136,.3)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00FF88",fontWeight:900}}>✅ APPROVE & ACTIVATE</button>
+                  <button onClick={()=>rejectBanner(b)} style={{flex:1,padding:"6px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.25)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",fontWeight:900}}>❌ REJECT</button>
+                </div>}
+                {b.status==="active"&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00FF88"}}>🟢 LIVE NOW — scrolling for all players</div>}
+              </div>
+            ))}
+          </div>
 
           {/* FANDOM REQUESTS */}
           <div style={{background:"#09091a",border:"2px solid rgba(200,255,0,.4)",borderRadius:12,padding:"18px"}}>
