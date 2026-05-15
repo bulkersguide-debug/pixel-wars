@@ -1134,6 +1134,9 @@ export default function App(){
         onComplete={(fandom)=>{setShowOnboarding(false);if(fandom)setTimeout(()=>setActive(fandom.id),300);pushToast(`⚔️ Welcome to the war, ${fandom?.name||"warrior"}!`,"#00F5FF",5000);}}
         onSkip={()=>setShowOnboarding(false)}
       />}
+      {/* REQUEST FANDOM — fixed button, always visible */}
+      {!isMobile&&<button onClick={()=>setShowFandomModal(true)} style={{position:"fixed",bottom:32,left:12,zIndex:150,padding:"7px 14px",background:"rgba(4,4,12,.95)",border:"2px solid #C8FF00",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#C8FF00",letterSpacing:1,fontWeight:900,backdropFilter:"blur(8px)",boxShadow:"0 0 16px rgba(200,255,0,.3)"}}>➕ REQUEST FANDOM</button>}
+
       {/* WAR TICKER — scrolling feed at bottom */}
       {!isMobile&&feed.length>4&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"rgba(4,4,12,.92)",borderTop:"1px solid rgba(0,245,255,.1)",height:26,overflow:"hidden",display:"flex",alignItems:"center"}}>
         <div style={{display:"flex",gap:"48px",whiteSpace:"nowrap",animation:"warTicker 35s linear infinite",flexShrink:0}}>
