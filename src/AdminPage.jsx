@@ -410,7 +410,7 @@ export default function AdminPage(){
           {/* SPONSORED BANNERS */}
           <div style={{background:"#09091a",border:"2px solid rgba(255,215,0,.3)",borderRadius:12,padding:"18px"}}>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#FFD700",letterSpacing:3,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <span>📣 SPONSORED BANNERS</span>
+              <span>📣 SPONSORED BANNERS v2</span>
               <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FF4400",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.3)",borderRadius:4,padding:"2px 7px"}}>
                 {banners.filter(b=>b.status==="pending").length} pending
               </span>
