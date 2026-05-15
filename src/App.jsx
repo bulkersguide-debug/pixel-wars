@@ -127,7 +127,7 @@ async function dbLoadSectors(sn){if(!supabase)return null;const{data}=await supa
 async function dbSaveSectors(sectors,sn){if(!supabase)return;const rows=sectors.map(([sx,sy])=>({season_num:sn,sx,sy}));await supabase.from("sectors").upsert(rows,{onConflict:"season_num,sx,sy"});}
 async function dbClearSeason(sn){if(!supabase)return;await supabase.from("pixels").delete().eq("season_num",sn);await supabase.from("sectors").delete().eq("season_num",sn);}
 async function dbLoadMessages(fandomId,sn){if(!supabase)return[];const{data}=await supabase.from("messages").select("*").eq("fandom_id",fandomId).eq("season_num",sn).order("created_at",{ascending:false}).limit(50);return(data||[]).reverse();}
-async function dbSendMessage(fandomId,text,sn){if(!supabase)return;await supabase.from("messages").insert({fandom_id:fandomId,text,season_num:sn});}
+async function dbSendMessage(fandomId,text,sn,username,role,rankIcon){if(!supabase)return;await supabase.from("messages").insert({fandom_id:fandomId,text,season_num:sn,username:username||"Warrior",role:role||"player",rank_icon:rankIcon||"🥉"});}
 async function dbLoadAlliances(sn){if(!supabase)return[];const{data}=await supabase.from("alliances").select("*").eq("season_num",sn).neq("status","rejected");return data||[];}
 async function dbProposeAlliance(proposer,target,sn){if(!supabase)return;await supabase.from("alliances").upsert({proposer,target,status:"pending",season_num:sn},{onConflict:"proposer,target,season_num"});}
 async function dbUpdateAlliance(id,status){if(!supabase)return;await supabase.from("alliances").update({status}).eq("id",id);}
@@ -221,6 +221,7 @@ export default function App(){
   const [showAuthModal,setShowAuthModal]=useState(false);
   const [authReason,setAuthReason]=useState("claim");
   const [totalPlayers,setTotalPlayers]=useState(0);
+  const [sponsoredBanners,setSponsoredBanners]=useState([]);
 
   const currentSeasonNum=season.num;
   const alreadyClaimedToday=streakData.last===todayStr();
@@ -384,7 +385,8 @@ export default function App(){
     if(!active||!chatInput.trim()||!isOnline)return;
     const clean=sanitizeChat(chatInput);
     if(!clean){setChatInput("");return;}
-    await dbSendMessage(active,clean,currentSeasonNum);
+    const rankIcon=getRank(myPixels).icon;
+    await dbSendMessage(active,clean,currentSeasonNum,profile?.username,profile?.role,rankIcon);
     setChatInput("");
   };
   const gatedSetMode=(m)=>{
@@ -461,6 +463,18 @@ export default function App(){
   useEffect(()=>{
     if(!supabase||!isOnline)return;
     supabase.rpc("get_player_count").then(({data})=>data&&setTotalPlayers(data));
+  },[]);
+
+  // Load active sponsored banners
+  useEffect(()=>{
+    if(!supabase||!isOnline)return;
+    const load=()=>supabase.from("sponsored_banners")
+      .select("*").eq("status","active").gt("end_at",new Date().toISOString())
+      .order("created_at",{ascending:true})
+      .then(({data})=>setSponsoredBanners(data||[]));
+    load();
+    const ch=supabase.channel("sponsored").on("postgres_changes",{event:"*",schema:"public",table:"sponsored_banners"},load).subscribe();
+    return()=>supabase.removeChannel(ch);
   },[]);
 
   // ── SERVICE WORKER ────────────────────────────────────────────────────────
@@ -843,7 +857,16 @@ export default function App(){
     }
   },[]);
 
-  // Leaderboard rank change alerts
+  // Rank-up notification
+  const prevRankRef=useRef(null);
+  useEffect(()=>{
+    const rank=getRank(myPixels);
+    if(prevRankRef.current&&prevRankRef.current!==rank.name&&myPixels>0){
+      pushToast(`${rank.icon} RANK UP! You are now ${rank.name}!`,rank.color,6000);
+      spawnConfetti(rank.color,40);
+    }
+    prevRankRef.current=rank.name;
+  },[myPixels]);
   useEffect(()=>{
     if(board.length===0)return;
     const prev=prevBoardRef.current;
@@ -1080,6 +1103,7 @@ export default function App(){
           <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
           <a href="/rivalries" style={{marginTop:3,display:"inline-block",background:"rgba(255,68,0,.06)",border:"1px solid rgba(255,68,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",letterSpacing:1,textDecoration:"none"}}>⚔️ RIVALRIES</a>
           <button onClick={()=>{if(!requireAuth("fandom"))return;navigate("/request-fandom");}} style={{marginTop:3,background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.5)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST FANDOM</button>
+          <button onClick={()=>navigate("/advertise")} style={{marginTop:3,background:"rgba(255,215,0,.1)",border:"1px solid rgba(255,215,0,.4)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FFD700",letterSpacing:1,fontWeight:900}}>📣 ADVERTISE</button>
           <div style={{display:"flex",gap:6,marginTop:3,flexWrap:"wrap"}}>
             <a href="/contact" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#4a4a6a",textDecoration:"none",letterSpacing:1,border:"1px solid #1a1a30",borderRadius:3,padding:"1px 5px"}}>CONTACT</a>
             <a href="/terms" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#4a4a6a",textDecoration:"none",letterSpacing:1,border:"1px solid #1a1a30",borderRadius:3,padding:"1px 5px"}}>TERMS</a>
@@ -1135,6 +1159,22 @@ export default function App(){
           <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FF4400"}}>War servers offline — playing in local mode. Progress may not sync.</span>
         </div>
         <button onClick={()=>window.location.reload()} style={{padding:"3px 10px",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.4)",borderRadius:4,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400",letterSpacing:1}}>RETRY</button>
+      </div>}
+
+      {/* SPONSORED BANNER STRIP */}
+      {sponsoredBanners.length>0&&<div style={{background:"rgba(255,215,0,.06)",borderBottom:"1px solid rgba(255,215,0,.2)",height:26,overflow:"hidden",display:"flex",alignItems:"center",position:"relative"}}>
+        <div style={{position:"absolute",left:0,top:0,bottom:0,width:60,background:"linear-gradient(90deg,rgba(4,4,8,1),transparent)",zIndex:2,display:"flex",alignItems:"center",paddingLeft:8}}>
+          <span style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FFD700",letterSpacing:1,whiteSpace:"nowrap"}}>SPONSORED</span>
+        </div>
+        <div style={{display:"flex",gap:"80px",whiteSpace:"nowrap",animation:`sponsorTicker ${Math.max(20,sponsoredBanners.length*15)}s linear infinite`,paddingLeft:70}}>
+          {[...sponsoredBanners,...sponsoredBanners].map((b,i)=>(
+            <span key={i} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#FFD700",letterSpacing:.5}}>
+              ★ {b.message} ★
+            </span>
+          ))}
+        </div>
+        <div style={{position:"absolute",right:0,top:0,bottom:0,width:40,background:"linear-gradient(270deg,rgba(4,4,8,1),transparent)",zIndex:2}}/>
+        <style>{`@keyframes sponsorTicker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}`}</style>
       </div>}
 
       {/* SEASON BANNER */}
@@ -1351,12 +1391,21 @@ export default function App(){
                 </div>
                 <div style={{flex:1,overflowY:"auto",padding:"8px 10px",display:"flex",flexDirection:"column",gap:5}}>
                   {chatMessages.length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#2a2a3a",textAlign:"center",paddingTop:20}}>No messages yet. Be first! 🔥</div>}
-                  {chatMessages.map((m,i)=>(
-                    <div key={m.id||i} style={{padding:"7px 10px",background:"#09091a",borderRadius:7,border:"1px solid #1a1a2a"}}>
-                      <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:at?.color,marginBottom:2,opacity:.5}}>{new Date(m.created_at).toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit"})}</div>
-                      <div style={{fontSize:13,color:"#c0c8e8",lineHeight:1.4,wordBreak:"break-word"}}>{m.text}</div>
+                  {chatMessages.map((m,i)=>{
+                    const roleBadge=m.role==="admin"?"⚡":m.role==="moderator"?"🛡️":m.role==="vip"?"⭐":"";
+                    const roleColor=m.role==="admin"?"#FFD700":m.role==="moderator"?"#00AAFF":m.role==="vip"?"#FF2D78":"#7a7aaa";
+                    return(
+                    <div key={m.id||i} style={{padding:"7px 10px",background:"#09091a",borderRadius:7,border:`1px solid ${m.role==="admin"?"rgba(255,215,0,.2)":m.role==="moderator"?"rgba(0,170,255,.15)":"#1a1a2a"}`}}>
+                      <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
+                        {roleBadge&&<span style={{fontSize:9}}>{roleBadge}</span>}
+                        <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:roleColor}}>{m.username||"Warrior"}</span>
+                        <span style={{fontSize:9}}>{m.rank_icon||"🥉"}</span>
+                        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)",marginLeft:"auto"}}>{new Date(m.created_at).toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit"})}</span>
+                      </div>
+                      <div style={{fontSize:12,color:"#c0c8e8",lineHeight:1.4,wordBreak:"break-word"}}>{m.text}</div>
                     </div>
-                  ))}
+                  );})}
+
                 </div>
                 <div style={{padding:"8px",borderTop:"1px solid #1a1a30",display:"flex",gap:6}}>
                   <input value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMessage()} placeholder="Rally the fans…" style={{flex:1,background:"#0c0c1c",border:`1px solid ${rgba(at?.color||"#1a1a2e",.3)}`,borderRadius:6,padding:"8px 12px",color:"#b0b8e0",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>

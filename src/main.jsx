@@ -10,6 +10,7 @@ import PrivacyPolicy from "./PrivacyPolicy";
 import Contact from "./Contact";
 import RivalriesPage from "./RivalriesPage";
 import RequestFandomPage from "./RequestFandomPage";
+import BuyBannerPage from "./BuyBannerPage";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -25,6 +26,7 @@ createRoot(document.getElementById("root")).render(
         <Route path="/contact"         element={<Contact />} />
         <Route path="/rivalries"       element={<RivalriesPage />} />
         <Route path="/request-fandom"  element={<RequestFandomPage />} />
+        <Route path="/advertise"       element={<BuyBannerPage />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>
