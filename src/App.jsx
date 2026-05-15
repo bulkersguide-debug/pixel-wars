@@ -1126,10 +1126,8 @@ export default function App(){
         </div>
       </div>
 
-      {/* DISCORD FLOATING PANEL — Discord official widget, no bot needed */}
-      <div style={{position:"fixed",bottom:56,right:12,zIndex:600}}>
-        {showDiscord&&<div style={{position:"absolute",bottom:60,right:0,width:320,background:"#2f3136",borderRadius:12,overflow:"hidden",border:"2px solid #5865F2",boxShadow:"0 8px 40px rgba(88,101,242,.45)",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)",display:"flex",flexDirection:"column"}}>
-          {/* Header */}
+      {/* DISCORD FLOATING PANEL — triggered from DISC tab */}
+      {showDiscord&&<div style={{position:"fixed",bottom:70,right:200,zIndex:600,width:320,background:"#2f3136",borderRadius:12,overflow:"hidden",border:"2px solid #5865F2",boxShadow:"0 8px 40px rgba(88,101,242,.45)",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)",display:"flex",flexDirection:"column"}}>
           <div style={{background:"#202225",padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <svg width="18" height="14" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
@@ -1137,28 +1135,9 @@ export default function App(){
             </div>
             <button onClick={()=>setShowDiscord(false)} style={{background:"none",border:"none",color:"#72767d",cursor:"pointer",fontSize:16,lineHeight:1}}>✕</button>
           </div>
-          {/* Discord official widget iframe */}
-          <iframe
-            src={`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`}
-            width="320"
-            height="380"
-            style={{border:"none",display:"block"}}
-            sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
-            title="Discord"
-          />
-          {/* Join button */}
-          <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer"
-            style={{display:"block",padding:"11px",background:"linear-gradient(90deg,#5865F2,#7289DA)",textAlign:"center",textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#fff",letterSpacing:1}}>
-            JOIN SERVER →
-          </a>
-        </div>}
-        <button onClick={()=>setShowDiscord(s=>!s)} title="Discord" style={{width:48,height:48,borderRadius:"50%",background:showDiscord?"#5865F2":"linear-gradient(135deg,#5865F2,#7289DA)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 20px rgba(88,101,242,${showDiscord?.6:.35})`,transition:"all .2s",transform:showDiscord?"rotate(90deg)":"none"}}>
-          {showDiscord
-            ?<span style={{color:"#fff",fontSize:20}}>✕</span>
-            :<svg width="24" height="18" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="white"/></svg>
-          }
-        </button>
-      </div>
+          <iframe src={`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`} width="320" height="380" style={{border:"none",display:"block"}} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" title="Discord"/>
+          <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{display:"block",padding:"11px",background:"linear-gradient(90deg,#5865F2,#7289DA)",textAlign:"center",textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#fff",letterSpacing:1}}>JOIN SERVER →</a>
+      </div>}
 
       {/* RESET BUTTON */}
       <button onClick={()=>setShowReset(true)} style={{position:"fixed",bottom:12,left:12,zIndex:500,background:"rgba(10,5,5,.92)",border:"1px solid rgba(255,60,60,.3)",borderRadius:7,padding:"6px 12px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#ff6b6b",letterSpacing:1,backdropFilter:"blur(6px)"}}>🔄 RESET GRID</button>
