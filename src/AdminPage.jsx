@@ -2,7 +2,7 @@
 // Access at: /admin?s=YOUR_VITE_ADMIN_SECRET
 // Set VITE_ADMIN_SECRET in Vercel environment variables
 
-import { useState, useEffect } from "react"; 
+import { useState, useEffect } from "react";
 import { supabase, isOnline } from "./supabase";
 
 const ADMIN_PIN = "StamMike2009@@1"; // ← change this
