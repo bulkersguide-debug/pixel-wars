@@ -5,6 +5,7 @@ import ShareModal from "./ShareModal";
 import MissionsModal, { MISSIONS } from "./MissionsModal";
 import OnboardingModal from "./OnboardingModal";
 import PixelHistoryModal from "./PixelHistoryModal";
+import CookieBanner from "./CookieBanner";
 
 // ── SOUND SYSTEM ──────────────────────────────────────────────────────────────
 let _audioCtx=null;
@@ -915,9 +916,12 @@ export default function App(){
             <span style={{color:isOnline?"#00FF88":"#FF4400"}}>{isOnline?"LIVE":"OFFLINE"}</span>
             <span style={{color:"rgba(0,255,136,.5)"}}>· 🟢 {onlineCount} online</span>
           </div>
-          <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 ALL FANDOMS</button>
+          <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 FANDOMS</button>
+          <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
           <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{marginTop:3,display:"inline-block",background:"rgba(88,101,242,.12)",border:"1px solid rgba(88,101,242,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#7289DA",letterSpacing:1,textDecoration:"none"}}>💬 DISCORD</a>
           <div style={{display:"flex",gap:6,marginTop:3}}>
+            <a href="/contact" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",textDecoration:"none",letterSpacing:1}}>CONTACT</a>
+            <span style={{color:"#1a1a2e",fontSize:7}}>·</span>
             <a href="/terms" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",textDecoration:"none",letterSpacing:1}}>TERMS</a>
             <span style={{color:"#1a1a2e",fontSize:7}}>·</span>
             <a href="/privacy" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",textDecoration:"none",letterSpacing:1}}>PRIVACY</a>
@@ -1005,6 +1009,7 @@ export default function App(){
         onSkip={()=>setShowOnboarding(false)}
       />}
       {pixelHistory&&<PixelHistoryModal pixel={pixelHistory.pixel} history={pixelHistory.history} TM={TM} onClose={()=>setPixelHistory(null)} onJumpTo={()=>{setVx(Math.max(0,pixelHistory.gx-VW/2));setVy(Math.max(0,pixelHistory.gy-VH/2));setPixelHistory(null);}}/>}
+      <CookieBanner/>
 
       {/* NOTIFICATION PERMISSION BANNER */}
       {showNotifBanner&&notifPermission==="default"&&<div style={{background:"linear-gradient(90deg,rgba(0,255,136,.1),rgba(0,245,255,.06),transparent)",borderBottom:"1px solid rgba(0,255,136,.25)",padding:"6px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",animation:"slideDown .3s ease"}}>

@@ -7,6 +7,7 @@ import FandomDirectory from "./FandomDirectory";
 import AdminPage from "./AdminPage";
 import TermsOfService from "./TermsOfService";
 import PrivacyPolicy from "./PrivacyPolicy";
+import Contact from "./Contact";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -19,6 +20,7 @@ createRoot(document.getElementById("root")).render(
         <Route path="/admin"     element={<AdminPage />} />
         <Route path="/terms"     element={<TermsOfService />} />
         <Route path="/privacy"   element={<PrivacyPolicy />} />
+        <Route path="/contact"   element={<Contact />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>
