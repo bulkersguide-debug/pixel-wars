@@ -1441,7 +1441,7 @@ export default function App(){
           </div>}
 
           {/* FANDOM BROWSER / SHOP */}
-          <div style={{flex:1,overflowY:"auto",padding:"3px 5px 8px"}}>
+          <div style={{flex:1,overflowY:"auto",padding:"3px 5px 40px"}}>
             {mode==="SHOP"?(
               <><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,letterSpacing:3,color:"#C8FF00",marginBottom:7}}>💥 POWER-UP SHOP</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(132px,1fr))",gap:5}}>
