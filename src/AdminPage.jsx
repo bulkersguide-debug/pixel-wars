@@ -29,10 +29,32 @@ export default function AdminPage(){
   const [msSectorY,setMsSectorY]=useState("9");
   const [msDays,setMsDays]=useState("7");
   const [msPrize,setMsPrize]=useState("🏅 Mini Champion");
+  // Fandom requests
+  const [fandomRequests,setFandomRequests]=useState([]);
+  const [loadingRequests,setLoadingRequests]=useState(false);
 
   const addLog=(msg,color="#00F5FF")=>setLog(l=>[{id:Date.now(),msg,color,ts:new Date().toLocaleTimeString()},...l].slice(0,50));
 
+  const approveFandom=async(req)=>{
+    const{error}=await supabase.from("fandom_requests").update({status:"approved",reviewed_at:new Date().toISOString()}).eq("id",req.id);
+    if(!error){setFandomRequests(r=>r.map(x=>x.id===req.id?{...x,status:"approved"}:x));addLog(`✅ Approved: ${req.name}`,"#00FF88");}
+    else addLog("Error approving: "+error.message,"#FF4400");
+  };
+
+  const rejectFandom=async(req)=>{
+    const reason=prompt(`Reason for rejecting "${req.name}"? (optional)`)||"";
+    const{error}=await supabase.from("fandom_requests").update({status:"rejected",reviewed_at:new Date().toISOString(),reject_reason:reason}).eq("id",req.id);
+    if(!error){setFandomRequests(r=>r.map(x=>x.id===req.id?{...x,status:"rejected"}:x));addLog(`❌ Rejected: ${req.name}`,"#FF4400");}
+    else addLog("Error rejecting: "+error.message,"#FF4400");
+  };
+
   useEffect(()=>{if(auth)loadStats();},[auth]);
+  useEffect(()=>{
+    if(!auth)return;
+    setLoadingRequests(true);
+    supabase.from("fandom_requests").select("*").order("created_at",{ascending:false})
+      .then(({data})=>{setFandomRequests(data||[]);setLoadingRequests(false);});
+  },[auth]);
 
   const loadStats=async()=>{
     setLoading(true);
@@ -297,6 +319,33 @@ export default function AdminPage(){
               </div>
             ))}
           </div>}
+
+          {/* FANDOM REQUESTS */}
+          <div style={{background:"#09091a",border:"2px solid rgba(200,255,0,.4)",borderRadius:12,padding:"18px"}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#C8FF00",letterSpacing:3,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span>📨 FANDOM REQUESTS</span>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FF4400",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.3)",borderRadius:4,padding:"2px 7px"}}>
+                {fandomRequests.filter(r=>r.status==="pending").length} pending
+              </span>
+            </div>
+            {loadingRequests&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>Loading...</div>}
+            {!loadingRequests&&fandomRequests.length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>No requests yet</div>}
+            {fandomRequests.map(req=>(
+              <div key={req.id} style={{marginBottom:8,padding:"10px 12px",background:req.status==="pending"?"rgba(200,255,0,.04)":req.status==="approved"?"rgba(0,255,136,.04)":"rgba(255,68,0,.04)",border:`1px solid ${req.status==="pending"?"rgba(200,255,0,.15)":req.status==="approved"?"rgba(0,255,136,.2)":"rgba(255,68,0,.15)"}`,borderRadius:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                  <div style={{width:10,height:10,borderRadius:2,background:req.color,flexShrink:0}}/>
+                  <span style={{fontWeight:700,fontSize:12,color:"#e0e8ff",flex:1}}>{req.name}</span>
+                  <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)"}}>{req.category.split(" ")[0]}</span>
+                  <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:req.status==="pending"?"#FFD700":req.status==="approved"?"#00FF88":"#FF4400",padding:"2px 6px",border:`1px solid currentColor`,borderRadius:3}}>{req.status.toUpperCase()}</span>
+                </div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",marginBottom:req.status==="pending"?8:0}}>{new Date(req.created_at).toLocaleDateString()}</div>
+                {req.status==="pending"&&<div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>approveFandom(req)} style={{flex:1,padding:"6px",background:"rgba(0,255,136,.1)",border:"1px solid rgba(0,255,136,.3)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00FF88",fontWeight:900}}>✅ APPROVE</button>
+                  <button onClick={()=>rejectFandom(req)} style={{flex:1,padding:"6px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.25)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",fontWeight:900}}>❌ REJECT</button>
+                </div>}
+              </div>
+            ))}
+          </div>
 
           {/* MINI-SEASON CREATOR */}
           <div style={{background:"#09091a",border:"1px solid rgba(255,215,0,.3)",borderRadius:12,padding:"18px"}}>
