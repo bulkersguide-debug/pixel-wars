@@ -101,7 +101,7 @@ const RARITY_COLOR={COMMON:"#aaa",UNCOMMON:"#00CC44",RARE:"#0088FF",EPIC:"#AA00F
 const DISCORD_ID="1504550947295072328";
 const DISCORD_CHANNEL="1504550948541042819";
 const DISCORD_WIDGET=`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`;
-const DISCORD_INVITE="https://discord.gg/GbxBnr5D";
+const DISCORD_INVITE="https://discord.gg/4Da2avYyPF";
 const EVENTS=[
   {icon:"⚡",label:"CHAOS HOUR",desc:"RAIDS 50% OFF!",duration:600,color:"#FF4400"},
   {icon:"💎",label:"MEGA BONUS",desc:"Buy 10px → get 5 FREE!",duration:300,color:"#FFD700"},
