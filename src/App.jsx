@@ -1121,9 +1121,12 @@ export default function App(){
       </div>
 
       {/* GUEST BANNER */}
-      {!user&&!loading&&<div style={{background:"rgba(88,101,242,.1)",borderBottom:"1px solid rgba(88,101,242,.3)",padding:"5px 14px",display:"flex",alignItems:"center",gap:8}}>
-        <span style={{fontSize:14}}>👀</span>
-        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#7289DA"}}>Viewing as guest — sign in with Discord to claim territory and get <strong style={{color:"#FFD700"}}>25 FREE pixels</strong></span>
+      {!user&&!loading&&<div style={{background:"rgba(88,101,242,.1)",borderBottom:"1px solid rgba(88,101,242,.3)",padding:"5px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:14}}>👀</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#7289DA"}}>Viewing as guest — sign in to claim territory and get <strong style={{color:"#FFD700"}}>25 FREE pixels</strong></span>
+        </div>
+        <button onClick={()=>setShowAuthModal(true)} style={{padding:"4px 14px",background:"linear-gradient(90deg,#5865F2,#7289DA)",border:"none",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#fff",letterSpacing:1}}>LOGIN WITH DISCORD →</button>
       </div>}
 
       {/* SUPABASE ERROR STATE */}
