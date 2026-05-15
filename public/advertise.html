@@ -5,190 +5,90 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Advertise — Pixels of War</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap');
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#040408;color:#c0c8e8;font-family:'Rajdhani',sans-serif;min-height:100vh}
-.header{background:#06060e;border-bottom:1px solid #1a1a30;padding:14px 24px;display:flex;align-items:center;gap:12px}
-.back{background:rgba(0,245,255,.08);border:1px solid rgba(0,245,255,.25);border-radius:6px;padding:6px 14px;font-family:'Orbitron',monospace;font-size:9px;color:#00F5FF;letter-spacing:1px;text-decoration:none;cursor:pointer}
-.logo{font-family:'Orbitron',monospace;font-size:16px;font-weight:900;letter-spacing:3px;background:linear-gradient(90deg,#FFD700,#FF9900);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-left:auto}
-.wrap{max-width:600px;margin:0 auto;padding:40px 20px 80px}
-h1{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;color:#FFD700;letter-spacing:3px;text-align:center;margin-bottom:8px}
-.sub{font-size:13px;color:rgba(192,200,232,.5);text-align:center;margin-bottom:32px;line-height:1.6}
-.label{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:#3a3a5a;margin-bottom:8px;display:block}
-input[type=text],input[type=email]{width:100%;background:#0c0c1c;border:1px solid rgba(255,215,0,.25);border-radius:8px;padding:12px 16px;color:#e0e8ff;font-size:14px;font-family:'Rajdhani',sans-serif;outline:none;margin-bottom:4px}
-input:focus{border-color:rgba(255,215,0,.5)}
-.chars{font-family:'Share Tech Mono',monospace;font-size:8px;color:#2a2a4a;text-align:right;margin-bottom:20px}
-.preview{padding:12px 16px;background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.2);border-radius:10px;margin-bottom:24px}
-.preview-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:#FFD700;margin-bottom:6px}
-.preview-text{font-family:'Share Tech Mono',monospace;font-size:11px;color:#FFD700;background:rgba(255,215,0,.04);border:1px solid rgba(255,215,0,.15);border-radius:6px;padding:8px 12px}
-.type-btns{display:flex;gap:8px;margin-bottom:16px}
-.type-btn{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:'Orbitron',monospace;font-size:10px;font-weight:900;transition:all .15s}
-.type-btn.on{border-color:#FFD700;background:rgba(255,215,0,.1);color:#FFD700}
-.price-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:28px}
-.price-card{padding:12px 8px;border-radius:9px;border:2px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);cursor:pointer;text-align:center;transition:all .15s}
-.price-card.on{border-color:#FFD700;background:rgba(255,215,0,.1)}
-.price-card .amt{font-family:'Orbitron',monospace;font-size:13px;font-weight:900;color:#c0c8e8;margin-bottom:4px}
-.price-card.on .amt{color:#FFD700}
-.price-card .unit{font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,255,255,.3)}
-.price-card .eur{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:rgba(255,255,255,.4);margin-top:4px}
-.price-card.on .eur{color:#C8FF00}
-.summary{padding:16px 20px;background:rgba(200,255,0,.06);border:1px solid rgba(200,255,0,.2);border-radius:10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-.total-price{font-family:'Orbitron',monospace;font-size:28px;font-weight:900;color:#C8FF00}
-.payment-note{text-align:right;font-family:'Share Tech Mono',monospace;font-size:9px;color:#3a3a5a;line-height:1.8}
-.err{padding:10px 14px;background:rgba(255,68,0,.1);border:1px solid rgba(255,68,0,.3);border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:10px;color:#FF4400;margin-bottom:16px;display:none}
-.submit{width:100%;padding:15px;border:none;border-radius:10px;cursor:not-allowed;font-family:'Orbitron',monospace;font-weight:900;font-size:13px;letter-spacing:2px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.2);transition:all .2s}
-.submit.ready{background:linear-gradient(90deg,#FFD700,#FF9900);color:#040408;cursor:pointer}
-.note{font-family:'Share Tech Mono',monospace;font-size:8px;color:#2a2a4a;text-align:center;margin-top:10px}
-.success{text-align:center;padding:60px 20px;display:none}
-.faq{margin-top:36px;border-top:1px solid #1a1a30;padding-top:24px}
-.faq-title{font-family:'Orbitron',monospace;font-size:10px;font-weight:900;color:#3a3a5a;letter-spacing:2px;margin-bottom:16px}
-.faq-item{margin-bottom:14px;padding:12px 16px;background:rgba(255,255,255,.03);border-radius:8px}
-.faq-q{font-family:'Orbitron',monospace;font-size:9px;color:#c0c8e8;font-weight:900;margin-bottom:4px}
-.faq-a{font-size:12px;color:rgba(192,200,232,.5);line-height:1.6}
-.mb{margin-bottom:20px}
+body{background:#040408;color:#FFD700;font-family:monospace;padding:40px;min-height:100vh}
+h1{font-size:28px;margin-bottom:20px}
+p{color:#c0c8e8;margin-bottom:16px;line-height:1.6}
+input{width:100%;padding:12px;background:#0c0c1c;border:1px solid #FFD700;color:#fff;font-size:14px;margin-bottom:12px;border-radius:6px;box-sizing:border-box}
+select{width:100%;padding:12px;background:#0c0c1c;border:1px solid #FFD700;color:#fff;font-size:14px;margin-bottom:12px;border-radius:6px}
+button{width:100%;padding:14px;background:#FFD700;color:#040408;font-size:14px;font-weight:900;border:none;border-radius:6px;cursor:pointer;margin-bottom:8px}
+a{color:#00F5FF}
+.price{font-size:24px;font-weight:900;color:#C8FF00;margin:16px 0}
 </style>
 </head>
 <body>
-<div class="header">
-  <a href="/" class="back">← BACK TO GAME</a>
-  <div class="logo">📣 ADVERTISE</div>
-</div>
-<div class="wrap">
-  <div id="form-section">
-    <div style="text-align:center;margin-bottom:32px">
-      <div style="font-size:40px;margin-bottom:12px">📣</div>
-      <h1>ADVERTISE HERE</h1>
-      <p class="sub">Your message scrolls across the top of Pixels of War — seen by every player in real time.<br/>Perfect for promoting a Discord server, fandom event, or community.</p>
-    </div>
+<a href="/">← Back to Game</a>
+<h1>📣 ADVERTISE ON PIXELS OF WAR</h1>
+<p>Your message scrolls across the top of the game — seen by every player in real time.</p>
 
-    <div class="preview">
-      <div class="preview-label">LIVE PREVIEW — your banner will look like this:</div>
-      <div class="preview-text" id="preview-text">★ Your message scrolls here across the game... ★</div>
-    </div>
+<label>Your message (max 120 chars):</label>
+<input type="text" id="msg" maxlength="120" placeholder="Join our BTS Discord! discord.gg/example" oninput="upd()"/>
 
-    <div class="mb">
-      <label class="label">YOUR MESSAGE *</label>
-      <input type="text" id="msg" placeholder="Join our BTS Discord! · discord.gg/yourserver" maxlength="120" oninput="upd()"/>
-      <div class="chars"><span id="mc">0</span>/120 characters</div>
-    </div>
+<label>Your email:</label>
+<input type="email" id="email" placeholder="you@example.com" oninput="upd()"/>
 
-    <div class="mb">
-      <label class="label">YOUR EMAIL * (for payment &amp; confirmation)</label>
-      <input type="email" id="email" placeholder="you@example.com" oninput="upd()"/>
-    </div>
+<label>Duration:</label>
+<select id="dur" onchange="upd()">
+  <option value="1h|2">1 hour — €2</option>
+  <option value="6h|8">6 hours — €8</option>
+  <option value="12h|14">12 hours — €14</option>
+  <option value="24h|20">24 hours — €20</option>
+  <option value="1d|20">1 day — €20</option>
+  <option value="3d|50">3 days — €50</option>
+  <option value="7d|100">7 days — €100</option>
+  <option value="30d|350">30 days — €350</option>
+</select>
 
-    <div class="mb">
-      <label class="label">DURATION TYPE</label>
-      <div class="type-btns">
-        <button class="type-btn on" onclick="selType(this,'hours')">⏰ HOURS</button>
-        <button class="type-btn" onclick="selType(this,'days')">📅 DAYS</button>
-      </div>
-    </div>
+<div class="price" id="price">€2</div>
 
-    <div class="mb">
-      <label class="label">SELECT DURATION &amp; PRICE</label>
-      <div class="price-grid" id="price-grid"></div>
-    </div>
+<button onclick="send()" id="btn" disabled>📣 REQUEST BANNER SLOT</button>
+<p style="font-size:12px;color:#3a3a5a">We'll email you payment details. Banner goes live within 2h of payment.</p>
 
-    <div class="summary">
-      <div>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#3a3a5a;margin-bottom:4px">TOTAL COST</div>
-        <div class="total-price" id="total-price">€2</div>
-        <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#3a3a5a" id="duration-label">for 1 hour</div>
-      </div>
-      <div class="payment-note">
-        <div style="font-size:10px;color:#c0c8e8;margin-bottom:4px">PAYMENT METHOD</div>
-        We'll email you options<br/>Bank · PayPal · Crypto
-      </div>
-    </div>
-
-    <div class="err" id="err"></div>
-    <button class="submit" id="sub" onclick="send()">📣 REQUEST BANNER SLOT</button>
-    <div class="note">We review all banners · Goes live within 2h of payment · No offensive content</div>
-
-    <div class="faq">
-      <div class="faq-title">FREQUENTLY ASKED QUESTIONS</div>
-      <div class="faq-item"><div class="faq-q">Who sees my banner?</div><div class="faq-a">Every player on pixelsofwar.com — desktop and mobile. The banner scrolls continuously while active.</div></div>
-      <div class="faq-item"><div class="faq-q">How do I pay?</div><div class="faq-a">After submitting, we'll email you payment options (bank transfer, PayPal, or crypto). Banner goes live within 2 hours of payment confirmation.</div></div>
-      <div class="faq-item"><div class="faq-q">Can I cancel?</div><div class="faq-a">Banners are non-refundable once live. For changes before activation, email info@pixelsofwar.com</div></div>
-      <div class="faq-item"><div class="faq-q">What's not allowed?</div><div class="faq-a">No adult content, hate speech, scams, or illegal services. All banners are reviewed before approval.</div></div>
-    </div>
-  </div>
-
-  <div class="success" id="success">
-    <div style="font-size:56px;margin-bottom:16px">✅</div>
-    <div style="font-family:'Orbitron',monospace;font-size:18px;font-weight:900;color:#FFD700;letter-spacing:2px;margin-bottom:12px">REQUEST RECEIVED!</div>
-    <p style="font-size:14px;color:rgba(192,200,232,.6);margin-bottom:8px">We'll contact you at <strong id="confirm-email" style="color:#e0e8ff"></strong> with payment details.</p>
-    <p style="font-size:12px;color:rgba(192,200,232,.3);margin-bottom:28px">Your banner goes live within 2 hours of payment confirmation.</p>
-    <a href="/" style="padding:12px 28px;background:linear-gradient(90deg,#FFD700,#FF9900);color:#040408;border-radius:8px;text-decoration:none;font-family:'Orbitron',monospace;font-weight:900;font-size:11px">← BACK TO GAME</a>
-  </div>
+<div id="ok" style="display:none;background:#00FF8822;border:1px solid #00FF88;padding:20px;border-radius:8px;text-align:center">
+  <h2 style="color:#00FF88">✅ Request Submitted!</h2>
+  <p>We'll contact you at <span id="em"></span> with payment details.</p>
+  <a href="/">← Back to Game</a>
 </div>
 
 <script>
-const SUPABASE_URL='https://bvafgptmjvggbbjbicfw.supabase.co';
+const URL='https://bvafgptmjvggbbjbicfw.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2YWZncHRtanZnZ2JiamJpY2Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NTk4NjEsImV4cCI6MjA5NDMzNTg2MX0.dI7JqhHHR6wxdxpcz2GJuVszOVcRsaXQj21eopwzXrI';
-
-const PRICES={hours:{1:2,6:8,12:14,24:20},days:{1:20,3:50,7:100,30:350}};
-let durType='hours',durAmt=1,selPrice=2;
-
-function buildGrid(){
-  const grid=document.getElementById('price-grid');
-  grid.innerHTML='';
-  Object.entries(PRICES[durType]).forEach(([amt,p])=>{
-    const d=document.createElement('div');
-    d.className='price-card'+(parseInt(amt)===durAmt?' on':'');
-    d.innerHTML=`<div class="amt">${amt}</div><div class="unit">${durType==='hours'?'hr':'day'}${parseInt(amt)>1?'s':''}</div><div class="eur">€${p}</div>`;
-    d.onclick=()=>{durAmt=parseInt(amt);selPrice=p;buildGrid();upd();};
-    grid.appendChild(d);
-  });
-  document.getElementById('total-price').textContent='€'+selPrice;
-  document.getElementById('duration-label').textContent='for '+durAmt+' '+durType;
-}
-
-function selType(btn,t){
-  durType=t;durAmt=Object.keys(PRICES[t])[0]*1;selPrice=Object.values(PRICES[t])[0];
-  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('on'));
-  btn.classList.add('on');
-  buildGrid();upd();
-}
 
 function upd(){
   const msg=document.getElementById('msg').value.trim();
   const em=document.getElementById('email').value.trim();
-  document.getElementById('mc').textContent=document.getElementById('msg').value.length;
-  document.getElementById('preview-text').textContent='★ '+(msg||'Your message scrolls here...')+' ★';
+  const dur=document.getElementById('dur').value;
+  const price=dur.split('|')[1];
+  document.getElementById('price').textContent='€'+price;
   const ok=msg.length>=5&&em.includes('@');
-  const btn=document.getElementById('sub');
-  btn.className='submit'+(ok?' ready':'');
+  const btn=document.getElementById('btn');
   btn.disabled=!ok;
-  btn.textContent=ok?'📣 REQUEST BANNER SLOT — €'+selPrice:'📣 REQUEST BANNER SLOT';
+  btn.textContent=ok?'📣 REQUEST BANNER — €'+price:'📣 REQUEST BANNER SLOT';
 }
 
 async function send(){
   const msg=document.getElementById('msg').value.trim();
   const em=document.getElementById('email').value.trim();
-  if(msg.length<5||!em.includes('@'))return;
-  const btn=document.getElementById('sub');
-  btn.disabled=true;btn.textContent='⏳ SUBMITTING...';
-  document.getElementById('err').style.display='none';
+  const dur=document.getElementById('dur').value.split('|');
+  const btn=document.getElementById('btn');
+  btn.disabled=true;btn.textContent='Submitting...';
   try{
-    const r=await fetch(SUPABASE_URL+'/rest/v1/sponsored_banners',{
+    const durType=dur[0].includes('h')?'hours':'days';
+    const durAmt=parseInt(dur[0]);
+    const r=await fetch(URL+'/rest/v1/sponsored_banners',{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},
-      body:JSON.stringify({message:msg,contact_email:em,duration_type:durType,duration_amount:durAmt,price_eur:selPrice,status:'pending'})
+      body:JSON.stringify({message:msg,contact_email:em,duration_type:durType,duration_amount:durAmt,price_eur:parseFloat(dur[1]),status:'pending'})
     });
     if(!r.ok)throw new Error(await r.text());
-    document.getElementById('confirm-email').textContent=em;
-    document.getElementById('form-section').style.display='none';
-    document.getElementById('success').style.display='block';
+    document.getElementById('em').textContent=em;
+    document.querySelector('form')||document.getElementById('btn').parentElement;
+    document.getElementById('ok').style.display='block';
+    btn.style.display='none';
   }catch(e){
-    document.getElementById('err').textContent='Failed: '+e.message;
-    document.getElementById('err').style.display='block';
-    btn.disabled=false;btn.textContent='📣 REQUEST BANNER SLOT — €'+selPrice;btn.className='submit ready';
+    alert('Error: '+e.message);
+    btn.disabled=false;
   }
 }
-
-window.onload=buildGrid;
 </script>
 </body>
 </html>
