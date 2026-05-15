@@ -10,7 +10,23 @@ const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || "";
 
 const rgba=(hex,a)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;};
 
-function AdminBannerForm({onCreated,addLog}){
+function BannerCountdown({endAt}){
+  const [left,setLeft]=useState("");
+  useEffect(()=>{
+    const calc=()=>{
+      const diff=new Date(endAt)-new Date();
+      if(diff<=0){setLeft("EXPIRED");return;}
+      const h=Math.floor(diff/3600000);
+      const m=Math.floor((diff%3600000)/60000);
+      const s=Math.floor((diff%60000)/1000);
+      setLeft(h>0?`${h}h ${m}m ${s}s`:`${m}m ${s}s`);
+    };
+    calc();
+    const t=setInterval(calc,1000);
+    return()=>clearInterval(t);
+  },[endAt]);
+  return<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00FF88"}}>⏱ {left}</span>;
+}
   const [msg,setMsg]=useState("");
   const [hours,setHours]=useState("24");
   const [loading,setLoading]=useState(false);
@@ -92,7 +108,18 @@ export default function AdminPage(){
     if(!error){setBanners(r=>r.map(x=>x.id===b.id?{...x,status:"rejected"}:x));addLog(`❌ Banner rejected`,"#FF4400");}
   };
 
-  const approveFandom=async(req)=>{
+  const terminateBanner=async(b)=>{
+    if(!window.confirm(`Stop banner "${b.message.slice(0,40)}..."?`))return;
+    const{error}=await supabase.from("sponsored_banners").update({status:"expired",end_at:new Date().toISOString()}).eq("id",b.id);
+    if(!error){setBanners(r=>r.map(x=>x.id===b.id?{...x,status:"expired"}:x));addLog(`🛑 Banner terminated`,"#FF4400");}
+  };
+
+  const editBanner=async(b)=>{
+    const newMsg=window.prompt("Edit banner message:",b.message);
+    if(!newMsg||newMsg.trim().length<5){addLog("Message too short","#FF4400");return;}
+    const{error}=await supabase.from("sponsored_banners").update({message:newMsg.trim()}).eq("id",b.id);
+    if(!error){setBanners(r=>r.map(x=>x.id===b.id?{...x,message:newMsg.trim()}:x));addLog(`✏️ Banner updated`,"#FFD700");}
+  };
     const{error}=await supabase.from("fandom_requests").update({status:"approved",reviewed_at:new Date().toISOString()}).eq("id",req.id);
     if(!error){setFandomRequests(r=>r.map(x=>x.id===req.id?{...x,status:"approved"}:x));addLog(`✅ Approved: ${req.name}`,"#00FF88");}
     else addLog("Error approving: "+error.message,"#FF4400");
@@ -411,7 +438,19 @@ export default function AdminPage(){
                   <button onClick={()=>approveBanner(b)} style={{flex:1,padding:"6px",background:"rgba(0,255,136,.1)",border:"1px solid rgba(0,255,136,.3)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00FF88",fontWeight:900}}>✅ APPROVE & ACTIVATE</button>
                   <button onClick={()=>rejectBanner(b)} style={{flex:1,padding:"6px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.25)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",fontWeight:900}}>❌ REJECT</button>
                 </div>}
-                {b.status==="active"&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00FF88"}}>🟢 LIVE NOW — scrolling for all players</div>}
+                {b.status==="active"&&<div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:6,height:6,borderRadius:"50%",background:"#00FF88",animation:"pulse .8s infinite"}}/>
+                      <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00FF88"}}>LIVE</span>
+                      {b.end_at&&<BannerCountdown endAt={b.end_at}/>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>editBanner(b)} style={{flex:1,padding:"6px",background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.25)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700",fontWeight:900}}>✏️ EDIT</button>
+                    <button onClick={()=>terminateBanner(b)} style={{flex:1,padding:"6px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.25)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",fontWeight:900}}>🛑 TERMINATE</button>
+                  </div>
+                </div>}
               </div>
             ))}
           </div>
