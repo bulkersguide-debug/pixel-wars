@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-const EFFECTIVE_DATE = "15 May 2025";
+const EFFECTIVE_DATE = "15 May 2026";
 const COMPANY = "Pixels of War";
 const CONTACT_EMAIL = "info@pixelsofwar.com"; // ← change this
 const WEBSITE = "https://www.pixelsofwar.com";
@@ -62,7 +62,8 @@ export default function PrivacyPolicy() {
             <tr><th>DATA TYPE</th><th>WHAT WE COLLECT</th><th>PURPOSE</th><th>LEGAL BASIS</th></tr>
           </thead>
           <tbody>
-            <tr><td><strong>Game data</strong></td><td>Pixel claims, territory, fandom choice, season history, power-up usage</td><td>Running the game</td><td>Contract performance</td></tr>
+            <tr><td><strong>Account data</strong></td><td>Discord username, Discord user ID, avatar image URL</td><td>Creating your player profile</td><td>Contract performance</td></tr>
+            <tr><td><strong>Game data</strong></td><td>Pixel claims, territory, fandom choice, season history, power-up usage, chat messages, role/rank</td><td>Running the game</td><td>Contract performance</td></tr>
             <tr><td><strong>Payment data</strong></td><td>Transaction amounts, timestamps. Card details handled by Stripe — we never see them.</td><td>Processing payments</td><td>Contract performance</td></tr>
             <tr><td><strong>Technical data</strong></td><td>IP address (hashed for referral tracking), browser type, device type</td><td>Security, fraud prevention</td><td>Legitimate interest</td></tr>
             <tr><td><strong>Usage data</strong></td><td>Pages visited, features used, session duration</td><td>Improving the service</td><td>Legitimate interest</td></tr>
@@ -89,7 +90,8 @@ export default function PrivacyPolicy() {
             <tr><th>PROVIDER</th><th>PURPOSE</th><th>DATA SHARED</th><th>LOCATION</th></tr>
           </thead>
           <tbody>
-            <tr><td><strong>Supabase</strong></td><td>Game database & real-time features</td><td>Game data, technical data</td><td>EU (AWS Frankfurt)</td></tr>
+            <tr><td><strong>Supabase</strong></td><td>Game database, auth & real-time features</td><td>Game data, account data, technical data</td><td>EU (AWS Frankfurt)</td></tr>
+            <tr><td><strong>Discord</strong></td><td>OAuth authentication (login)</td><td>Username, user ID, avatar URL</td><td>US (SCCs in place)</td></tr>
             <tr><td><strong>Stripe</strong></td><td>Payment processing</td><td>Payment data</td><td>EU/US (Privacy Shield)</td></tr>
             <tr><td><strong>Vercel</strong></td><td>Web hosting & deployment</td><td>Technical data</td><td>EU/US</td></tr>
             <tr><td><strong>Cloudflare</strong></td><td>Security & CDN</td><td>IP address, technical data</td><td>EU/US</td></tr>

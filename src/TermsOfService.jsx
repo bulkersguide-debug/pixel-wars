@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-const EFFECTIVE_DATE = "15 May 2025";
+const EFFECTIVE_DATE = "15 May 2026";
 const COMPANY = "Pixels of War";
 const CONTACT_EMAIL = "info@pixelsofwar.com"; // ← change this
 const WEBSITE = "https://www.pixelsofwar.com";
@@ -50,11 +50,23 @@ export default function TermsOfService() {
         <p>By creating an account, purchasing pixels, or otherwise using {COMPANY}, you confirm that you are at least <strong>18 years of age</strong> (or the age of majority in your jurisdiction, whichever is higher), and that you agree to be bound by these Terms and our <a href="/privacy">Privacy Policy</a>.</p>
         <p>If you do not agree to these Terms, you must stop using the service immediately.</p>
 
-        <h2>2. DESCRIPTION OF SERVICE</h2>
+        <h2>2. ACCOUNTS AND AUTHENTICATION</h2>
+        <p>To interact with {COMPANY} (claim pixels, send chat messages, form alliances, use power-ups), you must sign in using <strong>Discord OAuth</strong>. By signing in you authorise us to access your Discord username, user ID, and avatar. We do not access your Discord messages, friends list, or any other data.</p>
+        <p>You are responsible for maintaining the security of your Discord account. We are not liable for any loss resulting from unauthorised access to your account.</p>
+        <p>We may suspend or permanently ban accounts that violate these Terms, at our sole discretion.</p>
+
+        <h2>3. FREE PIXELS AND VIRTUAL ITEMS</h2>
+        <p>New players receive <strong>25 free pixels</strong> upon first login. These pixels are a promotional bonus with <strong>no monetary value</strong>. They cannot be transferred between accounts, redeemed for cash, or carried over between seasons.</p>
+        <p>Additional free pixels may be awarded through daily login streaks, combo bonuses, and referrals. All free pixel bonuses are subject to change at our discretion.</p>
+
+        <h2>4. ROLES AND MODERATION</h2>
+        <p>Players may be assigned roles including <strong>VIP</strong>, <strong>Moderator</strong>, or <strong>Admin</strong> at our discretion. Roles convey no financial value or legal rights.</p>
+        <p>Moderators have the ability to remove chat messages that violate these Terms. Admins have full platform access. Roles may be revoked at any time without notice.</p>
+        <p>Guest users (not logged in) may view the game but cannot claim pixels, send messages, or interact with other game features.</p>
         <p>{COMPANY} is an online game in which users purchase virtual pixels on a shared digital grid to represent their chosen fandom ("Territory"). Players may claim empty pixels, raid unprotected enemy pixels, and compete for territorial dominance across seasonal competitions.</p>
         <p>The service is provided on an "as is" and "as available" basis. We reserve the right to modify, suspend, or discontinue any aspect of the service at any time.</p>
 
-        <h2>3. VIRTUAL ITEMS AND PAYMENTS</h2>
+        <h2>5. VIRTUAL ITEMS AND PAYMENTS</h2>
         <h3>3.1 Pixels and Virtual Currency</h3>
         <p>Pixels purchased on {COMPANY} are <strong>virtual items with no real-world monetary value</strong>. They cannot be exchanged for real money, transferred between accounts, or redeemed for any tangible goods or services outside the platform.</p>
         <p>All purchases are for virtual, in-game content only. You are purchasing a limited, non-exclusive, revocable licence to use that virtual content within the game.</p>
@@ -69,11 +81,11 @@ export default function TermsOfService() {
         <p>All purchases are <strong>final and non-refundable</strong>, except as required by applicable law. If you experience a technical issue that prevents delivery of purchased content, please contact us at <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> within 48 hours and we will investigate.</p>
         <p>Under EU consumer law, you may have a 14-day right of withdrawal for digital content purchases. By proceeding with a purchase and accessing the digital content immediately, you acknowledge that the right of withdrawal no longer applies once delivery has begun.</p>
 
-        <h2>4. SEASONAL RESETS</h2>
+        <h2>6. SEASONAL RESETS</h2>
         <p>The game operates in <strong>seasons</strong> (approximately 90 days each). At the end of each season, all pixel territories are reset and a new season begins. This is a core feature of the game, not a defect. Purchasing pixels constitutes acceptance that your territory will be reset at season end.</p>
         <p>Season results and champion records are retained permanently and displayed in the Hall of Fame.</p>
 
-        <h2>5. USER CONDUCT</h2>
+        <h2>7. USER CONDUCT</h2>
         <p>You agree not to:</p>
         <ul>
           <li>Use bots, scripts, or automated tools to interact with the game</li>
@@ -86,11 +98,11 @@ export default function TermsOfService() {
         </ul>
         <p>Violation of these rules may result in immediate account suspension or permanent ban without refund.</p>
 
-        <h2>6. INTELLECTUAL PROPERTY</h2>
+        <h2>8. INTELLECTUAL PROPERTY</h2>
         <p>All content on {COMPANY} — including the game engine, graphics, UI, game mechanics, and branding — is owned by or licensed to {COMPANY} and is protected by intellectual property laws.</p>
         <p>Fandom names, logos, and related trademarks referenced in the game belong to their respective owners. {COMPANY} is an independent fan-created platform and is not affiliated with, endorsed by, or sponsored by any of the fandoms represented.</p>
 
-        <h2>7. DISCLAIMERS AND LIMITATION OF LIABILITY</h2>
+        <h2>9. DISCLAIMERS AND LIMITATION OF LIABILITY</h2>
         <p>To the maximum extent permitted by law, {COMPANY} shall not be liable for:</p>
         <ul>
           <li>Loss of virtual items due to account termination for breach of these Terms</li>
@@ -100,17 +112,17 @@ export default function TermsOfService() {
         </ul>
         <p>Nothing in these Terms limits liability for death or personal injury caused by our negligence, fraud, or any other liability that cannot be excluded by law.</p>
 
-        <h2>8. TERMINATION</h2>
+        <h2>10. TERMINATION</h2>
         <p>We may suspend or terminate your access to {COMPANY} at any time for breach of these Terms. You may stop using the service at any time.</p>
         <p>Upon termination, your pixel territory will be removed and any unused in-game bonuses will be forfeited. Payments already made for consumed content are non-refundable.</p>
 
-        <h2>9. CHANGES TO TERMS</h2>
+        <h2>11. CHANGES TO TERMS</h2>
         <p>We may update these Terms from time to time. We will notify you of material changes by posting a notice on the platform. Continued use of the service after changes take effect constitutes your acceptance of the revised Terms.</p>
 
-        <h2>10. GOVERNING LAW</h2>
+        <h2>12. GOVERNING LAW</h2>
         <p>These Terms are governed by the laws of <strong>Greece</strong> and the European Union. Any disputes shall be subject to the exclusive jurisdiction of the courts of Greece, without prejudice to your rights as a consumer under the laws of your country of residence.</p>
 
-        <h2>11. CONTACT</h2>
+        <h2>13. CONTACT</h2>
         <p>If you have questions about these Terms, please contact us at:<br/>
         📧 <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a><br/>
         🌐 <a href={WEBSITE}>{WEBSITE}</a></p>
