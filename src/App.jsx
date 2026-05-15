@@ -398,7 +398,22 @@ export default function App(){
   };
 
   useEffect(()=>{const add=()=>{const t1=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];let t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];while(t2===t1)t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];const acts=["claimed","raided","shielded","renewed"];const action=acts[randInt(0,acts.length-1)];const px=randInt(1,60);const icon={"claimed":"🏴","raided":"⚔️","shielded":"🛡️","renewed":"♻️"}[action];setFeed(f=>[{id:Date.now()+Math.random(),icon,team:t1,msg:action==="claimed"?`claimed ${px}px`:action==="raided"?`RAIDED ${t2}`:action==="renewed"?`renewed ${px}px`:`shielded territory`,color:tc(t1),ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"})},...f].slice(0,40));};add();const iv=setInterval(add,randInt(2500,5500));return()=>clearInterval(iv);},[]);
-  useEffect(()=>{const start=()=>{const ev=EVENTS[randInt(0,EVENTS.length-1)];setEvent(ev);setEventTimer(ev.duration);pushToast(`${ev.icon} ${ev.label}! ${ev.desc}`,"#FFD700",4000);};const iv=setInterval(()=>setEventTimer(t=>{if(t<=1){setEvent(null);setTimeout(start,randInt(15000,30000));return 0;}return t-1;}),1000);setTimeout(start,6000);return()=>clearInterval(iv);},[]);
+  useEffect(()=>{
+    let active=true;
+    const start=()=>{
+      if(!active)return;
+      const ev=EVENTS[randInt(0,EVENTS.length-1)];
+      setEvent(ev);setEventTimer(ev.duration);
+      // Don't push toast for every event — only occasionally
+      if(Math.random()>.4)pushToast(`${ev.icon} ${ev.label} — ${ev.desc}`,"#FFD700",4000);
+    };
+    const iv=setInterval(()=>setEventTimer(t=>{
+      if(t<=1){setEvent(null);if(active)setTimeout(start,randInt(20000,40000));return 0;}
+      return t-1;
+    }),1000);
+    setTimeout(start,8000);
+    return()=>{active=false;clearInterval(iv);};
+  },[]);
   useEffect(()=>{const f=(e)=>{if(e.key==="Escape"){setActive(null);setPending(new Set());}};window.addEventListener("keydown",f);return()=>window.removeEventListener("keydown",f);},[]);
 
   // ── RESIZE DETECTION ──────────────────────────────────────────────────────
@@ -765,9 +780,9 @@ export default function App(){
 
       {flashColor&&<div style={{position:"fixed",inset:0,background:rgba(flashColor,.22),zIndex:50,pointerEvents:"none",animation:"raid .3s ease forwards"}}/>}
 
-      {/* TOASTS */}
-      <div style={{position:"fixed",top:68,right:12,zIndex:200,display:"flex",flexDirection:"column",gap:6,pointerEvents:"none",maxWidth:310}}>
-        {toasts.map(t=><div key={t.id} style={{background:`linear-gradient(135deg,${rgba(t.color,.15)},${rgba(t.color,.06)})`,border:`1px solid ${rgba(t.color,.6)}`,borderRadius:10,padding:"8px 14px",fontSize:11,fontWeight:700,color:t.color,fontFamily:"'Orbitron',monospace",animation:"slideDown .3s cubic-bezier(.34,1.56,.64,1)",lineHeight:1.4,backdropFilter:"blur(12px)",boxShadow:`0 4px 20px ${rgba(t.color,.2)},0 0 0 1px ${rgba(t.color,.1)}`}}>{t.msg}</div>)}
+      {/* TOASTS — top right, below all banners */}
+      <div style={{position:"fixed",top:160,right:12,zIndex:200,display:"flex",flexDirection:"column",gap:6,pointerEvents:"none",maxWidth:300}}>
+        {toasts.map(t=><div key={t.id} style={{background:`linear-gradient(135deg,${rgba(t.color,.15)},${rgba(t.color,.06)})`,border:`1px solid ${rgba(t.color,.6)}`,borderRadius:10,padding:"8px 14px",fontSize:11,fontWeight:700,color:t.color,fontFamily:"'Orbitron',monospace",animation:"slideDown .3s cubic-bezier(.34,1.56,.64,1)",lineHeight:1.4,backdropFilter:"blur(12px)",boxShadow:`0 4px 20px ${rgba(t.color,.2)}`}}>{t.msg}</div>)}
       </div>
 
       {/* RAID ALERT */}
