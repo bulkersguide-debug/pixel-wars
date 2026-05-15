@@ -1043,6 +1043,7 @@ export default function App(){
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 FANDOMS</button>
           <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
           <a href="/rivalries" style={{marginTop:3,display:"inline-block",background:"rgba(255,68,0,.06)",border:"1px solid rgba(255,68,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",letterSpacing:1,textDecoration:"none"}}>⚔️ RIVALRIES</a>
+          <button onClick={()=>setShowFandomModal(true)} style={{marginTop:3,background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.5)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST FANDOM</button>
           <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{marginTop:3,display:"inline-block",background:"rgba(88,101,242,.12)",border:"1px solid rgba(88,101,242,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#7289DA",letterSpacing:1,textDecoration:"none"}}>💬 DISCORD</a>
           <div style={{display:"flex",gap:6,marginTop:3,flexWrap:"wrap"}}>
             <a href="/contact" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#4a4a6a",textDecoration:"none",letterSpacing:1,border:"1px solid #1a1a30",borderRadius:3,padding:"1px 5px"}}>CONTACT</a>
@@ -1134,19 +1135,17 @@ export default function App(){
         onComplete={(fandom)=>{setShowOnboarding(false);if(fandom)setTimeout(()=>setActive(fandom.id),300);pushToast(`⚔️ Welcome to the war, ${fandom?.name||"warrior"}!`,"#00F5FF",5000);}}
         onSkip={()=>setShowOnboarding(false)}
       />}
-      {/* REQUEST FANDOM — fixed button, always visible */}
-      {!isMobile&&<button onClick={()=>setShowFandomModal(true)} style={{position:"fixed",bottom:58,left:12,zIndex:150,padding:"7px 14px",background:"rgba(4,4,12,.95)",border:"2px solid #C8FF00",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#C8FF00",letterSpacing:1,fontWeight:900,backdropFilter:"blur(8px)",boxShadow:"0 0 16px rgba(200,255,0,.3)"}}>➕ REQUEST FANDOM</button>}
 
       {/* WAR TICKER — scrolling feed at bottom */}
-      {!isMobile&&feed.length>4&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"rgba(4,4,12,.92)",borderTop:"1px solid rgba(0,245,255,.1)",height:26,overflow:"hidden",display:"flex",alignItems:"center"}}>
-        <div style={{display:"flex",gap:"48px",whiteSpace:"nowrap",animation:"warTicker 35s linear infinite",flexShrink:0}}>
-          {[...feed,...feed].map((f,i)=>(
+      {!isMobile&&feed.length>0&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"rgba(4,4,12,.92)",borderTop:"1px solid rgba(0,245,255,.1)",height:26,overflow:"hidden",display:"flex",alignItems:"center"}}>
+        <div style={{display:"flex",gap:"48px",whiteSpace:"nowrap",animation:`warTicker ${Math.max(15,feed.length*3)}s linear infinite`,flexShrink:0}}>
+          {[...feed,...feed,...feed].map((f,i)=>(
             <span key={i} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:f.color,letterSpacing:.5,flexShrink:0}}>
               {f.icon} <span style={{fontWeight:700}}>{f.team}</span> {f.msg} <span style={{color:"rgba(255,255,255,.15)"}}>·</span>
             </span>
           ))}
         </div>
-        <style>{`@keyframes warTicker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}`}</style>
+        <style>{`@keyframes warTicker{0%{transform:translateX(0)}100%{transform:translateX(-33.33%)}}`}</style>
       </div>}
 
       {pixelHistory&&<PixelHistoryModal pixel={pixelHistory.pixel} history={pixelHistory.history} TM={TM} onClose={()=>setPixelHistory(null)} onJumpTo={()=>{setVx(Math.max(0,pixelHistory.gx-VW/2));setVy(Math.max(0,pixelHistory.gy-VH/2));setPixelHistory(null);}}/>}
