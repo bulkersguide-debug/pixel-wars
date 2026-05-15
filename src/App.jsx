@@ -168,6 +168,8 @@ export default function App(){
   });
   const [referralCode,setReferralCode]=useState(null);
   const [referralCount,setReferralCount]=useState(0);
+  const [isMobile,setIsMobile]=useState(()=>typeof window!=="undefined"&&window.innerWidth<768);
+  const [mobileTab,setMobileTab]=useState("GAME");
 
   const alreadyClaimedToday=streakData.last===todayStr();
   const currentSeasonNum=season.num;
@@ -324,6 +326,31 @@ export default function App(){
   useEffect(()=>{const add=()=>{const t1=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];let t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];while(t2===t1)t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];const acts=["claimed","raided","shielded","renewed"];const action=acts[randInt(0,acts.length-1)];const px=randInt(1,60);const icon={"claimed":"🏴","raided":"⚔️","shielded":"🛡️","renewed":"♻️"}[action];setFeed(f=>[{id:Date.now()+Math.random(),icon,team:t1,msg:action==="claimed"?`claimed ${px}px`:action==="raided"?`RAIDED ${t2}`:action==="renewed"?`renewed ${px}px`:`shielded territory`,color:tc(t1),ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"})},...f].slice(0,40));};add();const iv=setInterval(add,randInt(2500,5500));return()=>clearInterval(iv);},[]);
   useEffect(()=>{const start=()=>{const ev=EVENTS[randInt(0,EVENTS.length-1)];setEvent(ev);setEventTimer(ev.duration);pushToast(`${ev.icon} ${ev.label}! ${ev.desc}`,"#FFD700",4000);};const iv=setInterval(()=>setEventTimer(t=>{if(t<=1){setEvent(null);setTimeout(start,randInt(15000,30000));return 0;}return t-1;}),1000);setTimeout(start,6000);return()=>clearInterval(iv);},[]);
   useEffect(()=>{const f=(e)=>{if(e.key==="Escape"){setActive(null);setPending(new Set());}};window.addEventListener("keydown",f);return()=>window.removeEventListener("keydown",f);},[]);
+
+  // ── RESIZE DETECTION ──────────────────────────────────────────────────────
+  useEffect(()=>{
+    const onResize=()=>setIsMobile(window.innerWidth<768);
+    window.addEventListener("resize",onResize);
+    return()=>window.removeEventListener("resize",onResize);
+  },[]);
+
+  // ── TOUCH HANDLERS ────────────────────────────────────────────────────────
+  const onTouchStart=useCallback((e)=>{
+    if(e.touches.length!==1)return;
+    e.preventDefault();
+    const t=e.touches[0];
+    onMD({clientX:t.clientX,clientY:t.clientY,preventDefault:()=>{}});
+  },[onMD]);
+  const onTouchMove=useCallback((e)=>{
+    if(e.touches.length!==1)return;
+    e.preventDefault();
+    const t=e.touches[0];
+    onMM_h({clientX:t.clientX,clientY:t.clientY});
+  },[onMM_h]);
+  const onTouchEnd=useCallback((e)=>{
+    e.preventDefault();
+    onMU();
+  },[onMU]);
 
   // ── SERVICE WORKER ────────────────────────────────────────────────────────
   useEffect(()=>{
@@ -841,14 +868,224 @@ export default function App(){
       </div>}
 
       {/* ── MAIN LAYOUT ── */}
-      <div style={{display:"flex",height:`calc(100vh - ${bannerOffset}px)`,overflow:"hidden"}}>
+      {isMobile?(
+        /* ── MOBILE LAYOUT ── */
+        <div style={{display:"flex",flexDirection:"column",height:`calc(100vh - ${bannerOffset}px)`,overflow:"hidden"}}>
+
+          {/* CANVAS */}
+          <div style={{padding:"3px 3px 0",flexShrink:0}}>
+            <div style={{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"default",position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 20px ${rgba(at?.color||modeColor,.1)}`}}>
+              <canvas ref={cvs} width={CW} height={CH} style={{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"40vw",touchAction:"none"}}
+                onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onDragStart={e=>e.preventDefault()}
+                onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}/>
+              <div style={{position:"absolute",top:4,left:4,background:rgba(modeColor,.15),border:`1px solid ${rgba(modeColor,.5)}`,borderRadius:4,padding:"2px 6px",fontFamily:"'Orbitron',monospace",fontSize:7,color:modeColor,pointerEvents:"none",letterSpacing:1}}>{mode==="BUILD"?"🏗":"mode"==="RAID"?"⚔️":"💥"} {mode}</div>
+              <div style={{position:"absolute",top:4,right:4,background:"rgba(4,4,12,.85)",borderRadius:4,border:"1px solid rgba(0,245,255,.2)",overflow:"hidden",cursor:"crosshair"}} onClick={onMmClick}>
+                <canvas ref={mmCvs} width={MM} height={MM} style={{display:"block",width:60,height:60}}/>
+              </div>
+              {!active&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(4,4,8,.85))",padding:"10px 8px 4px",pointerEvents:"none",textAlign:"center"}}>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:2,color:"rgba(0,245,255,.5)"}}>⚔ SELECT A FANDOM BELOW</div>
+              </div>}
+            </div>
+          </div>
+
+          {/* MOBILE MODE BUTTONS + ACTIVE BAR */}
+          <div style={{flexShrink:0,padding:"3px 3px 0"}}>
+            <div style={{display:"flex",gap:3,marginBottom:3}}>
+              {[{m:"BUILD",icon:"🏗",c:"#00F5FF"},{m:"RAID",icon:"⚔️",c:"#FF4400"},{m:"SHOP",icon:"💥",c:"#C8FF00"}].map(({m,icon,c})=>{const on=mode===m;return(
+                <button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"7px 4px",background:on?rgba(c,.15):"transparent",border:`1px solid ${on?c:rgba(c,.22)}`,borderRadius:5,color:on?c:rgba(c,.45),cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,transition:"all .12s"}}>
+                  {icon} {m}
+                </button>
+              );})}
+              {active&&<button onClick={()=>setShowMissions(true)} style={{padding:"7px 8px",background:pendingMissionCount>0?"rgba(255,215,0,.12)":"rgba(255,255,255,.04)",border:`1px solid ${pendingMissionCount>0?"rgba(255,215,0,.4)":"rgba(255,255,255,.08)"}`,borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:pendingMissionCount>0?"#FFD700":"#3a3a5a",position:"relative"}}>
+                🎯{pendingMissionCount>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#FFD700",color:"#040408",borderRadius:"50%",width:13,height:13,fontSize:7,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900}}>{pendingMissionCount}</span>}
+              </button>}
+            </div>
+            {at&&<div style={{padding:"5px 8px",background:rgba(modeColor,.06),border:`1px solid ${rgba(modeColor,.3)}`,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:8,height:8,borderRadius:1,background:at.color,boxShadow:`0 0 6px ${at.color}`}}/>
+                <span style={{fontWeight:700,fontSize:11,color:at.color,fontFamily:"'Orbitron',monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:100}}>{at.name}</span>
+                {pending.size>=10&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FFD700",animation:"pulse 1s infinite"}}>🔥</span>}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                {pending.size>0&&<>
+                  <span style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#C8FF00"}}>€{(pendingCost-freeUsedPreview).toFixed(2)}</span>
+                  <button onClick={requestClaim} style={{padding:"5px 10px",background:`linear-gradient(90deg,${modeColor},${at.color})`,color:"#040408",border:"none",borderRadius:5,fontWeight:900,cursor:"pointer",fontSize:10,fontFamily:"'Orbitron',monospace"}}>
+                    {mode==="RAID"?"⚔ RAID!":"🏴 CLAIM!"}
+                  </button>
+                  <button onClick={()=>setPending(new Set())} style={{background:"none",border:"none",color:"#3a3a5a",cursor:"pointer",fontSize:14,padding:"0 4px"}}>✕</button>
+                </>}
+                {pending.size===0&&<>
+                  <button onClick={()=>{setShowShare(true);trackMission("share",1);}} style={{padding:"4px 7px",background:"rgba(255,45,120,.08)",border:"1px solid rgba(255,45,120,.25)",borderRadius:4,color:"#FF2D78",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8}}>📢</button>
+                  <button onClick={()=>{setActive(null);setPending(new Set());}} style={{padding:"4px 7px",background:"rgba(255,60,60,.06)",border:"1px solid rgba(255,60,60,.25)",borderRadius:4,color:"#ff6b6b",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8}}>✕</button>
+                </>}
+              </div>
+            </div>}
+          </div>
+
+          {/* MOBILE BOTTOM TABS */}
+          <div style={{display:"flex",borderBottom:"1px solid #1a1a30",borderTop:"1px solid #1a1a30",flexShrink:0,background:"#05050d"}}>
+            {[["GAME","🏴"],["FEED","📡"],["CHAT","💬"],["WARS","⚔️"],["DISC","🎮"]].map(([t,icon])=>{
+              const on=mobileTab===t;
+              return(<button key={t} onClick={()=>setMobileTab(t)} style={{flex:1,padding:"7px 0",background:on?"#0a0a1a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",letterSpacing:.5}}>
+                <div style={{fontSize:13}}>{icon}</div>
+                <div>{t}</div>
+              </button>);
+            })}
+          </div>
+
+          {/* MOBILE TAB CONTENT */}
+          <div style={{flex:1,overflowY:"auto",background:"#05050d"}}>
+
+            {/* GAME — fandom selector */}
+            {mobileTab==="GAME"&&<div style={{padding:"6px"}}>
+              {mode==="SHOP"?(
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:6}}>
+                  {POWERUPS.map(pu=>(
+                    <div key={pu.id} onClick={()=>usePowerup(pu)} style={{background:rgba(pu.color,.07),border:`1px solid ${rgba(pu.color,.3)}`,borderRadius:8,padding:"10px",cursor:"pointer"}}>
+                      <div style={{fontSize:22,marginBottom:3}}>{pu.icon}</div>
+                      <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:pu.color,marginBottom:2}}>{pu.name}</div>
+                      <div style={{fontSize:9,color:"#7a7aaa",marginBottom:4}}>{pu.desc}</div>
+                      <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>€{pu.price}</div>
+                    </div>
+                  ))}
+                </div>
+              ):(
+                <>
+                  <input value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 Search ${ALL.length} fandoms…`} style={{width:"100%",background:"#0c0c1c",border:"1px solid rgba(0,245,255,.15)",borderRadius:6,padding:"8px 12px",color:"#b0b8e0",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:6}}/>
+                  <div style={{display:"flex",gap:3,marginBottom:6,overflowX:"auto",paddingBottom:2}}>
+                    {["All","🎮 Gaming","🎌 Anime","🎵 Music"].map(c=>{const acc=c==="All"?"#5566AA":CAT_ACCENT[c],on=selCat===c;return(
+                      <button key={c} onClick={()=>setSelCat(c)} style={{padding:"5px 10px",borderRadius:5,border:`1px solid ${on?acc:acc+"33"}`,background:on?rgba(acc,.15):"transparent",color:on?acc:acc+"77",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"'Orbitron',monospace",whiteSpace:"nowrap",flexShrink:0}}>{c}</button>
+                    );})}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:5}}>
+                    {vis.slice(0,40).map(t=>{const isA=active===t.id;const px=Object.values(pixels).filter(p=>p?.t===t.id).length;const rank=getRank(px);const allied=active&&isAllied(t.id);return(
+                      <div key={t.id} onClick={()=>setActive(isA?null:t.id)} style={{padding:"8px 10px",borderRadius:6,cursor:"pointer",border:`1px solid ${isA?t.color:allied?"rgba(0,255,170,.25)":rgba(t.color,.2)}`,background:isA?rgba(t.color,.1):"#0c0c1a",display:"flex",alignItems:"center",gap:7}}>
+                        <div style={{width:10,height:10,borderRadius:2,background:t.color,flexShrink:0,boxShadow:isA?`0 0 6px ${t.color}`:undefined}}/>
+                        <div style={{minWidth:0}}>
+                          <div style={{fontWeight:700,fontSize:11,color:isA?t.color:"#c0c8e8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}{allied?" 🤝":""}</div>
+                          {px>0&&<div style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:rank.color}}>{rank.icon} {px}px</div>}
+                        </div>
+                      </div>
+                    );})}
+                  </div>
+                </>
+              )}
+            </div>}
+
+            {/* FEED */}
+            {mobileTab==="FEED"&&<div style={{padding:"6px"}}>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#2a2a4a",marginBottom:6,display:"flex",alignItems:"center",gap:4}}>
+                <div style={{width:5,height:5,borderRadius:"50%",background:"#FF2D78",animation:"pulse .8s infinite"}}/>LIVE FEED
+              </div>
+              {feed.map(f=>(
+                <div key={f.id} style={{marginBottom:5,padding:"7px 9px",background:f.isMe?rgba(f.color,.08):f.isWar?"rgba(255,68,0,.06)":"#08081a",borderRadius:6,border:`1px solid ${f.isMe?rgba(f.color,.3):"#1a1a2a"}`,animation:"slideDown .2s ease"}}>
+                  <div style={{display:"flex",gap:5,alignItems:"flex-start"}}>
+                    <span style={{fontSize:13,flexShrink:0}}>{f.icon}</span>
+                    <div>
+                      <span style={{fontSize:10,fontWeight:700,color:f.color}}>{f.team} </span>
+                      <span style={{fontSize:10,color:"#5a5a7a"}}>{f.msg}</span>
+                    </div>
+                  </div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#2a2a3a",marginTop:2}}>{f.ts}</div>
+                </div>
+              ))}
+            </div>}
+
+            {/* CHAT */}
+            {mobileTab==="CHAT"&&<div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+              {!active?<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:20,textAlign:"center"}}>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"#2a2a4a",lineHeight:2}}>💬<br/>Select a fandom<br/>to join their War Room</div>
+              </div>:<>
+                <div style={{padding:"8px 10px",borderBottom:"1px solid #1a1a30",display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:8,height:8,borderRadius:1,background:at?.color||"#888",boxShadow:`0 0 5px ${at?.color}`}}/>
+                  <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:at?.color,fontWeight:900}}>{at?.name} WAR ROOM</span>
+                </div>
+                <div style={{flex:1,overflowY:"auto",padding:"8px 10px",display:"flex",flexDirection:"column",gap:5}}>
+                  {chatMessages.length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#2a2a3a",textAlign:"center",paddingTop:20}}>No messages yet. Be first! 🔥</div>}
+                  {chatMessages.map((m,i)=>(
+                    <div key={m.id||i} style={{padding:"7px 10px",background:"#09091a",borderRadius:7,border:"1px solid #1a1a2a"}}>
+                      <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:at?.color,marginBottom:2,opacity:.5}}>{new Date(m.created_at).toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit"})}</div>
+                      <div style={{fontSize:13,color:"#c0c8e8",lineHeight:1.4,wordBreak:"break-word"}}>{m.text}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{padding:"8px",borderTop:"1px solid #1a1a30",display:"flex",gap:6}}>
+                  <input value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMessage()} placeholder="Rally the fans…" style={{flex:1,background:"#0c0c1c",border:`1px solid ${rgba(at?.color||"#1a1a2e",.3)}`,borderRadius:6,padding:"8px 12px",color:"#b0b8e0",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
+                  <button onClick={sendMessage} style={{padding:"8px 14px",background:rgba(at?.color||"#00F5FF",.15),border:`1px solid ${rgba(at?.color||"#00F5FF",.3)}`,borderRadius:6,cursor:"pointer",color:at?.color||"#00F5FF",fontSize:16,fontWeight:900}}>→</button>
+                </div>
+              </>}
+            </div>}
+
+            {/* WARS — leaderboard + wars + alliances */}
+            {mobileTab==="WARS"&&<div style={{padding:"6px"}}>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:2,color:"#2a2a4a",marginBottom:6}}>TERRITORY RANKINGS</div>
+              {board.slice(0,10).map((t,i)=>{const acc=CAT_ACCENT[t.cat]||"#00F5FF";const rank=getRank(t.count);return(
+                <div key={t.id} onClick={()=>setActive(t.id)} style={{marginBottom:4,padding:"7px 10px",background:"#09091a",borderRadius:6,border:`1px solid ${acc}18`,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:7}}>
+                    <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#3a3a5a",width:16}}>{i+1}</span>
+                    <div style={{width:8,height:8,borderRadius:1,background:t.color}}/>
+                    <div>
+                      <div style={{fontSize:11,fontWeight:700,color:t.color}}>{rank.icon} {t.name}{isAllied(t.id)?" 🤝":""}</div>
+                      <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a"}}>{rank.name}</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5}}>
+                    {t.trend>0&&<span style={{fontSize:9,color:"#00FF88"}}>▲{t.trend}</span>}
+                    {t.trend<0&&<span style={{fontSize:9,color:"#FF4400"}}>▼{Math.abs(t.trend)}</span>}
+                    <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:"#C8FF00"}}>{t.count}px</span>
+                  </div>
+                </div>
+              );})}
+              {active&&<div style={{display:"flex",gap:6,marginTop:8}}>
+                <button onClick={()=>setShowWarModal(true)} style={{flex:1,padding:"10px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.3)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FF4400"}}>⚔️ DECLARE WAR</button>
+                <button onClick={()=>setShowAllianceModal(true)} style={{flex:1,padding:"10px",background:"rgba(0,255,170,.06)",border:"1px solid rgba(0,255,170,.25)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#00FFAA"}}>🤝 ALLY</button>
+              </div>}
+              {myActiveAlliances.length>0&&<>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:2,color:"#00FFAA",marginTop:10,marginBottom:5}}>🤝 ACTIVE ALLIANCES</div>
+                {myActiveAlliances.map(a=>{const partnerId=a.proposer===active?a.target:a.proposer;const partner=TM[partnerId];return(
+                  <div key={a.id} style={{marginBottom:5,padding:"8px 10px",background:"rgba(0,255,170,.05)",border:"1px solid rgba(0,255,170,.2)",borderRadius:7,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:11,fontWeight:700,color:partner?.color||"#888"}}>{partner?.name||"?"}</span>
+                    <button onClick={()=>betrayAlliance(a.id,partner?.name||"?")} style={{padding:"4px 8px",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.3)",borderRadius:4,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400"}}>BETRAY</button>
+                  </div>
+                );})}
+              </>}
+              {wars.slice(0,5).length>0&&<>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:2,color:"#FF4400",marginTop:10,marginBottom:5}}>⚔️ ACTIVE WARS</div>
+                {wars.slice(0,5).map(w=>{const att=TM[w.attacker];const def=TM[w.defender];return(
+                  <div key={w.id} style={{marginBottom:4,padding:"7px 10px",background:"rgba(255,68,0,.04)",border:"1px solid rgba(255,68,0,.2)",borderRadius:6,display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:10,fontWeight:700,color:att?.color}}>{att?.name||"?"}</span>
+                    <span style={{color:"#FF4400"}}>⚔️</span>
+                    <span style={{fontSize:10,fontWeight:700,color:def?.color}}>{def?.name||"?"}</span>
+                  </div>
+                );})}
+              </>}
+            </div>}
+
+            {/* DISC */}
+            {mobileTab==="DISC"&&<div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+              <div style={{padding:"10px",borderBottom:"1px solid #1a1a30",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <svg width="18" height="14" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
+                  <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#5865F2"}}>WAR COUNCIL</span>
+                </div>
+                <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{padding:"6px 12px",background:"linear-gradient(90deg,#5865F2,#7289DA)",borderRadius:6,textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#fff",letterSpacing:1}}>JOIN →</a>
+              </div>
+              <iframe src={`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`} style={{flex:1,border:"none",width:"100%"}} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" title="Discord"/>
+            </div>}
+
+          </div>
+        </div>
+      ):(
+        /* ── DESKTOP LAYOUT ── */
+        <div style={{display:"flex",height:`calc(100vh - ${bannerOffset}px)`,overflow:"hidden"}}>
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
 
           {/* CANVAS */}
           <div style={{padding:"5px 5px 0",flexShrink:0}}>
             <div style={{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"default",position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 30px ${rgba(at?.color||modeColor,.12)},0 0 60px ${rgba(at?.color||modeColor,.06)},inset 0 0 30px rgba(0,0,0,.3)`}}>
-              <canvas ref={cvs} width={CW} height={CH} style={{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"38vh"}}
-                onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onDragStart={e=>e.preventDefault()}/>
+              <canvas ref={cvs} width={CW} height={CH} style={{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:isMobile?"45vw":"38vh",touchAction:"none"}}
+                onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onDragStart={e=>e.preventDefault()}
+                onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}/>
               <div style={{position:"absolute",top:5,left:5,background:rgba(modeColor,.12),border:`1px solid ${rgba(modeColor,.4)}`,borderRadius:4,padding:"2px 7px",fontFamily:"'Orbitron',monospace",fontSize:7,color:modeColor,pointerEvents:"none",letterSpacing:2}}>
                 {mode==="BUILD"?"🏗 BUILD":mode==="RAID"?"⚔️ RAID":"💥 SHOP"}
               </div>
@@ -1125,6 +1362,7 @@ export default function App(){
 
         </div>
       </div>
+      )} {/* end desktop layout ternary */}
 
       {/* DISCORD FLOATING PANEL — triggered from DISC tab */}
       {showDiscord&&<div style={{position:"fixed",bottom:70,right:200,zIndex:600,width:320,background:"#2f3136",borderRadius:12,overflow:"hidden",border:"2px solid #5865F2",boxShadow:"0 8px 40px rgba(88,101,242,.45)",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)",display:"flex",flexDirection:"column"}}>
