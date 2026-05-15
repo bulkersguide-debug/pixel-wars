@@ -2,7 +2,8 @@
   "name": "Pixels of War",
   "short_name": "PixelWar",
   "description": "Fandom territory battle. Claim pixels. Raid enemies. Dominate the grid.",
-  "start_url": "/?source=pwa",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#040408",
   "theme_color": "#040408",
@@ -17,11 +18,7 @@
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "shortcuts": [
-    { "name": "Play Now",      "url": "/?source=shortcut",  "description": "Jump back into the war" },
-    { "name": "Leaderboard",  "url": "/?tab=war",           "description": "See who is winning" }
-  ],
-  "screenshots": [
-    { "src": "/screenshots/desktop.png", "sizes": "1280x720", "type": "image/png", "form_factor": "wide"   },
-    { "src": "/screenshots/mobile.png",  "sizes": "390x844",  "type": "image/png", "form_factor": "narrow" }
+    { "name": "Play Now",    "url": "/", "description": "Jump back into the war" },
+    { "name": "Leaderboard", "url": "/", "description": "See who is winning"     }
   ]
 }
