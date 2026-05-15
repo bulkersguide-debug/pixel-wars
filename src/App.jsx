@@ -791,6 +791,9 @@ export default function App(){
         }
       });
   },[]);
+
+  // Music toggle
+  useEffect(()=>{
     localStorage.setItem("pow_music",musicEnabled?"1":"0");
     if(musicEnabled)startMusic();else stopMusic();
   },[musicEnabled]);
