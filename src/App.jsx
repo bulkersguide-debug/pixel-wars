@@ -404,8 +404,6 @@ export default function App(){
       if(!active)return;
       const ev=EVENTS[randInt(0,EVENTS.length-1)];
       setEvent(ev);setEventTimer(ev.duration);
-      // Don't push toast for every event — only occasionally
-      if(Math.random()>.4)pushToast(`${ev.icon} ${ev.label} — ${ev.desc}`,"#FFD700",4000);
     };
     const iv=setInterval(()=>setEventTimer(t=>{
       if(t<=1){setEvent(null);if(active)setTimeout(start,randInt(20000,40000));return 0;}
@@ -780,9 +778,9 @@ export default function App(){
 
       {flashColor&&<div style={{position:"fixed",inset:0,background:rgba(flashColor,.22),zIndex:50,pointerEvents:"none",animation:"raid .3s ease forwards"}}/>}
 
-      {/* TOASTS — top right, below all banners */}
-      <div style={{position:"fixed",top:160,right:12,zIndex:200,display:"flex",flexDirection:"column",gap:6,pointerEvents:"none",maxWidth:300}}>
-        {toasts.map(t=><div key={t.id} style={{background:`linear-gradient(135deg,${rgba(t.color,.15)},${rgba(t.color,.06)})`,border:`1px solid ${rgba(t.color,.6)}`,borderRadius:10,padding:"8px 14px",fontSize:11,fontWeight:700,color:t.color,fontFamily:"'Orbitron',monospace",animation:"slideDown .3s cubic-bezier(.34,1.56,.64,1)",lineHeight:1.4,backdropFilter:"blur(12px)",boxShadow:`0 4px 20px ${rgba(t.color,.2)}`}}>{t.msg}</div>)}
+      {/* TOASTS — centered at top, above canvas */}
+      <div style={{position:"fixed",top:100,left:"50%",transform:"translateX(-50%)",zIndex:200,display:"flex",flexDirection:"column",gap:5,pointerEvents:"none",alignItems:"center",width:"auto",maxWidth:"60vw"}}>
+        {toasts.map(t=><div key={t.id} style={{background:`linear-gradient(135deg,${rgba(t.color,.18)},${rgba(t.color,.07)})`,border:`1px solid ${rgba(t.color,.6)}`,borderRadius:10,padding:"7px 18px",fontSize:11,fontWeight:700,color:t.color,fontFamily:"'Orbitron',monospace",animation:"slideDown .3s cubic-bezier(.34,1.56,.64,1)",lineHeight:1.4,backdropFilter:"blur(14px)",boxShadow:`0 4px 24px ${rgba(t.color,.25)}`,whiteSpace:"nowrap"}}>{t.msg}</div>)}
       </div>
 
       {/* RAID ALERT */}
