@@ -334,24 +334,6 @@ export default function App(){
     return()=>window.removeEventListener("resize",onResize);
   },[]);
 
-  // ── TOUCH HANDLERS ────────────────────────────────────────────────────────
-  const onTouchStart=useCallback((e)=>{
-    if(e.touches.length!==1)return;
-    e.preventDefault();
-    const t=e.touches[0];
-    onMD({clientX:t.clientX,clientY:t.clientY,preventDefault:()=>{}});
-  },[onMD]);
-  const onTouchMove=useCallback((e)=>{
-    if(e.touches.length!==1)return;
-    e.preventDefault();
-    const t=e.touches[0];
-    onMM_h({clientX:t.clientX,clientY:t.clientY});
-  },[onMM_h]);
-  const onTouchEnd=useCallback((e)=>{
-    e.preventDefault();
-    onMU();
-  },[onMU]);
-
   // ── SERVICE WORKER ────────────────────────────────────────────────────────
   useEffect(()=>{
     if("serviceWorker" in navigator){
@@ -521,6 +503,11 @@ export default function App(){
   const requestClaim=()=>{if(!active||pending.size===0)return;const t=TM[active];const isRaid=mode==="RAID";const cost=calcCost(pending);const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;setConfirmPayload({count:pending.size,cost,freeUsed,isRaid,bonus,teamName:t.name,teamColor:t.color,modeLabel:isRaid?"⚔️ RAID":"🏴 CLAIM"});setShowConfirm(true);};
   const onMU=()=>{setDrag(false);if(pending.size>0)requestClaim();};
   const onML=()=>{setHov(null);setHovSector(null);if(drag){setDrag(false);if(pending.size>0)requestClaim();}};
+
+  // ── TOUCH HANDLERS (defined after mouse handlers) ─────────────────────────
+  const onTouchStart=(e)=>{if(e.touches.length!==1)return;e.preventDefault();const t=e.touches[0];onMD({clientX:t.clientX,clientY:t.clientY,preventDefault:()=>{}});};
+  const onTouchMove=(e)=>{if(e.touches.length!==1)return;e.preventDefault();const t=e.touches[0];onMM_h({clientX:t.clientX,clientY:t.clientY});};
+  const onTouchEnd=(e)=>{e.preventDefault();onMU();};
 
   // ── CLAIM ──────────────────────────────────────────────────────────────────
   const handleClaim=async()=>{
