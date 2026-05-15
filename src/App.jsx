@@ -1097,17 +1097,13 @@ export default function App(){
           <div style={{display:"flex",alignItems:"center",gap:5,background:rgba(myRank.color,.07),border:`1px solid ${rgba(myRank.color,.25)}`,borderRadius:7,padding:"4px 9px"}}>
             <span style={{fontSize:13}}>{myRank.icon}</span><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:myRank.color}}>{myRank.name}</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{myPixels}px</div></div>
           </div>
-          {/* User auth */}
-          {user?(
+          {/* User auth — only show when logged in */}
+          {user&&(
             <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 8px",background:"rgba(88,101,242,.1)",border:"1px solid rgba(88,101,242,.3)",borderRadius:6,cursor:"pointer"}} onClick={()=>supabase?.auth.signOut()}>
               {profile?.avatar_url&&<img src={profile.avatar_url} style={{width:18,height:18,borderRadius:"50%"}} alt="avatar"/>}
               <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"#7289DA",maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{profile?.username||"Player"}</span>
               <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00"}}>{profile?.free_pixels||0}px free</span>
             </div>
-          ):(
-            <button onClick={()=>{setAuthReason("join");setShowAuthModal(true);}} style={{padding:"4px 12px",background:"linear-gradient(90deg,#5865F2,#7289DA)",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#fff",letterSpacing:1}}>
-              LOGIN WITH DISCORD
-            </button>
           )}
           {event&&<div style={{display:"flex",alignItems:"center",gap:5,background:rgba(event.color,.1),border:`1px solid ${rgba(event.color,.4)}`,borderRadius:7,padding:"4px 10px",animation:"pulse 2s infinite"}}>
             <span style={{fontSize:14}}>{event.icon}</span>
@@ -1125,12 +1121,9 @@ export default function App(){
       </div>
 
       {/* GUEST BANNER */}
-      {!user&&!loading&&<div style={{background:"rgba(88,101,242,.1)",borderBottom:"1px solid rgba(88,101,242,.3)",padding:"5px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:14}}>👀</span>
-          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#7289DA"}}>You're viewing as guest — sign in to claim territory and get <strong style={{color:"#FFD700"}}>25 FREE pixels</strong></span>
-        </div>
-        <button onClick={()=>setShowAuthModal(true)} style={{padding:"4px 14px",background:"linear-gradient(90deg,#5865F2,#7289DA)",border:"none",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#fff",letterSpacing:1}}>LOGIN WITH DISCORD →</button>
+      {!user&&!loading&&<div style={{background:"rgba(88,101,242,.1)",borderBottom:"1px solid rgba(88,101,242,.3)",padding:"5px 14px",display:"flex",alignItems:"center",gap:8}}>
+        <span style={{fontSize:14}}>👀</span>
+        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#7289DA"}}>Viewing as guest — sign in with Discord to claim territory and get <strong style={{color:"#FFD700"}}>25 FREE pixels</strong></span>
       </div>}
 
       {/* SUPABASE ERROR STATE */}
