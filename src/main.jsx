@@ -5,16 +5,20 @@ import App from "./App";
 import FandomPage from "./FandomPage";
 import FandomDirectory from "./FandomDirectory";
 import AdminPage from "./AdminPage";
+import TermsOfService from "./TermsOfService";
+import PrivacyPolicy from "./PrivacyPolicy";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/fandoms" element={<FandomDirectory />} />
-        <Route path="/fandom/:slug" element={<FandomPage />} />
+        <Route path="/"          element={<App />} />
+        <Route path="/fandoms"   element={<FandomDirectory />} />
+        <Route path="/fandom/:slug"  element={<FandomPage />} />
         <Route path="/fandoms/:slug" element={<FandomPage />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin"     element={<AdminPage />} />
+        <Route path="/terms"     element={<TermsOfService />} />
+        <Route path="/privacy"   element={<PrivacyPolicy />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>

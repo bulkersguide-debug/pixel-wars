@@ -776,6 +776,11 @@ export default function App(){
           </div>
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 ALL FANDOMS</button>
           <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{marginTop:3,display:"inline-block",background:"rgba(88,101,242,.12)",border:"1px solid rgba(88,101,242,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#7289DA",letterSpacing:1,textDecoration:"none"}}>💬 DISCORD</a>
+          <div style={{display:"flex",gap:6,marginTop:3}}>
+            <a href="/terms" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",textDecoration:"none",letterSpacing:1}}>TERMS</a>
+            <span style={{color:"#1a1a2e",fontSize:7}}>·</span>
+            <a href="/privacy" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",textDecoration:"none",letterSpacing:1}}>PRIVACY</a>
+          </div>
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
           {freePixels>0&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:7,padding:"4px 9px",cursor:"pointer"}} onClick={openDailyModal}>
