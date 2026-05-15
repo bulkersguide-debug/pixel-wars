@@ -39,9 +39,18 @@ export default function AuthModal({ onClose, reason = "claim" }) {
           JOIN THE WAR
         </div>
         <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 14, color: "rgba(192,200,232,.55)", marginBottom: 28, lineHeight: 1.6 }}>
-          {reason === "claim" ? "Sign in to claim pixels and fight for your fandom." : reason === "free" ? "Sign in to collect your 25 free pixels." : "Sign in to continue."}
-          <br />
-          <strong style={{ color: "#FFD700" }}>New players get 25 FREE pixels</strong> on first login.
+          {reason === "claim" ? "Sign in to claim pixels for your fandom." :
+           reason === "raid" ? "Sign in to raid enemy territory." :
+           reason === "chat" ? "Sign in to join the War Room chat." :
+           reason === "war" ? "Sign in to declare war." :
+           reason === "alliance" ? "Sign in to form alliances." :
+           reason === "missions" ? "Sign in to track and claim missions." :
+           reason === "powerup" ? "Sign in to use power-ups." :
+           reason === "share" ? "Sign in to share your territory." :
+           reason === "fandom" ? "Sign in to request a new fandom." :
+           reason === "daily" ? "Sign in to claim your daily pixels." :
+           "Sign in to interact with the game."}
+          <br/><strong style={{ color: "#FFD700" }}>New players get 25 FREE pixels</strong> on first login.
         </div>
 
         {/* Discord button */}

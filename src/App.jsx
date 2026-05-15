@@ -377,20 +377,23 @@ export default function App(){
   const betrayAlliance=async(allianceId,partnerName)=>{if(!confirm(`BETRAY ${partnerName}?`))return;await dbUpdateAlliance(allianceId,"betrayed");setAlliances(prev=>prev.map(a=>a.id===allianceId?{...a,status:"betrayed"}:a));pushToast(`💀 BETRAYAL! Alliance with ${partnerName} broken!`,"#FF4400",6000);setFeed(f=>[{id:Date.now(),icon:"💀",team:TM[active]?.name||"?",msg:`BETRAYED ${partnerName}!`,color:"#FF4400",ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isBetrayal:true},...f].slice(0,40));};
   const declareWar=async(targetId)=>{if(!active||!isOnline)return;if(isAllied(targetId)){pushToast("Break the alliance first!","#FF4400",3000);return;}const already=wars.some(w=>w.attacker===active&&w.defender===targetId);if(already){pushToast("Already at war!","#FF4400",3000);return;}await dbDeclareWar(active,targetId,currentSeasonNum);pushToast(`⚔️ WAR DECLARED on ${TM[targetId]?.name}!`,"#FF4400",6000);setShowWarModal(false);};
   const sanitizeChat=(text)=>{
-    // Strip HTML, limit URLs, clean whitespace
-    return text
-      .replace(/<[^>]*>/g,"")
-      .replace(/https?:\/\/[^\s]{0,200}/g,"[link]")
-      .replace(/[^\p{L}\p{N}\p{P}\p{Z}\p{Emoji}]/gu,"")
-      .trim()
-      .slice(0,200);
+    return text.replace(/<[^>]*>/g,"").replace(/https?:\/\/[^\s]{0,200}/g,"[link]").trim().slice(0,200);
   };
   const sendMessage=async()=>{
+    if(!requireAuth("chat"))return;
     if(!active||!chatInput.trim()||!isOnline)return;
     const clean=sanitizeChat(chatInput);
     if(!clean){setChatInput("");return;}
     await dbSendMessage(active,clean,currentSeasonNum);
     setChatInput("");
+  };
+  const gatedSetMode=(m)=>{
+    if(m!=="BUILD"&&!requireAuth("interact"))return;
+    setMode(m);
+  };
+  const gatedOpenDaily=()=>{
+    if(!requireAuth("daily"))return;
+    openDailyModal();
   };
 
   const claimDaily=()=>{if(!dailyInfo||alreadyClaimedToday)return;const today=todayStr();const ns={days:dailyInfo.days,last:today,total:(streakData.total||0)+1};setStreakData(ns);localStorage.setItem("pow_streak",JSON.stringify(ns));const nf=freePixels+dailyInfo.reward.px;setFreePixels(nf);localStorage.setItem("pow_free",String(nf));pushToast(`🎁 +${dailyInfo.reward.px} FREE PIXELS!`,"#FFD700",5000);if(dailyInfo.reward.bonus)setTimeout(()=>pushToast(dailyInfo.reward.bonus,"#FF2D78",4000),800);setDailyInfo(null);setShowDaily(false);};
@@ -716,7 +719,11 @@ export default function App(){
   };
   const onML=()=>{setHov(null);setHovSector(null);if(drag){setDrag(false);if(pending.size>0)requestClaim();}};
 
-  // ── TOUCH HANDLERS (defined after mouse handlers) ─────────────────────────
+  // ── AUTH GATE ─────────────────────────────────────────────────────────────
+  const requireAuth=(reason="join")=>{
+    if(!user){setAuthReason(reason);setShowAuthModal(true);return false;}
+    return true;
+  };
   const onTouchStart=(e)=>{if(e.touches.length!==1)return;e.preventDefault();const t=e.touches[0];onMD({clientX:t.clientX,clientY:t.clientY,preventDefault:()=>{}});};
   const onTouchMove=(e)=>{if(e.touches.length!==1)return;e.preventDefault();const t=e.touches[0];onMM_h({clientX:t.clientX,clientY:t.clientY});};
   const onTouchEnd=(e)=>{e.preventDefault();onMU();};
@@ -1072,7 +1079,7 @@ export default function App(){
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 FANDOMS</button>
           <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
           <a href="/rivalries" style={{marginTop:3,display:"inline-block",background:"rgba(255,68,0,.06)",border:"1px solid rgba(255,68,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",letterSpacing:1,textDecoration:"none"}}>⚔️ RIVALRIES</a>
-          <button onClick={()=>navigate("/request-fandom")} style={{marginTop:3,background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.5)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST FANDOM</button>
+          <button onClick={()=>{if(!requireAuth("fandom"))return;navigate("/request-fandom");}} style={{marginTop:3,background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.5)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST FANDOM</button>
           <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{marginTop:3,display:"inline-block",background:"rgba(88,101,242,.12)",border:"1px solid rgba(88,101,242,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#7289DA",letterSpacing:1,textDecoration:"none"}}>💬 DISCORD</a>
           <div style={{display:"flex",gap:6,marginTop:3,flexWrap:"wrap"}}>
             <a href="/contact" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#4a4a6a",textDecoration:"none",letterSpacing:1,border:"1px solid #1a1a30",borderRadius:3,padding:"1px 5px"}}>CONTACT</a>
@@ -1081,10 +1088,10 @@ export default function App(){
           </div>
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-          {freePixels>0&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:7,padding:"4px 9px",cursor:"pointer"}} onClick={openDailyModal}>
+          {freePixels>0&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:7,padding:"4px 9px",cursor:"pointer"}} onClick={gatedOpenDaily}>
             <span style={{fontSize:13}}>🎁</span><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#FFD700"}}>{freePixels}px FREE</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{alreadyClaimedToday?"CLAIMED":"TAP"}</div></div>
           </div>}
-          <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,45,120,.07)",border:"1px solid rgba(255,45,120,.25)",borderRadius:7,padding:"4px 9px",cursor:"pointer"}} onClick={openDailyModal}>
+          <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,45,120,.07)",border:"1px solid rgba(255,45,120,.25)",borderRadius:7,padding:"4px 9px",cursor:"pointer"}} onClick={gatedOpenDaily}>
             <span style={{fontSize:13}}>🔥</span><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#FF2D78"}}>{streakData.days}d</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{alreadyClaimedToday?"✅":"STREAK"}</div></div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:5,background:rgba(myRank.color,.07),border:`1px solid ${rgba(myRank.color,.25)}`,borderRadius:7,padding:"4px 9px"}}>
@@ -1116,6 +1123,15 @@ export default function App(){
           ))}
         </div>
       </div>
+
+      {/* GUEST BANNER */}
+      {!user&&!loading&&<div style={{background:"rgba(88,101,242,.1)",borderBottom:"1px solid rgba(88,101,242,.3)",padding:"5px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:14}}>👀</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#7289DA"}}>You're viewing as guest — sign in to claim territory and get <strong style={{color:"#FFD700"}}>25 FREE pixels</strong></span>
+        </div>
+        <button onClick={()=>setShowAuthModal(true)} style={{padding:"4px 14px",background:"linear-gradient(90deg,#5865F2,#7289DA)",border:"none",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#fff",letterSpacing:1}}>LOGIN WITH DISCORD →</button>
+      </div>}
 
       {/* SUPABASE ERROR STATE */}
       {!loading&&!isOnline&&<div style={{background:"rgba(255,68,0,.08)",borderBottom:"1px solid rgba(255,68,0,.3)",padding:"5px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
@@ -1229,11 +1245,11 @@ export default function App(){
           <div style={{flexShrink:0,padding:"3px 3px 0"}}>
             <div style={{display:"flex",gap:3,marginBottom:3}}>
               {[{m:"BUILD",icon:"🏗",c:"#00F5FF"},{m:"RAID",icon:"⚔️",c:"#FF4400"},{m:"SHOP",icon:"💥",c:"#C8FF00"}].map(({m,icon,c})=>{const on=mode===m;return(
-                <button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"7px 4px",background:on?rgba(c,.15):"transparent",border:`1px solid ${on?c:rgba(c,.22)}`,borderRadius:5,color:on?c:rgba(c,.45),cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,transition:"all .12s"}}>
+                <button key={m} onClick={()=>gatedSetMode(m)} style={{flex:1,padding:"7px 4px",background:on?rgba(c,.15):"transparent",border:`1px solid ${on?c:rgba(c,.22)}`,borderRadius:5,color:on?c:rgba(c,.45),cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,transition:"all .12s"}}>
                   {icon} {m}
                 </button>
               );})}
-              {active&&<button onClick={()=>setShowMissions(true)} style={{padding:"7px 8px",background:pendingMissionCount>0?"rgba(255,215,0,.12)":"rgba(255,255,255,.04)",border:`1px solid ${pendingMissionCount>0?"rgba(255,215,0,.4)":"rgba(255,255,255,.08)"}`,borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:pendingMissionCount>0?"#FFD700":"#3a3a5a",position:"relative"}}>
+              {active&&<button onClick={()=>{if(!requireAuth("missions"))return;setShowMissions(true);}} style={{padding:"7px 8px",background:pendingMissionCount>0?"rgba(255,215,0,.12)":"rgba(255,255,255,.04)",border:`1px solid ${pendingMissionCount>0?"rgba(255,215,0,.4)":"rgba(255,255,255,.08)"}`,borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:pendingMissionCount>0?"#FFD700":"#3a3a5a",position:"relative"}}>
                 🎯{pendingMissionCount>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#FFD700",color:"#040408",borderRadius:"50%",width:13,height:13,fontSize:7,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900}}>{pendingMissionCount}</span>}
               </button>}
             </div>
@@ -1252,7 +1268,7 @@ export default function App(){
                   <button onClick={()=>setPending(new Set())} style={{background:"none",border:"none",color:"#3a3a5a",cursor:"pointer",fontSize:14,padding:"0 4px"}}>✕</button>
                 </>}
                 {pending.size===0&&<>
-                  <button onClick={()=>{setShowShare(true);trackMission("share",1);}} style={{padding:"4px 7px",background:"rgba(255,45,120,.08)",border:"1px solid rgba(255,45,120,.25)",borderRadius:4,color:"#FF2D78",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8}}>📢</button>
+                  <button onClick={()=>{if(!requireAuth("share"))return;setShowShare(true);trackMission("share",1);}} style={{padding:"4px 7px",background:"rgba(255,45,120,.08)",border:"1px solid rgba(255,45,120,.25)",borderRadius:4,color:"#FF2D78",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8}}>📢</button>
                   <button onClick={()=>{setActive(null);setPending(new Set());}} style={{padding:"4px 7px",background:"rgba(255,60,60,.06)",border:"1px solid rgba(255,60,60,.25)",borderRadius:4,color:"#ff6b6b",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8}}>✕</button>
                 </>}
               </div>
@@ -1278,7 +1294,7 @@ export default function App(){
               {mode==="SHOP"?(
                 <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:6}}>
                   {POWERUPS.map(pu=>(
-                    <div key={pu.id} onClick={()=>usePowerup(pu)} style={{background:rgba(pu.color,.07),border:`1px solid ${rgba(pu.color,.3)}`,borderRadius:8,padding:"10px",cursor:"pointer"}}>
+                    <div key={pu.id} onClick={()=>{if(!requireAuth("powerup"))return;usePowerup(pu);}} style={{background:rgba(pu.color,.07),border:`1px solid ${rgba(pu.color,.3)}`,borderRadius:8,padding:"10px",cursor:"pointer"}}>
                       <div style={{fontSize:22,marginBottom:3}}>{pu.icon}</div>
                       <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:pu.color,marginBottom:2}}>{pu.name}</div>
                       <div style={{fontSize:9,color:"#7a7aaa",marginBottom:4}}>{pu.desc}</div>
@@ -1289,7 +1305,7 @@ export default function App(){
               ):(
                 <>
                   <input value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 Search ${ALL.length} fandoms…`} style={{width:"100%",background:"#0c0c1c",border:"1px solid rgba(0,245,255,.15)",borderRadius:6,padding:"8px 12px",color:"#b0b8e0",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:6}}/>
-                  <button onClick={()=>navigate("/request-fandom")} style={{width:"100%",marginBottom:6,padding:"8px",background:"rgba(200,255,0,.08)",border:"2px solid rgba(200,255,0,.4)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST A FANDOM</button>
+                  <button onClick={()=>{if(!requireAuth("fandom"))return;navigate("/request-fandom");}} style={{width:"100%",marginBottom:6,padding:"8px",background:"rgba(200,255,0,.08)",border:"2px solid rgba(200,255,0,.4)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST A FANDOM</button>
                   <div style={{display:"flex",gap:3,marginBottom:6,overflowX:"auto",paddingBottom:2}}>
                     {["All","🎮 Gaming","🎌 Anime","🎵 Music"].map(c=>{const acc=c==="All"?"#5566AA":CAT_ACCENT[c],on=selCat===c;return(
                       <button key={c} onClick={()=>setSelCat(c)} style={{padding:"5px 10px",borderRadius:5,border:`1px solid ${on?acc:acc+"33"}`,background:on?rgba(acc,.15):"transparent",color:on?acc:acc+"77",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"'Orbitron',monospace",whiteSpace:"nowrap",flexShrink:0}}>{c}</button>
@@ -1375,8 +1391,8 @@ export default function App(){
                 </div>
               );})}
               {active&&<div style={{display:"flex",gap:6,marginTop:8}}>
-                <button onClick={()=>setShowWarModal(true)} style={{flex:1,padding:"10px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.3)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FF4400"}}>⚔️ DECLARE WAR</button>
-                <button onClick={()=>setShowAllianceModal(true)} style={{flex:1,padding:"10px",background:"rgba(0,255,170,.06)",border:"1px solid rgba(0,255,170,.25)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#00FFAA"}}>🤝 ALLY</button>
+                <button onClick={()=>{if(!requireAuth("war"))return;setShowWarModal(true);}} style={{flex:1,padding:"10px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.3)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FF4400"}}>⚔️ DECLARE WAR</button>
+                <button onClick={()=>{if(!requireAuth("alliance"))return;setShowAllianceModal(true);}} style={{flex:1,padding:"10px",background:"rgba(0,255,170,.06)",border:"1px solid rgba(0,255,170,.25)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#00FFAA"}}>🤝 ALLY</button>
               </div>}
               {myActiveAlliances.length>0&&<>
                 <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:2,color:"#00FFAA",marginTop:10,marginBottom:5}}>🤝 ACTIVE ALLIANCES</div>
@@ -1452,11 +1468,11 @@ export default function App(){
               })}
             </div>
             <div style={{display:"flex",gap:3,marginLeft:4}}>
-              {[{m:"BUILD",icon:"🏗",c:"#00F5FF"},{m:"RAID",icon:"⚔️",c:"#FF4400"},{m:"SHOP",icon:"💥",c:"#C8FF00"}].map(({m,icon,c})=>{const on=mode===m;return(<button key={m} className="chip" onClick={()=>setMode(m)} style={{padding:"5px 9px",background:on?rgba(c,.15):"transparent",border:`1px solid ${on?c:rgba(c,.22)}`,borderRadius:5,color:on?c:rgba(c,.45),cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,letterSpacing:.5,transition:"all .12s",boxShadow:on?`0 0 14px ${rgba(c,.2)}`:"none"}}>{icon} {m}</button>);})}
+              {[{m:"BUILD",icon:"🏗",c:"#00F5FF"},{m:"RAID",icon:"⚔️",c:"#FF4400"},{m:"SHOP",icon:"💥",c:"#C8FF00"}].map(({m,icon,c})=>{const on=mode===m;return(<button key={m} className="chip" onClick={()=>gatedSetMode(m)} style={{padding:"5px 9px",background:on?rgba(c,.15):"transparent",border:`1px solid ${on?c:rgba(c,.22)}`,borderRadius:5,color:on?c:rgba(c,.45),cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,letterSpacing:.5,transition:"all .12s",boxShadow:on?`0 0 14px ${rgba(c,.2)}`:"none"}}>{icon} {m}</button>);})}
             </div>
             {active&&<div style={{display:"flex",gap:3,marginLeft:"auto"}}>
-              <button onClick={()=>setShowWarModal(true)} style={{padding:"4px 8px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.3)",borderRadius:5,color:"#FF4400",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:1}}>⚔️ WAR</button>
-              <button onClick={()=>setShowAllianceModal(true)} style={{padding:"4px 8px",background:"rgba(0,255,170,.08)",border:"1px solid rgba(0,255,170,.3)",borderRadius:5,color:"#00FFAA",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:1}}>🤝 ALLY</button>
+              <button onClick={()=>{if(!requireAuth("war"))return;setShowWarModal(true);}} style={{padding:"4px 8px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.3)",borderRadius:5,color:"#FF4400",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:1}}>⚔️ WAR</button>
+              <button onClick={()=>{if(!requireAuth("alliance"))return;setShowAllianceModal(true);}} style={{padding:"4px 8px",background:"rgba(0,255,170,.08)",border:"1px solid rgba(0,255,170,.3)",borderRadius:5,color:"#00FFAA",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:1}}>🤝 ALLY</button>
             </div>}
           </div>
 
@@ -1477,7 +1493,7 @@ export default function App(){
                 <button onClick={requestClaim} style={{padding:"4px 11px",background:`linear-gradient(90deg,${modeColor},${at.color})`,color:"#040408",border:"none",borderRadius:4,fontWeight:900,cursor:"pointer",fontSize:9,fontFamily:"'Orbitron',monospace",letterSpacing:1}}>{mode==="RAID"?"⚔ RAID!":"🏴 CLAIM!"}</button>
                 <button onClick={()=>setPending(new Set())} style={{background:"none",border:"none",color:"#3a3a5a",cursor:"pointer",fontSize:12}}>✕</button>
               </>}
-              <button onClick={()=>{setShowShare(true);trackMission("share",1);}} style={{padding:"4px 9px",background:"rgba(255,45,120,.08)",border:"1px solid rgba(255,45,120,.3)",borderRadius:5,color:"#FF2D78",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:.5}}>📢 SHARE</button>
+              <button onClick={()=>{if(!requireAuth("share"))return;setShowShare(true);trackMission("share",1);}} style={{padding:"4px 9px",background:"rgba(255,45,120,.08)",border:"1px solid rgba(255,45,120,.3)",borderRadius:5,color:"#FF2D78",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:.5}}>📢 SHARE</button>
               <button onClick={()=>{setActive(null);setPending(new Set());}} style={{padding:"3px 9px",background:"rgba(255,60,60,.08)",border:"1px solid rgba(255,60,60,.3)",borderRadius:4,color:"#ff6b6b",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:1,fontWeight:700}}>✕ OUT</button>
             </div>
           </div>}
@@ -1488,7 +1504,7 @@ export default function App(){
               <><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,letterSpacing:3,color:"#C8FF00",marginBottom:7}}>💥 POWER-UP SHOP</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(132px,1fr))",gap:5}}>
                 {POWERUPS.map(pu=>(
-                  <div key={pu.id} className="pubtn" onClick={()=>usePowerup(pu)} style={{background:rgba(pu.color,.07),border:`1px solid ${rgba(pu.color,.3)}`,borderRadius:8,padding:"10px",cursor:"pointer",transition:"all .15s",position:"relative"}}>
+                  <div key={pu.id} className="pubtn" onClick={()=>{if(!requireAuth("powerup"))return;usePowerup(pu);}} style={{background:rgba(pu.color,.07),border:`1px solid ${rgba(pu.color,.3)}`,borderRadius:8,padding:"10px",cursor:"pointer",transition:"all .15s",position:"relative"}}>
                     <div style={{position:"absolute",top:4,right:5,fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:RARITY_COLOR[pu.rarity]}}>{pu.rarity}</div>
                     <div style={{fontSize:20,marginBottom:4}}>{pu.icon}</div>
                     <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:pu.color,marginBottom:2}}>{pu.name}</div>
@@ -1536,10 +1552,10 @@ export default function App(){
           </div>
           {/* Missions + Share quick actions */}
           <div style={{display:"flex",gap:4,padding:"5px 5px 0",flexShrink:0}}>
-            <button onClick={()=>setShowMissions(true)} style={{flex:1,padding:"5px",background:pendingMissionCount>0?"rgba(255,215,0,.1)":"rgba(255,255,255,.04)",border:`1px solid ${pendingMissionCount>0?"rgba(255,215,0,.4)":"rgba(255,255,255,.08)"}`,borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:pendingMissionCount>0?"#FFD700":"#3a3a5a",letterSpacing:.5,position:"relative"}}>
+            <button onClick={()=>{if(!requireAuth("missions"))return;setShowMissions(true);}} style={{flex:1,padding:"5px",background:pendingMissionCount>0?"rgba(255,215,0,.1)":"rgba(255,255,255,.04)",border:`1px solid ${pendingMissionCount>0?"rgba(255,215,0,.4)":"rgba(255,255,255,.08)"}`,borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:pendingMissionCount>0?"#FFD700":"#3a3a5a",letterSpacing:.5,position:"relative"}}>
               🎯 MISSIONS{pendingMissionCount>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#FFD700",color:"#040408",borderRadius:"50%",width:14,height:14,fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900}}>{pendingMissionCount}</span>}
             </button>
-            {active&&<button onClick={()=>{setShowShare(true);trackMission("share",1);}} style={{flex:1,padding:"5px",background:"rgba(255,45,120,.06)",border:"1px solid rgba(255,45,120,.2)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FF2D78",letterSpacing:.5}}>📢 SHARE</button>}
+            {active&&<button onClick={()=>{if(!requireAuth("share"))return;setShowShare(true);trackMission("share",1);}} style={{flex:1,padding:"5px",background:"rgba(255,45,120,.06)",border:"1px solid rgba(255,45,120,.2)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FF2D78",letterSpacing:.5}}>📢 SHARE</button>}
             <button onClick={()=>setShowHallOfFame(s=>!s)} style={{flex:1,padding:"5px",background:"rgba(255,215,0,.05)",border:"1px solid rgba(255,215,0,.18)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FFD700",letterSpacing:.5}}>🏆 HOF</button>          </div>
 
           {/* Season mini stats */}
@@ -1554,11 +1570,11 @@ export default function App(){
             <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)"}}>🟢 {onlineCount} online · {unlockedSectors.length}/400 sectors</div>
           </div>
 
-          <div onClick={openDailyModal} style={{margin:"4px 5px 0",padding:"4px 8px",background:"rgba(255,215,0,.04)",border:"1px solid rgba(255,215,0,.12)",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
+          <div onClick={gatedOpenDaily} style={{margin:"4px 5px 0",padding:"4px 8px",background:"rgba(255,215,0,.04)",border:"1px solid rgba(255,215,0,.12)",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
             <span style={{fontSize:12}}>🔥</span>
             <div><div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#FFD700"}}>{streakData.days}d streak</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{alreadyClaimedToday?"✅ Claimed":`🎁 ${freePixels}px free`}</div></div>
           </div>
-          <div onClick={()=>navigate("/request-fandom")} style={{margin:"4px 5px 0",padding:"6px 8px",background:"rgba(200,255,0,.08)",border:"2px solid rgba(200,255,0,.4)",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,flexShrink:0}}>
+          <div onClick={()=>{if(!requireAuth("fandom"))return;navigate("/request-fandom");}} style={{margin:"4px 5px 0",padding:"6px 8px",background:"rgba(200,255,0,.08)",border:"2px solid rgba(200,255,0,.4)",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,flexShrink:0}}>
             <span style={{fontSize:11}}>➕</span>
             <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#C8FF00",letterSpacing:1}}>REQUEST A FANDOM</span>
           </div>
@@ -1653,8 +1669,8 @@ export default function App(){
           {/* WARS TAB — Alliances + War declarations */}
           {tab==="WARS"&&<div style={{flex:1,overflowY:"auto",padding:"5px 5px"}}>
             {active&&<div style={{display:"flex",gap:4,marginBottom:10}}>
-              <button onClick={()=>setShowWarModal(true)} style={{flex:1,padding:"7px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.3)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",letterSpacing:.5}}>⚔️ DECLARE WAR</button>
-              <button onClick={()=>setShowAllianceModal(true)} style={{flex:1,padding:"7px",background:"rgba(0,255,170,.06)",border:"1px solid rgba(0,255,170,.25)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00FFAA",letterSpacing:.5}}>🤝 ALLY</button>
+              <button onClick={()=>{if(!requireAuth("war"))return;setShowWarModal(true);}} style={{flex:1,padding:"7px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.3)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",letterSpacing:.5}}>⚔️ DECLARE WAR</button>
+              <button onClick={()=>{if(!requireAuth("alliance"))return;setShowAllianceModal(true);}} style={{flex:1,padding:"7px",background:"rgba(0,255,170,.06)",border:"1px solid rgba(0,255,170,.25)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00FFAA",letterSpacing:.5}}>🤝 ALLY</button>
             </div>}
 
             {/* Active alliances */}
