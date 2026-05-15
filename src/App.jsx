@@ -711,7 +711,7 @@ export default function App(){
   const decayStats=useMemo(()=>{const now=Date.now();let warn=0,expired=0;Object.values(pixels).forEach(p=>{if(!p?.at)return;const age=now-p.at;if(age>DECAY_EXPIRE*86400000)expired++;else if(age>DECAY_WARN*86400000)warn++;});return{warn,expired};},[pixels]);
   const miniSeasonLeader=useMemo(()=>{if(!miniSeason)return null;const{sector_x:msx,sector_y:msy}=miniSeason;const cnt={};for(let py=msy*SECTOR;py<(msy+1)*SECTOR;py++)for(let px2=msx*SECTOR;px2<(msx+1)*SECTOR;px2++){const p=pixels[py*GW+px2];if(p?.t)cnt[p.t]=(cnt[p.t]||0)+1;}const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];return top?{id:top[0],name:TM[top[0]]?.name||"?",color:TM[top[0]]?.color||"#888",count:top[1]}:null;},[pixels,miniSeason]);
   const miniSeasonDaysLeft=miniSeason?Math.max(0,Math.ceil((new Date(miniSeason.end_date)-Date.now())/86400000)):0;
-  const bannerOffset=145+(event?28:0)+(miniSeason?30:0)+(pendingAlliances.length>0?30:0)+(showNotifBanner&&notifPermission==="default"?36:0);
+  const bannerOffset=145+(miniSeason?30:0)+(pendingAlliances.length>0?30:0)+(showNotifBanner&&notifPermission==="default"?36:0);
 
   // Sector leaderboard
   const sectorLeaderboard=useMemo(()=>{
@@ -963,6 +963,14 @@ export default function App(){
           <div style={{display:"flex",alignItems:"center",gap:5,background:rgba(myRank.color,.07),border:`1px solid ${rgba(myRank.color,.25)}`,borderRadius:7,padding:"4px 9px"}}>
             <span style={{fontSize:13}}>{myRank.icon}</span><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:myRank.color}}>{myRank.name}</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{myPixels}px</div></div>
           </div>
+          {/* Event badge — inline in header, no overlap */}
+          {event&&<div style={{display:"flex",alignItems:"center",gap:5,background:rgba(event.color,.1),border:`1px solid ${rgba(event.color,.4)}`,borderRadius:7,padding:"4px 10px",animation:"pulse 2s infinite"}}>
+            <span style={{fontSize:14}}>{event.icon}</span>
+            <div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:event.color,letterSpacing:1,whiteSpace:"nowrap"}}>{event.label}</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:event.color,opacity:.7}}>{Math.floor(eventTimer/60)}:{String(eventTimer%60).padStart(2,"0")} · {event.desc}</div>
+            </div>
+          </div>}
         </div>
         <div style={{display:"flex",gap:14,flexWrap:"wrap",alignItems:"center"}}>
           {[["SOLD",totalSold.toLocaleString(),"#00F5FF"],["€ REV",`€${totalSold}`,"#C8FF00"],["SECTORS",`${unlockedSectors.length}/400`,"#FF2D78"]].map(([l,v,c])=>(
@@ -1009,12 +1017,6 @@ export default function App(){
           <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FFD700"}}>{miniSeasonDaysLeft}d · {miniSeason.prize}</span>
           <button onClick={()=>{setVx(Math.max(0,miniSeason.sector_x*SECTOR-40));setVy(Math.max(0,miniSeason.sector_y*SECTOR-30));}} style={{padding:"2px 7px",background:"rgba(255,215,0,.12)",border:"1px solid rgba(255,215,0,.35)",borderRadius:4,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700"}}>GO →</button>
         </div>
-      </div>}
-
-      {/* EVENT BANNER */}
-      {event&&<div style={{background:`linear-gradient(90deg,${rgba(event.color,.14)},transparent)`,borderBottom:`1px solid ${rgba(event.color,.35)}`,padding:"4px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:15,animation:"pulse 1s infinite"}}>{event.icon}</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:event.color,letterSpacing:2}}>{event.label}</span><span style={{fontSize:10,color:"#c0c8e8"}}>— {event.desc}</span></div>
-        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:event.color,animation:"pulse 1s infinite"}}>{Math.floor(eventTimer/60)}:{String(eventTimer%60).padStart(2,"0")}</div>
       </div>}
 
       {/* PENDING ALLIANCE ALERT */}
