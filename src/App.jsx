@@ -1165,10 +1165,13 @@ export default function App(){
 
       {/* SPONSORED BANNER STRIP */}
       {sponsoredBanners.length>0&&<div style={{background:"rgba(255,215,0,.06)",borderBottom:"1px solid rgba(255,215,0,.2)",height:26,overflow:"hidden",display:"flex",alignItems:"center",position:"relative"}}>
-        <div style={{position:"absolute",left:0,top:0,bottom:0,width:90,background:"rgba(4,4,12,.98)",zIndex:2,display:"flex",alignItems:"center",paddingLeft:8,borderRight:"1px solid rgba(255,215,0,.2)"}}>
+        <div style={{position:"absolute",left:0,top:0,bottom:0,width:90,background:"rgba(4,4,12,.98)",zIndex:2,display:"flex",alignItems:"center",paddingLeft:8,borderRight:"1px solid rgba(255,215,0,.2)",flexShrink:0}}>
           <span style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FFD700",letterSpacing:1,whiteSpace:"nowrap",fontWeight:900}}>📣 SPONSORED</span>
         </div>
-        <div style={{marginLeft:90,overflow:"hidden",flex:1,display:"flex",alignItems:"center"}}>
+        <div style={{position:"absolute",right:0,top:0,bottom:0,width:90,background:"rgba(4,4,12,.98)",zIndex:2,display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:8,borderLeft:"1px solid rgba(255,215,0,.2)",flexShrink:0}}>
+          <span style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FFD700",letterSpacing:1,whiteSpace:"nowrap",fontWeight:900}}>SPONSORED 📣</span>
+        </div>
+        <div style={{marginLeft:90,marginRight:90,overflow:"hidden",flex:1,display:"flex",alignItems:"center"}}>
           <div style={{display:"flex",gap:"80px",whiteSpace:"nowrap",animation:`sponsorTicker ${Math.max(20,sponsoredBanners.length*15)}s linear infinite`}}>
             {[...sponsoredBanners,...sponsoredBanners].map((b,i)=>(
               <span key={i} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#FFD700",letterSpacing:.5}}>
@@ -1177,7 +1180,6 @@ export default function App(){
             ))}
           </div>
         </div>
-        <div style={{position:"absolute",right:0,top:0,bottom:0,width:30,background:"linear-gradient(270deg,rgba(4,4,12,.98),transparent)",zIndex:2}}/>
         <style>{`@keyframes sponsorTicker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}`}</style>
       </div>}
 
