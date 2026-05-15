@@ -217,6 +217,7 @@ export default function App(){
   const prevBoardRef=useRef([]);
 
   const currentSeasonNum=season.num;
+  const alreadyClaimedToday=streakData.last===todayStr();
 
   const pushToast=useCallback((msg,color,dur=3000)=>{const id=Date.now()+Math.random();setToasts(t=>[...t,{id,msg,color}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),dur);},[]);
   useEffect(()=>{vxRef.current=vx;},[vx]);
