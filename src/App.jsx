@@ -6,6 +6,7 @@ import MissionsModal, { MISSIONS } from "./MissionsModal";
 import OnboardingModal from "./OnboardingModal";
 import PixelHistoryModal from "./PixelHistoryModal";
 import CookieBanner from "./CookieBanner";
+import { startMusic, stopMusic } from "./MusicPlayer";
 
 // ── SOUND SYSTEM ──────────────────────────────────────────────────────────────
 let _audioCtx=null;
@@ -209,8 +210,10 @@ export default function App(){
   const [showOnboarding,setShowOnboarding]=useState(()=>!localStorage.getItem("pow_onboarded"));
   const [countdownStr,setCountdownStr]=useState("");
   const [soundEnabled,setSoundEnabled]=useState(()=>localStorage.getItem("pow_sound")!=="0");
-  const [pixelHistory,setPixelHistory]=useState(null);// {pixel, history[], gx, gy}
-  const lastClaimRef=useRef(0);// rate limiting
+  const [musicEnabled,setMusicEnabled]=useState(()=>localStorage.getItem("pow_music")==="1");
+  const [pixelHistory,setPixelHistory]=useState(null);
+  const lastClaimRef=useRef(0);
+  const prevBoardRef=useRef([]);
 
   const alreadyClaimedToday=streakData.last===todayStr();
   const currentSeasonNum=season.num;
@@ -590,6 +593,29 @@ export default function App(){
     const vig=ctx.createRadialGradient(CW/2,CH/2,CW*0.28,CW/2,CH/2,CW*0.72);
     vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,10,0.55)");
     ctx.fillStyle=vig;ctx.fillRect(0,0,CW,CH);
+
+    // Fandom flags on dominant sectors
+    if(!showPriceMap&&!showHeatmap){
+      sectorLeaderboard.slice(0,30).forEach(s=>{
+        if(!s.leader||s.leaderPx<20)return;
+        const domPct=s.leaderPx/s.total;
+        if(domPct<0.4)return;
+        const cx2=(s.sx*SECTOR+SECTOR/2-vx)*CELL;
+        const cy2=(s.sy*SECTOR+SECTOR/2-vy)*CELL;
+        if(cx2<-SECTOR*CELL||cx2>CW+SECTOR*CELL||cy2<-SECTOR*CELL||cy2>CH+SECTOR*CELL)return;
+        const label=s.leader.name.slice(0,4).toUpperCase();
+        const alpha=Math.min(0.75,domPct*0.9);
+        // Badge bg
+        ctx.fillStyle=`rgba(4,4,14,${alpha*0.7})`;
+        ctx.beginPath();
+        if(ctx.roundRect)ctx.roundRect(cx2-22,cy2-9,44,18,4);else ctx.rect(cx2-22,cy2-9,44,18);
+        ctx.fill();
+        // Label
+        ctx.fillStyle=s.leader.color+(Math.round(alpha*255).toString(16).padStart(2,"0"));
+        ctx.font=`bold 9px monospace`;ctx.textAlign="center";
+        ctx.fillText(label,cx2,cy2+4);
+      });
+    }
   },[pixels,shields,pending,active,mode,vx,vy,unlockedSet,sectorFills,showPriceMap,showHeatmap,heatmapTick,miniSeason]);
 
   // ── MINIMAP ────────────────────────────────────────────────────────────────
@@ -683,9 +709,9 @@ export default function App(){
     sample.forEach(idx=>spawnParticles(t.color,idx%GW,Math.floor(idx/GW),isRaid?14:9,isRaid));
     if(claimArr.length>0){const mid=claimArr[Math.floor(claimArr.length/2)];spawnShockwave(t.color,mid%GW,Math.floor(mid/GW));}
     if(isRaid){triggerFlash("#FF0000",true);playSound("raid",soundEnabled);pushToast(`⚔️ RAID! ${toClaim.size}px conquered!`,"#FF4400",4000);}
-    else{triggerFlash(t.color);playSound("claim",soundEnabled);}
+    else{triggerFlash(t.color);playSound("claim",soundEnabled);spawnConfetti(t.color,Math.min(30,toClaim.size+10));}
     if(freeUsed>0)pushToast(`🎁 ${freeUsed} free pixels used!`,"#FFD700",3000);
-    if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);playSound("combo",soundEnabled);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
+    if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);playSound("combo",soundEnabled);spawnConfetti(t.color,40);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
     else pushToast(`🏴 ${toClaim.size}px for ${t.name}! €${(cost-freeUsed).toFixed(2)}`,"#00F5FF",3000);
     setFeed(f=>[{id:Date.now(),icon:isRaid?"⚔️":"🏴",team:t.name,msg:`${isRaid?"RAIDED":"claimed"} ${toClaim.size}px (€${cost.toFixed(2)})`,color:t.color,ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isMe:true},...f].slice(0,40));
   };
@@ -747,6 +773,40 @@ export default function App(){
   // Sync sound pref
   useEffect(()=>{localStorage.setItem("pow_sound",soundEnabled?"1":"0");},[soundEnabled]);
 
+  // Music toggle
+  useEffect(()=>{
+    localStorage.setItem("pow_music",musicEnabled?"1":"0");
+    if(musicEnabled)startMusic();else stopMusic();
+  },[musicEnabled]);
+
+  // Confetti on claim
+  const spawnConfetti=useCallback((color,count=22)=>{
+    for(let i=0;i<count;i++){
+      const el=document.createElement("div");
+      const angle=(Math.PI*2*i/count)+Math.random()*.5;
+      const dist=40+Math.random()*60;
+      const size=3+Math.random()*5;
+      const isCircle=Math.random()>.5;
+      el.style.cssText=`position:fixed;width:${size}px;height:${size}px;background:${color};border-radius:${isCircle?"50%":"2px"};left:50%;top:45%;pointer-events:none;z-index:400;animation:confettiFall ${.6+Math.random()*.6}s ease-out forwards;--cx:${Math.cos(angle)*dist}px;--cy:${Math.sin(angle)*dist}px`;
+      document.body.appendChild(el);setTimeout(()=>el.remove(),1400);
+    }
+  },[]);
+
+  // Leaderboard rank change alerts
+  useEffect(()=>{
+    if(board.length===0)return;
+    const prev=prevBoardRef.current;
+    if(prev.length>0){
+      board.forEach((team,newRank)=>{
+        const prevRank=prev.findIndex(t=>t.id===team.id);
+        if(prevRank>newRank&&newRank===0)pushToast(`👑 ${team.name} TAKES #1!`,team.color,6000);
+        else if(prevRank>0&&newRank===0)pushToast(`📈 ${team.name} moved to #1!`,team.color,5000);
+        else if(prevRank>newRank&&prevRank-newRank>=2)pushToast(`📈 ${team.name} up to #${newRank+1}!`,team.color,4000);
+      });
+    }
+    prevBoardRef.current=[...board];
+  },[board]);
+
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return(
@@ -772,6 +832,7 @@ export default function App(){
         @keyframes shockwaveExp{0%{transform:scale(1);opacity:.9;box-shadow:0 0 8px currentColor}100%{transform:scale(22);opacity:0}}
         @keyframes bgDrift{0%,100%{transform:translateY(0) translateX(0) rotate(0deg);opacity:.4}33%{transform:translateY(-18px) translateX(8px) rotate(120deg);opacity:.7}66%{transform:translateY(10px) translateX(-6px) rotate(240deg);opacity:.3}}
         @keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
+        @keyframes confettiFall{0%{transform:translate(0,0) rotate(0deg);opacity:1}100%{transform:translate(var(--cx),calc(var(--cy) + 80px)) rotate(540deg);opacity:0}}
         .chip:hover{filter:brightness(1.4)!important}.tbtn:hover{filter:brightness(1.15);transform:translateY(-1px)}.pubtn:hover{filter:brightness(1.2);transform:scale(1.02)}.nav-btn:hover{background:rgba(255,255,255,.12)!important}
         ::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-thumb{background:#222240;border-radius:2px}*{box-sizing:border-box}input::placeholder{color:#2a2a4a}
       `}</style>
@@ -906,17 +967,25 @@ export default function App(){
 
       {/* SEASON END */}
       {showSeasonEnd&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:998,backdropFilter:"blur(12px)"}}>
-        <div style={{background:"#09091c",border:"1px solid rgba(255,215,0,.5)",borderRadius:20,padding:"36px 32px",width:440,maxWidth:"94vw",animation:"pop .5s cubic-bezier(.34,1.56,.64,1)",textAlign:"center"}}>
-          <div style={{fontSize:56,marginBottom:12}}>🏆</div>
+        {/* Fireworks */}
+        <div style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden"}}>
+          {Array.from({length:12}).map((_,i)=>(
+            <div key={i} style={{position:"absolute",left:`${10+i*7}%`,top:`${10+((i*37)%50)}%`,width:4,height:4,borderRadius:"50%",background:["#FFD700","#FF4400","#00F5FF","#C8FF00","#FF2D78","#9747FF"][i%6],animation:`firework ${1+Math.random()}s ease-out infinite`,animationDelay:`${i*.2}s`,boxShadow:`0 0 6px currentColor`}}/>
+          ))}
+        </div>
+        <style>{`@keyframes firework{0%{transform:scale(0) translateY(0);opacity:1}50%{transform:scale(1) translateY(-60px);opacity:1}100%{transform:scale(0) translateY(-120px);opacity:0}}`}</style>
+        <div style={{background:"rgba(9,9,30,.97)",border:"1px solid rgba(255,215,0,.5)",borderRadius:20,padding:"36px 32px",width:440,maxWidth:"94vw",animation:"pop .5s cubic-bezier(.34,1.56,.64,1)",textAlign:"center",position:"relative",zIndex:1,boxShadow:"0 0 80px rgba(255,215,0,.2)"}}>
+          <div style={{fontSize:56,marginBottom:12,animation:"bounce 1s ease-in-out infinite"}}>🏆</div>
+          <style>{`@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}`}</style>
           <div style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:3,marginBottom:20}}>SEASON {season.num} OVER!</div>
           {board[0]&&<div style={{background:rgba(board[0].color,.1),border:`1px solid ${rgba(board[0].color,.4)}`,borderRadius:12,padding:"16px",marginBottom:20}}>
             <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)",marginBottom:6}}>SEASON CHAMPION 👑</div>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:board[0].color}}>{board[0].name}</div>
-            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)",marginTop:4}}>{board[0].count.toLocaleString()} pixels</div>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:board[0].color,textShadow:`0 0 20px ${board[0].color}`}}>{board[0].name}</div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)",marginTop:4}}>{board[0].count.toLocaleString()} pixels dominated</div>
           </div>}
           <div style={{background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:10,padding:"12px 16px",marginBottom:20,display:"flex",gap:12,alignItems:"center"}}>
             <span style={{fontSize:24}}>{THEMES[(season.theme+1)%THEMES.length].icon}</span>
-            <div style={{textAlign:"left"}}><div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>SEASON {season.num+1}: {THEMES[(season.theme+1)%THEMES.length].name}</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginTop:2}}>{THEMES[(season.theme+1)%THEMES.length].desc}</div></div>
+            <div style={{textAlign:"left"}}><div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>NEXT: {THEMES[(season.theme+1)%THEMES.length].name}</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginTop:2}}>{THEMES[(season.theme+1)%THEMES.length].desc}</div></div>
           </div>
           <button onClick={startNewSeason} style={{width:"100%",padding:"14px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",color:"#040408",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:13,letterSpacing:2}}>🚀 START SEASON {season.num+1} →</button>
         </div>
@@ -957,13 +1026,12 @@ export default function App(){
           </div>
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 FANDOMS</button>
           <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
+          <a href="/rivalries" style={{marginTop:3,display:"inline-block",background:"rgba(255,68,0,.06)",border:"1px solid rgba(255,68,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",letterSpacing:1,textDecoration:"none"}}>⚔️ RIVALRIES</a>
           <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{marginTop:3,display:"inline-block",background:"rgba(88,101,242,.12)",border:"1px solid rgba(88,101,242,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#7289DA",letterSpacing:1,textDecoration:"none"}}>💬 DISCORD</a>
-          <div style={{display:"flex",gap:6,marginTop:3}}>
-            <a href="/contact" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",textDecoration:"none",letterSpacing:1}}>CONTACT</a>
-            <span style={{color:"#1a1a2e",fontSize:7}}>·</span>
-            <a href="/terms" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",textDecoration:"none",letterSpacing:1}}>TERMS</a>
-            <span style={{color:"#1a1a2e",fontSize:7}}>·</span>
-            <a href="/privacy" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",textDecoration:"none",letterSpacing:1}}>PRIVACY</a>
+          <div style={{display:"flex",gap:6,marginTop:3,flexWrap:"wrap"}}>
+            <a href="/contact" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#4a4a6a",textDecoration:"none",letterSpacing:1,border:"1px solid #1a1a30",borderRadius:3,padding:"1px 5px"}}>CONTACT</a>
+            <a href="/terms" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#4a4a6a",textDecoration:"none",letterSpacing:1,border:"1px solid #1a1a30",borderRadius:3,padding:"1px 5px"}}>TERMS</a>
+            <a href="/privacy" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#4a4a6a",textDecoration:"none",letterSpacing:1,border:"1px solid #1a1a30",borderRadius:3,padding:"1px 5px"}}>PRIVACY</a>
           </div>
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
@@ -1013,7 +1081,8 @@ export default function App(){
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button onClick={()=>setShowHeatmap(s=>!s)} style={{background:showHeatmap?"rgba(255,100,0,.2)":"rgba(255,100,0,.05)",border:`1px solid ${showHeatmap?"rgba(255,100,0,.6)":"rgba(255,100,0,.2)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF6422",letterSpacing:1,transition:"all .15s"}}>{showHeatmap?"HIDE":"🔥 HEATMAP"}</button>
           <button onClick={()=>setShowPriceMap(s=>!s)} style={{background:showPriceMap?"rgba(0,245,255,.15)":"rgba(0,245,255,.05)",border:`1px solid ${showPriceMap?"rgba(0,245,255,.5)":"rgba(0,245,255,.15)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00F5FF",transition:"all .15s"}}>{showPriceMap?"HIDE":"💰 PRICES"}</button>
-          <button onClick={()=>setSoundEnabled(s=>!s)} style={{background:soundEnabled?"rgba(200,255,0,.1)":"rgba(255,255,255,.04)",border:`1px solid ${soundEnabled?"rgba(200,255,0,.4)":"rgba(255,255,255,.1)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:soundEnabled?"#C8FF00":"#3a3a5a",transition:"all .15s"}}>{soundEnabled?"🔊 ON":"🔇 OFF"}</button>
+          <button onClick={()=>setSoundEnabled(s=>!s)} style={{background:soundEnabled?"rgba(200,255,0,.1)":"rgba(255,255,255,.04)",border:`1px solid ${soundEnabled?"rgba(200,255,0,.4)":"rgba(255,255,255,.1)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:soundEnabled?"#C8FF00":"#3a3a5a",transition:"all .15s"}}>{soundEnabled?"🔊 SFX":"🔇 SFX"}</button>
+          <button onClick={()=>setMusicEnabled(s=>!s)} style={{background:musicEnabled?"rgba(147,71,255,.15)":"rgba(255,255,255,.04)",border:`1px solid ${musicEnabled?"rgba(147,71,255,.5)":"rgba(255,255,255,.1)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:musicEnabled?"#9747FF":"#3a3a5a",transition:"all .15s"}}>{musicEnabled?"🎵 MUSIC":"🎵 MUSIC"}</button>
         </div>
       </div>
 
@@ -1049,6 +1118,18 @@ export default function App(){
         onComplete={(fandom)=>{setShowOnboarding(false);if(fandom)setTimeout(()=>setActive(fandom.id),300);pushToast(`⚔️ Welcome to the war, ${fandom?.name||"warrior"}!`,"#00F5FF",5000);}}
         onSkip={()=>setShowOnboarding(false)}
       />}
+      {/* WAR TICKER — scrolling feed at bottom */}
+      {!isMobile&&feed.length>4&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"rgba(4,4,12,.92)",borderTop:"1px solid rgba(0,245,255,.1)",height:26,overflow:"hidden",display:"flex",alignItems:"center"}}>
+        <div style={{display:"flex",gap:"48px",whiteSpace:"nowrap",animation:"warTicker 35s linear infinite",flexShrink:0}}>
+          {[...feed,...feed].map((f,i)=>(
+            <span key={i} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:f.color,letterSpacing:.5,flexShrink:0}}>
+              {f.icon} <span style={{fontWeight:700}}>{f.team}</span> {f.msg} <span style={{color:"rgba(255,255,255,.15)"}}>·</span>
+            </span>
+          ))}
+        </div>
+        <style>{`@keyframes warTicker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}`}</style>
+      </div>}
+
       {pixelHistory&&<PixelHistoryModal pixel={pixelHistory.pixel} history={pixelHistory.history} TM={TM} onClose={()=>setPixelHistory(null)} onJumpTo={()=>{setVx(Math.max(0,pixelHistory.gx-VW/2));setVy(Math.max(0,pixelHistory.gy-VH/2));setPixelHistory(null);}}/>}
       <CookieBanner/>
 
