@@ -7,6 +7,7 @@ import OnboardingModal from "./OnboardingModal";
 import PixelHistoryModal from "./PixelHistoryModal";
 import CookieBanner from "./CookieBanner";
 import { startMusic, stopMusic } from "./MusicPlayer";
+import AuthModal from "./AuthModal";
 
 
 // ── SOUND SYSTEM ──────────────────────────────────────────────────────────────
@@ -215,6 +216,11 @@ export default function App(){
   const [pixelHistory,setPixelHistory]=useState(null);
   const lastClaimRef=useRef(0);
   const prevBoardRef=useRef([]);
+  const [user,setUser]=useState(null);
+  const [profile,setProfile]=useState(null);
+  const [showAuthModal,setShowAuthModal]=useState(false);
+  const [authReason,setAuthReason]=useState("claim");
+  const [totalPlayers,setTotalPlayers]=useState(0);
 
   const currentSeasonNum=season.num;
   const alreadyClaimedToday=streakData.last===todayStr();
@@ -423,6 +429,35 @@ export default function App(){
     const onResize=()=>setIsMobile(window.innerWidth<768);
     window.addEventListener("resize",onResize);
     return()=>window.removeEventListener("resize",onResize);
+  },[]);
+
+  // ── AUTH ──────────────────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!supabase)return;
+    // Get initial session
+    supabase.auth.getSession().then(({data:{session}})=>{
+      setUser(session?.user||null);
+      if(session?.user)loadProfile(session.user.id);
+    });
+    // Listen for auth changes
+    const{data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
+      setUser(session?.user||null);
+      if(session?.user)loadProfile(session.user.id);
+      else setProfile(null);
+    });
+    return()=>subscription.unsubscribe();
+  },[]);
+
+  const loadProfile=async(userId)=>{
+    if(!supabase)return;
+    const{data}=await supabase.from("profiles").select("*").eq("id",userId).single();
+    if(data)setProfile(data);
+  };
+
+  // Load total player count
+  useEffect(()=>{
+    if(!supabase||!isOnline)return;
+    supabase.rpc("get_player_count").then(({data})=>data&&setTotalPlayers(data));
   },[]);
 
   // ── SERVICE WORKER ────────────────────────────────────────────────────────
@@ -650,7 +685,15 @@ export default function App(){
   const onMM_h=(e)=>{const g=mouseToGrid(e);if(g){setHov(pixels[g.idx]?TM[pixels[g.idx].t]:null);const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);setHovSector({sx,sy,unlocked:unlockedSet.has(sectorKey(sx,sy)),fill:sectorFills[sectorKey(sx,sy)]||0});}if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}};
   const triggerFlash=(color,shake=false)=>{setFlashColor(color);setTimeout(()=>setFlashColor(null),300);if(shake){setShakeCanvas(true);setTimeout(()=>setShakeCanvas(false),500);}};
   const calcCost=(pendingSet)=>{if(!pendingSet.size)return 0;let total=0;const groups={};pendingSet.forEach(idx=>{const[sx,sy]=sectorOf(idx);const k=sectorKey(sx,sy);if(!groups[k])groups[k]=[];groups[k].push(idx);});Object.entries(groups).forEach(([k,idxs])=>{const[sx,sy]=k.split(",").map(Number);const fill=sectorFills[k]||0;let price=sectorBasePrice(sx,sy)*fillMultiplier(fill);if(mode==="RAID")price*=2;if(event?.label==="CHAOS HOUR"&&mode==="RAID")price*=0.5;if(event?.label==="SECTOR SALE")price*=0.5;total+=idxs.length*price;});return Math.round(total*100)/100;};
-  const requestClaim=()=>{if(!active||pending.size===0)return;const t=TM[active];const isRaid=mode==="RAID";const cost=calcCost(pending);const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;setConfirmPayload({count:pending.size,cost,freeUsed,isRaid,bonus,teamName:t.name,teamColor:t.color,modeLabel:isRaid?"⚔️ RAID":"🏴 CLAIM"});setShowConfirm(true);};
+  const requestClaim=()=>{
+    if(!active||pending.size===0)return;
+    if(!user){setAuthReason("claim");setShowAuthModal(true);return;}
+    const t=TM[active];const isRaid=mode==="RAID";const cost=calcCost(pending);
+    const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;
+    const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;
+    setConfirmPayload({count:pending.size,cost,freeUsed,isRaid,bonus,teamName:t.name,teamColor:t.color,modeLabel:isRaid?"⚔️ RAID":"🏴 CLAIM"});
+    setShowConfirm(true);
+  };
   const onMU=()=>{
     setDrag(false);
     if(pending.size>0){requestClaim();return;}
@@ -1023,7 +1066,8 @@ export default function App(){
             S{season.num} · {currentTheme.icon} {currentTheme.name}
             <span style={{width:5,height:5,borderRadius:"50%",background:isOnline?"#00FF88":"#FF4400",display:"inline-block",animation:isOnline?"pulse 2s infinite":undefined}}/>
             <span style={{color:isOnline?"#00FF88":"#FF4400"}}>{isOnline?"LIVE":"OFFLINE"}</span>
-            <span style={{color:"rgba(0,255,136,.5)"}}>· 🟢 {onlineCount} online</span>
+            <span style={{color:onlineCount>1?"#00FF88":"rgba(0,255,136,.4)",fontWeight:onlineCount>1?900:400,animation:onlineCount>1?"pulse 1.5s infinite":undefined}}>· {onlineCount>1?`⚔️ ${onlineCount} WARRIORS ONLINE`:`🟢 ${onlineCount} online`}</span>
+            {totalPlayers>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a"}}>· {totalPlayers} joined</span>}
           </div>
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 FANDOMS</button>
           <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
@@ -1046,7 +1090,18 @@ export default function App(){
           <div style={{display:"flex",alignItems:"center",gap:5,background:rgba(myRank.color,.07),border:`1px solid ${rgba(myRank.color,.25)}`,borderRadius:7,padding:"4px 9px"}}>
             <span style={{fontSize:13}}>{myRank.icon}</span><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:myRank.color}}>{myRank.name}</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{myPixels}px</div></div>
           </div>
-          {/* Event badge — inline in header, no overlap */}
+          {/* User auth */}
+          {user?(
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 8px",background:"rgba(88,101,242,.1)",border:"1px solid rgba(88,101,242,.3)",borderRadius:6,cursor:"pointer"}} onClick={()=>supabase?.auth.signOut()}>
+              {profile?.avatar_url&&<img src={profile.avatar_url} style={{width:18,height:18,borderRadius:"50%"}} alt="avatar"/>}
+              <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"#7289DA",maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{profile?.username||"Player"}</span>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00"}}>{profile?.free_pixels||0}px free</span>
+            </div>
+          ):(
+            <button onClick={()=>{setAuthReason("join");setShowAuthModal(true);}} style={{padding:"4px 12px",background:"linear-gradient(90deg,#5865F2,#7289DA)",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#fff",letterSpacing:1}}>
+              LOGIN WITH DISCORD
+            </button>
+          )}
           {event&&<div style={{display:"flex",alignItems:"center",gap:5,background:rgba(event.color,.1),border:`1px solid ${rgba(event.color,.4)}`,borderRadius:7,padding:"4px 10px",animation:"pulse 2s infinite"}}>
             <span style={{fontSize:14}}>{event.icon}</span>
             <div>
@@ -1134,6 +1189,7 @@ export default function App(){
       </div>}
 
       {pixelHistory&&<PixelHistoryModal pixel={pixelHistory.pixel} history={pixelHistory.history} TM={TM} onClose={()=>setPixelHistory(null)} onJumpTo={()=>{setVx(Math.max(0,pixelHistory.gx-VW/2));setVy(Math.max(0,pixelHistory.gy-VH/2));setPixelHistory(null);}}/>}
+      {showAuthModal&&<AuthModal onClose={()=>setShowAuthModal(false)} reason={authReason}/>}
       <CookieBanner/>
 
       {/* NOTIFICATION PERMISSION BANNER */}
@@ -1233,6 +1289,7 @@ export default function App(){
               ):(
                 <>
                   <input value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 Search ${ALL.length} fandoms…`} style={{width:"100%",background:"#0c0c1c",border:"1px solid rgba(0,245,255,.15)",borderRadius:6,padding:"8px 12px",color:"#b0b8e0",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:6}}/>
+                  <button onClick={()=>navigate("/request-fandom")} style={{width:"100%",marginBottom:6,padding:"8px",background:"rgba(200,255,0,.08)",border:"2px solid rgba(200,255,0,.4)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST A FANDOM</button>
               <button onClick={()=>navigate('/request-fandom')} style={{width:"100%",marginBottom:6,padding:"6px",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST A FANDOM</button>
                   <div style={{display:"flex",gap:3,marginBottom:6,overflowX:"auto",paddingBottom:2}}>
                     {["All","🎮 Gaming","🎌 Anime","🎵 Music"].map(c=>{const acc=c==="All"?"#5566AA":CAT_ACCENT[c],on=selCat===c;return(
@@ -1492,9 +1549,9 @@ export default function App(){
               <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#FFD700"}}>S{season.num} · {seasonDaysLeft}d left</span>
               <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)"}}>{Math.round((1-seasonDaysLeft/SEASON_DAYS)*100)}%</span>
             </div>
-            <div style={{height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden",marginBottom:3}}>
+            {(1-seasonDaysLeft/SEASON_DAYS)>=0.1&&<div style={{height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden",marginBottom:3}}>
               <div style={{height:"100%",width:`${(1-seasonDaysLeft/SEASON_DAYS)*100}%`,background:"linear-gradient(90deg,#FFD700,#FF4400)",borderRadius:2,transition:"width 1s"}}/>
-            </div>
+            </div>}
             <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)"}}>🟢 {onlineCount} online · {unlockedSectors.length}/400 sectors</div>
           </div>
 
