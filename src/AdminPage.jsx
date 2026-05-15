@@ -341,20 +341,39 @@ export default function AdminPage(){
           </div>
         </div>
 
-        {/* RIGHT COLUMN — LOG */}
-        <div style={{background:"#09091a",border:"1px solid #1a1a30",borderRadius:12,padding:"16px",height:"fit-content",position:"sticky",top:16}}>
-          <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#00F5FF",letterSpacing:3,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:5,height:5,borderRadius:"50%",background:"#00FF88"}}/>
-            ACTIVITY LOG
-          </div>
-          {loading&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#00F5FF",marginBottom:8,animation:"pulse 1s infinite"}}>⏳ Processing...</div>}
-          {log.length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>No actions yet</div>}
-          {log.map(l=>(
-            <div key={l.id} style={{marginBottom:6,padding:"6px 8px",background:rgba(l.color,.06),borderLeft:`2px solid ${l.color}`,borderRadius:4,animation:"slideDown .2s ease"}}>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:l.color}}>{l.msg}</div>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)",marginTop:2}}>{l.ts}</div>
+        {/* RIGHT COLUMN — LOG + ANALYTICS */}
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {/* Umami Analytics */}
+          <div style={{background:"#09091a",border:"1px solid rgba(0,245,255,.2)",borderRadius:12,overflow:"hidden"}}>
+            <div style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid #1a1a30"}}>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#00F5FF",letterSpacing:3,display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:5,height:5,borderRadius:"50%",background:"#00FF88",animation:"pulse 2s infinite"}}/>
+                LIVE ANALYTICS
+              </div>
+              <a href="https://cloud.umami.is/share/6RlcXYmu6QT5hn2x" target="_blank" rel="noopener noreferrer" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",textDecoration:"none",letterSpacing:1}}>OPEN FULL ↗</a>
             </div>
-          ))}
+            <iframe
+              src="https://cloud.umami.is/share/6RlcXYmu6QT5hn2x"
+              style={{width:"100%",height:480,border:"none",background:"#09091a"}}
+              title="Umami Analytics"
+            />
+          </div>
+
+          {/* Activity Log */}
+          <div style={{background:"#09091a",border:"1px solid #1a1a30",borderRadius:12,padding:"16px"}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#00F5FF",letterSpacing:3,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:5,height:5,borderRadius:"50%",background:"#00FF88"}}/>
+              ACTIVITY LOG
+            </div>
+            {loading&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#00F5FF",marginBottom:8,animation:"pulse 1s infinite"}}>⏳ Processing...</div>}
+            {log.length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>No actions yet</div>}
+            {log.map(l=>(
+              <div key={l.id} style={{marginBottom:6,padding:"6px 8px",background:rgba(l.color,.06),borderLeft:`2px solid ${l.color}`,borderRadius:4,animation:"slideDown .2s ease"}}>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:l.color}}>{l.msg}</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)",marginTop:2}}>{l.ts}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
