@@ -347,6 +347,18 @@ export default function AdminPage(){
             ))}
           </div>
 
+          {/* ROLE MANAGEMENT */}
+          <div style={{background:"#09091a",border:"1px solid rgba(255,215,0,.2)",borderRadius:12,padding:"18px"}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#FFD700",letterSpacing:3,marginBottom:14}}>⚡ ROLE MANAGEMENT</div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",marginBottom:8,letterSpacing:1}}>Run in SQL Editor to assign roles:</div>
+            {[["admin","⚡ Admin","#FFD700"],["moderator","🛡️ Moderator","#00AAFF"],["vip","⭐ VIP","#FF2D78"],["player","👤 Player","#3a3a5a"]].map(([role,label,color])=>(
+              <div key={role} style={{marginBottom:6,padding:"8px 10px",background:rgba(color,.05),border:`1px solid ${rgba(color,.2)}`,borderRadius:6}}>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color,marginBottom:3}}>{label}</div>
+                <code style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",display:"block",wordBreak:"break-all"}}>UPDATE profiles SET role='{role}' WHERE username='USERNAME';</code>
+              </div>
+            ))}
+          </div>
+
           {/* MINI-SEASON CREATOR */}
           <div style={{background:"#09091a",border:"1px solid rgba(255,215,0,.3)",borderRadius:12,padding:"18px"}}>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#FFD700",letterSpacing:3,marginBottom:14}}>⚡ CREATE MINI SEASON</div>
