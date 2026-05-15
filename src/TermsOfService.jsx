@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 const EFFECTIVE_DATE = "15 May 2025";
 const COMPANY = "Pixels of War";
-const CONTACT_EMAIL = "legal@pixelsofwar.com"; // ← change this
+const CONTACT_EMAIL = "info@pixelsofwar.com"; // ← change this
 const WEBSITE = "https://www.pixelsofwar.com";
 
 export default function TermsOfService() {
