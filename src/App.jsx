@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase, isOnline } from "./supabase";
+import ShareModal from "./ShareModal";
+import MissionsModal, { MISSIONS } from "./MissionsModal";
 
 // ── GRID ──────────────────────────────────────────────────────────────────────
 const GW=2000,GH=2000,CELL=5,VW=180,VH=117,CW=VW*CELL,CH=VH*CELL,MM=200,MMS=GW/MM;
@@ -18,6 +20,7 @@ const cv=(hex)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),1
 const rgba=(hex,a)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;};
 const todayStr=()=>new Date().toISOString().split("T")[0];
 const yesterdayStr=()=>new Date(Date.now()-86400000).toISOString().split("T")[0];
+const getWeekNum=()=>{const d=new Date(),s=new Date(d.getFullYear(),0,1);return Math.ceil(((d-s)/86400000+s.getDay()+1)/7);};
 const sectorOf=(idx)=>[Math.floor((idx%GW)/SECTOR),Math.floor(Math.floor(idx/GW)/SECTOR)];
 const sectorKey=(sx,sy)=>`${sx},${sy}`;
 const centerDist=(sx,sy)=>Math.max(Math.abs(sx-9.5),Math.abs(sy-9.5));
@@ -155,6 +158,16 @@ export default function App(){
   const [showConfirm,setShowConfirm]=useState(false);
   const [confirmPayload,setConfirmPayload]=useState(null);
   const [showDiscord,setShowDiscord]=useState(false);
+  const [showShare,setShowShare]=useState(false);
+  const [showMissions,setShowMissions]=useState(false);
+  const [showHallOfFame,setShowHallOfFame]=useState(false);
+  const [notifPermission,setNotifPermission]=useState(Notification?.permission||"default");
+  const [showNotifBanner,setShowNotifBanner]=useState(false);
+  const [missionProgress,setMissionProgress]=useState(()=>{
+    try{const wk=getWeekNum();const saved=JSON.parse(localStorage.getItem("pow_missions")||"{}");return saved.week===wk?saved.data:{};}catch{return{};}
+  });
+  const [referralCode,setReferralCode]=useState(null);
+  const [referralCount,setReferralCount]=useState(0);
 
   const alreadyClaimedToday=streakData.last===todayStr();
   const currentSeasonNum=season.num;
@@ -246,6 +259,7 @@ export default function App(){
             const[sx,sy]=sectorOf(payload.new.idx);const attacker=TM[payload.new.team_id];
             setRaidAlert({attacker:attacker?.name||"Unknown",attackerColor:attacker?.color||"#FF4400",sectorX:sx,sectorY:sy,idx:payload.new.idx});
             setTimeout(()=>setRaidAlert(null),10000);
+            sendLocalNotif(`⚔️ ${attacker?.name||"Someone"} is raiding your territory!`,"Tap to defend your pixels now!","raid","/");
           }
           return myActive;
         });
@@ -310,6 +324,65 @@ export default function App(){
   useEffect(()=>{const add=()=>{const t1=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];let t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];while(t2===t1)t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];const acts=["claimed","raided","shielded","renewed"];const action=acts[randInt(0,acts.length-1)];const px=randInt(1,60);const icon={"claimed":"🏴","raided":"⚔️","shielded":"🛡️","renewed":"♻️"}[action];setFeed(f=>[{id:Date.now()+Math.random(),icon,team:t1,msg:action==="claimed"?`claimed ${px}px`:action==="raided"?`RAIDED ${t2}`:action==="renewed"?`renewed ${px}px`:`shielded territory`,color:tc(t1),ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"})},...f].slice(0,40));};add();const iv=setInterval(add,randInt(2500,5500));return()=>clearInterval(iv);},[]);
   useEffect(()=>{const start=()=>{const ev=EVENTS[randInt(0,EVENTS.length-1)];setEvent(ev);setEventTimer(ev.duration);pushToast(`${ev.icon} ${ev.label}! ${ev.desc}`,"#FFD700",4000);};const iv=setInterval(()=>setEventTimer(t=>{if(t<=1){setEvent(null);setTimeout(start,randInt(15000,30000));return 0;}return t-1;}),1000);setTimeout(start,6000);return()=>clearInterval(iv);},[]);
   useEffect(()=>{const f=(e)=>{if(e.key==="Escape"){setActive(null);setPending(new Set());}};window.addEventListener("keydown",f);return()=>window.removeEventListener("keydown",f);},[]);
+
+  // ── SERVICE WORKER ────────────────────────────────────────────────────────
+  useEffect(()=>{
+    if("serviceWorker" in navigator){
+      navigator.serviceWorker.register("/sw.js").then(reg=>{
+        console.log("SW registered:",reg.scope);
+      }).catch(e=>console.log("SW failed:",e));
+    }
+    // Show notif banner after 30s (not immediately — less annoying)
+    if(Notification?.permission==="default"){setTimeout(()=>setShowNotifBanner(true),30000);}
+    // Referral check
+    const params=new URLSearchParams(window.location.search);
+    const ref=params.get("ref");
+    if(ref&&!localStorage.getItem("pow_referrer")){
+      localStorage.setItem("pow_referrer",ref);
+      setReferralCode(ref);
+      pushToast(`🎁 Referred by ${ref.replace(/-/g," ")}! Claim pixels to get your welcome bonus!`,"#FFD700",7000);
+      // Credit referral in DB
+      if(isOnline&&supabase){supabase.from("referrals").insert({referrer:ref,season_num:1}).catch(()=>{});}
+    }
+  },[]);
+
+  // ── NOTIFICATION HELPERS ──────────────────────────────────────────────────
+  const requestNotifPermission=async()=>{
+    if(!("Notification" in window))return;
+    const result=await Notification.requestPermission();
+    setNotifPermission(result);setShowNotifBanner(false);
+    if(result==="granted")pushToast("🔔 Notifications ON! We'll alert you when you're raided.","#00FF88",5000);
+  };
+  const sendLocalNotif=(title,body,tag="pow",url="/")=>{
+    if(Notification?.permission!=="granted")return;
+    if(document.visibilityState==="visible")return;// only when tab is hidden
+    try{
+      const n=new Notification(title,{body,icon:"/icons/icon-192.png",badge:"/icons/icon-72.png",tag,data:{url}});
+      n.onclick=()=>{window.focus();n.close();};
+    }catch{}
+  };
+
+  // ── MISSION HELPERS ───────────────────────────────────────────────────────
+  const saveMissions=(data)=>{localStorage.setItem("pow_missions",JSON.stringify({week:getWeekNum(),data}));};
+  const trackMission=useCallback((type,increment=1)=>{
+    setMissionProgress(prev=>{
+      const next={...prev};
+      MISSIONS.filter(m=>m.type===type&&!prev[m.id]?.claimed).forEach(m=>{
+        const cur=(prev[m.id]?.count||0)+increment;
+        next[m.id]={count:cur,claimed:prev[m.id]?.claimed||false};
+      });
+      saveMissions(next);return next;
+    });
+  },[]);
+  const claimMission=(mission)=>{
+    setMissionProgress(prev=>{
+      const next={...prev,[mission.id]:{...prev[mission.id],claimed:true}};
+      saveMissions(next);return next;
+    });
+    const nf=freePixels+mission.reward;setFreePixels(nf);localStorage.setItem("pow_free",String(nf));
+    pushToast(`🎯 MISSION COMPLETE! +${mission.reward} free pixels!`,"#FFD700",5000);
+  };
+  const pendingMissionCount=MISSIONS.filter(m=>{const p=missionProgress[m.id];const cur=m.id==="login7"?streakData.days:(p?.count||0);return cur>=m.goal&&!p?.claimed;}).length;
 
   // Load WidgetBot Crate (floating Discord chat)
   useEffect(()=>{
@@ -437,6 +510,14 @@ export default function App(){
     const toClaim=new Set(pending);setPending(new Set());
     if(isOnline)await dbUpsertPixels(toClaim,active,currentSeasonNum);else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
     toClaim.forEach(idx=>trackHeatmap(idx));
+    // Track missions
+    trackMission(isRaid?"raid":"claim", toClaim.size+bonus);
+    // Referral first-purchase bonus
+    if(referralCode&&!localStorage.getItem("pow_ref_used")){
+      localStorage.setItem("pow_ref_used","1");
+      const nf2=freePixels+10;setFreePixels(nf2);localStorage.setItem("pow_free",String(nf2));
+      pushToast("🎁 Welcome bonus! +10 free pixels for joining via referral!","#FFD700",6000);
+    }
     // Particle effects
     const claimArr=Array.from(toClaim);
     const sample=claimArr.filter((_,i)=>i%Math.max(1,Math.floor(claimArr.length/6))===0).slice(0,6);
@@ -461,6 +542,7 @@ export default function App(){
     else if(pu.id==="renew"){let r=0;const myPx=Object.entries(next).filter(([,v])=>v?.t===active).sort((a,b)=>a[1].at-b[1].at).slice(0,50);myPx.forEach(([k])=>{if(next[k]){next[k]={...next[k],at:now};toUpsert.push(parseInt(k));r++;}});pushToast(`♻️ RENEWED ${r} pixels!`,"#00FFAA",5000);triggerFlash("#00FFAA");}
     else if(pu.id==="double"){const win=Math.random()>.5;pushToast(win?"✨ WIN! Bonus territory!":"✨ LOST 💀","#BB88FF",5000);triggerFlash("#BB88FF",win);}
     setPixels(next);setShields(newShields);try{localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
+    trackMission("powerup",1);
     if(isOnline){if(toDelete.length)await dbDeletePixels(toDelete,currentSeasonNum);if(toUpsert.length)await dbUpsertPixels(new Set(toUpsert),active,currentSeasonNum);}else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
   };
 
@@ -482,7 +564,7 @@ export default function App(){
   const decayStats=useMemo(()=>{const now=Date.now();let warn=0,expired=0;Object.values(pixels).forEach(p=>{if(!p?.at)return;const age=now-p.at;if(age>DECAY_EXPIRE*86400000)expired++;else if(age>DECAY_WARN*86400000)warn++;});return{warn,expired};},[pixels]);
   const miniSeasonLeader=useMemo(()=>{if(!miniSeason)return null;const{sector_x:msx,sector_y:msy}=miniSeason;const cnt={};for(let py=msy*SECTOR;py<(msy+1)*SECTOR;py++)for(let px2=msx*SECTOR;px2<(msx+1)*SECTOR;px2++){const p=pixels[py*GW+px2];if(p?.t)cnt[p.t]=(cnt[p.t]||0)+1;}const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];return top?{id:top[0],name:TM[top[0]]?.name||"?",color:TM[top[0]]?.color||"#888",count:top[1]}:null;},[pixels,miniSeason]);
   const miniSeasonDaysLeft=miniSeason?Math.max(0,Math.ceil((new Date(miniSeason.end_date)-Date.now())/86400000)):0;
-  const bannerOffset=145+(event?28:0)+(miniSeason?30:0)+(pendingAlliances.length>0?30:0);
+  const bannerOffset=145+(event?28:0)+(miniSeason?30:0)+(pendingAlliances.length>0?30:0)+(showNotifBanner&&notifPermission==="default"?36:0);
 
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
@@ -743,6 +825,21 @@ export default function App(){
         <button onClick={()=>dbUpdateAlliance(pendingAlliances[0].id,"rejected").then(()=>setAlliances(a=>a.filter(x=>x.id!==pendingAlliances[0].id)))} style={{padding:"2px 9px",background:"transparent",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#5a5a7a"}}>DECLINE</button>
       </div>}
 
+      {showShare&&at&&<ShareModal fandom={at} pixelCount={Object.values(pixels).filter(p=>p?.t===active).length} rank={(board.findIndex(b=>b.id===active)+1)||"?"} referralBonus={10} onClose={()=>setShowShare(false)} pushToast={pushToast}/>}
+      {showMissions&&<MissionsModal progress={missionProgress} onClaim={claimMission} streakDays={streakData.days} onClose={()=>setShowMissions(false)} accentColor={at?.color||"#00F5FF"}/>}
+
+      {/* NOTIFICATION PERMISSION BANNER */}
+      {showNotifBanner&&notifPermission==="default"&&<div style={{background:"linear-gradient(90deg,rgba(0,255,136,.1),rgba(0,245,255,.06),transparent)",borderBottom:"1px solid rgba(0,255,136,.25)",padding:"6px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",animation:"slideDown .3s ease"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:16}}>🔔</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.6)"}}>Get raided? We'll alert you instantly.</span>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <button onClick={requestNotifPermission} style={{padding:"4px 12px",background:"rgba(0,255,136,.15)",border:"1px solid rgba(0,255,136,.4)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00FF88",letterSpacing:1,fontWeight:900}}>ENABLE</button>
+          <button onClick={()=>setShowNotifBanner(false)} style={{padding:"4px 8px",background:"transparent",border:"1px solid rgba(255,255,255,.1)",borderRadius:5,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a"}}>later</button>
+        </div>
+      </div>}
+
       {/* ── MAIN LAYOUT ── */}
       <div style={{display:"flex",height:`calc(100vh - ${bannerOffset}px)`,overflow:"hidden"}}>
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
@@ -805,6 +902,7 @@ export default function App(){
                 <button onClick={requestClaim} style={{padding:"4px 11px",background:`linear-gradient(90deg,${modeColor},${at.color})`,color:"#040408",border:"none",borderRadius:4,fontWeight:900,cursor:"pointer",fontSize:9,fontFamily:"'Orbitron',monospace",letterSpacing:1}}>{mode==="RAID"?"⚔ RAID!":"🏴 CLAIM!"}</button>
                 <button onClick={()=>setPending(new Set())} style={{background:"none",border:"none",color:"#3a3a5a",cursor:"pointer",fontSize:12}}>✕</button>
               </>}
+              <button onClick={()=>{setShowShare(true);trackMission("share",1);}} style={{padding:"4px 9px",background:"rgba(255,45,120,.08)",border:"1px solid rgba(255,45,120,.3)",borderRadius:5,color:"#FF2D78",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:.5}}>📢 SHARE</button>
               <button onClick={()=>{setActive(null);setPending(new Set());}} style={{padding:"3px 9px",background:"rgba(255,60,60,.08)",border:"1px solid rgba(255,60,60,.3)",borderRadius:4,color:"#ff6b6b",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:1,fontWeight:700}}>✕ OUT</button>
             </div>
           </div>}
@@ -861,6 +959,13 @@ export default function App(){
           <div style={{display:"flex",borderBottom:"1px solid #1a1a30",flexShrink:0}}>
             {[["WAR","⚔"],["FEED","📡"],["CHAT","💬"],["WARS","🔥"],["DISC","🎮"]].map(([t,icon])=>{const on=tab===t;return(<button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"5px 0",background:on?"#08081a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,letterSpacing:.5,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",transition:"all .1s"}}>{icon}<br/>{t}</button>);})}
           </div>
+          {/* Missions + Share quick actions */}
+          <div style={{display:"flex",gap:4,padding:"5px 5px 0",flexShrink:0}}>
+            <button onClick={()=>setShowMissions(true)} style={{flex:1,padding:"5px",background:pendingMissionCount>0?"rgba(255,215,0,.1)":"rgba(255,255,255,.04)",border:`1px solid ${pendingMissionCount>0?"rgba(255,215,0,.4)":"rgba(255,255,255,.08)"}`,borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:pendingMissionCount>0?"#FFD700":"#3a3a5a",letterSpacing:.5,position:"relative"}}>
+              🎯 MISSIONS{pendingMissionCount>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#FFD700",color:"#040408",borderRadius:"50%",width:14,height:14,fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900}}>{pendingMissionCount}</span>}
+            </button>
+            {active&&<button onClick={()=>{setShowShare(true);trackMission("share",1);}} style={{flex:1,padding:"5px",background:"rgba(255,45,120,.06)",border:"1px solid rgba(255,45,120,.2)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FF2D78",letterSpacing:.5}}>📢 SHARE</button>}
+            <button onClick={()=>setShowHallOfFame(s=>!s)} style={{flex:1,padding:"5px",background:"rgba(255,215,0,.05)",border:"1px solid rgba(255,215,0,.18)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FFD700",letterSpacing:.5}}>🏆 HOF</button>          </div>
 
           {/* Season mini stats */}
           <div style={{margin:"5px 5px 0",padding:"6px 8px",background:"rgba(255,215,0,.05)",border:"1px solid rgba(255,215,0,.12)",borderRadius:7,flexShrink:0}}>
@@ -881,6 +986,18 @@ export default function App(){
 
           {/* WAR TAB — Territory Leaderboard with Trend */}
           {tab==="WAR"&&<div style={{flex:1,overflowY:"auto",padding:"5px 5px"}}>
+            {/* Hall of Fame */}
+            {showHallOfFame&&season.winners?.length>0&&<div style={{marginBottom:10}}>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#FFD700",marginBottom:5}}>🏆 HALL OF FAME</div>
+              {[...season.winners].reverse().map((w,i)=>(
+                <div key={i} style={{marginBottom:4,padding:"6px 8px",background:"rgba(255,215,0,.05)",border:"1px solid rgba(255,215,0,.15)",borderRadius:6}}>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:"rgba(255,215,0,.5)",marginBottom:2}}>Season {w.season} · {w.theme?.split(" vs ")[0]||"—"}</div>
+                  <div style={{fontWeight:700,fontSize:10,color:"#FFD700"}}>👑 {w.team}</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.25)"}}>{w.pixels?.toLocaleString()} pixels</div>
+                </div>
+              ))}
+              <div style={{borderBottom:"1px solid rgba(255,255,255,.06)",marginBottom:8}}/>
+            </div>}
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#2a2a4a",marginBottom:4}}>TERRITORY RANKINGS</div>
             {board.length===0?<div style={{fontSize:8,color:"#1a1a2a",fontFamily:"'Share Tech Mono',monospace",paddingTop:6}}>No territory yet</div>
             :board.map((t,i)=>{const acc=CAT_ACCENT[t.cat]||"#00F5FF";const rank=getRank(t.count);const trendUp=t.trend>0;const trendDown=t.trend<0;return(
