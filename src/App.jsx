@@ -7,6 +7,7 @@ import OnboardingModal from "./OnboardingModal";
 import PixelHistoryModal from "./PixelHistoryModal";
 import CookieBanner from "./CookieBanner";
 import { startMusic, stopMusic } from "./MusicPlayer";
+import AddFandomModal from "./AddFandomModal";
 
 // ── SOUND SYSTEM ──────────────────────────────────────────────────────────────
 let _audioCtx=null;
@@ -214,8 +215,10 @@ export default function App(){
   const [pixelHistory,setPixelHistory]=useState(null);
   const lastClaimRef=useRef(0);
   const prevBoardRef=useRef([]);
+  const [showFandomModal,setShowFandomModal]=useState(false);
+  const [customFandoms,setCustomFandoms]=useState([]);
 
-  const alreadyClaimedToday=streakData.last===todayStr();
+  const allFandoms=useMemo(()=>[...ALL,...customFandoms],[customFandoms]);
   const currentSeasonNum=season.num;
 
   const pushToast=useCallback((msg,color,dur=3000)=>{const id=Date.now()+Math.random();setToasts(t=>[...t,{id,msg,color}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),dur);},[]);
@@ -737,7 +740,7 @@ export default function App(){
   // ── DERIVED ────────────────────────────────────────────────────────────────
   const subArrFull=useMemo(()=>{const subs=selCat==="All"?[...new Set(CAT.map(e=>e.sub))]:CAT.filter(e=>e.cat===selCat).map(e=>e.sub);return["All",...subs];},[selCat]);
   useEffect(()=>setSelSub("All"),[selCat]);
-  const vis=useMemo(()=>{if(q.trim().length>1){const lq=q.toLowerCase();return ALL.filter(t=>t.name.toLowerCase().includes(lq)||t.sub.toLowerCase().includes(lq));}return ALL.filter(t=>{if(selCat!=="All"&&t.cat!==selCat)return false;if(selSub!=="All"&&t.sub!==selSub)return false;return true;});},[selCat,selSub,q]);
+  const vis=useMemo(()=>{if(q.trim().length>1){const lq=q.toLowerCase();return allFandoms.filter(t=>t.name.toLowerCase().includes(lq));}return allFandoms.filter(t=>{if(selCat!=="All"&&t.cat!==selCat)return false;if(selSub!=="All"&&t.sub&&t.sub!==selSub)return false;return true;});},[selCat,selSub,q,allFandoms]);
   const board=useMemo(()=>{const cnt={};Object.values(pixels).forEach(p=>{if(p?.t)cnt[p.t]=(cnt[p.t]||0)+1;});return Object.entries(cnt).map(([id,count])=>({...(TM[id]||{}),id,count,trend:territoryTrend[id]||0})).filter(t=>t.name).sort((a,b)=>b.count-a.count).slice(0,20);},[pixels,territoryTrend]);
   const totalSold=Object.keys(pixels).length;
   const at=active?TM[active]:null;
@@ -773,8 +776,21 @@ export default function App(){
   // Sync sound pref
   useEffect(()=>{localStorage.setItem("pow_sound",soundEnabled?"1":"0");},[soundEnabled]);
 
-  // Music toggle
+  // Fetch approved custom fandoms
   useEffect(()=>{
+    if(!supabase)return;
+    supabase.from("fandom_requests").select("*").eq("status","approved")
+      .then(({data})=>{
+        if(data?.length){
+          setCustomFandoms(data.map(f=>({
+            id:`${f.category}|Custom|${f.name}`,
+            name:f.name,
+            color:f.color,
+            cat:f.category,
+          })));
+        }
+      });
+  },[]);
     localStorage.setItem("pow_music",musicEnabled?"1":"0");
     if(musicEnabled)startMusic();else stopMusic();
   },[musicEnabled]);
@@ -1131,6 +1147,7 @@ export default function App(){
       </div>}
 
       {pixelHistory&&<PixelHistoryModal pixel={pixelHistory.pixel} history={pixelHistory.history} TM={TM} onClose={()=>setPixelHistory(null)} onJumpTo={()=>{setVx(Math.max(0,pixelHistory.gx-VW/2));setVy(Math.max(0,pixelHistory.gy-VH/2));setPixelHistory(null);}}/>}
+      {showFandomModal&&<AddFandomModal onClose={()=>setShowFandomModal(false)} onSubmitted={()=>pushToast("📨 Fandom request submitted! Check back soon.","#C8FF00",5000)}/>}
       <CookieBanner/>
 
       {/* NOTIFICATION PERMISSION BANNER */}
@@ -1229,7 +1246,8 @@ export default function App(){
                 </div>
               ):(
                 <>
-                  <input value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 Search ${ALL.length} fandoms…`} style={{width:"100%",background:"#0c0c1c",border:"1px solid rgba(0,245,255,.15)",borderRadius:6,padding:"8px 12px",color:"#b0b8e0",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:6}}/>
+                  <input value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 Search ${allFandoms.length} fandoms…`} style={{width:"100%",background:"#0c0c1c",border:"1px solid rgba(0,245,255,.15)",borderRadius:6,padding:"8px 12px",color:"#b0b8e0",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:6}}/>
+              <button onClick={()=>setShowFandomModal(true)} style={{width:"100%",marginBottom:6,padding:"6px",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST A FANDOM</button>
                   <div style={{display:"flex",gap:3,marginBottom:6,overflowX:"auto",paddingBottom:2}}>
                     {["All","🎮 Gaming","🎌 Anime","🎵 Music"].map(c=>{const acc=c==="All"?"#5566AA":CAT_ACCENT[c],on=selCat===c;return(
                       <button key={c} onClick={()=>setSelCat(c)} style={{padding:"5px 10px",borderRadius:5,border:`1px solid ${on?acc:acc+"33"}`,background:on?rgba(acc,.15):"transparent",color:on?acc:acc+"77",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"'Orbitron',monospace",whiteSpace:"nowrap",flexShrink:0}}>{c}</button>
@@ -1438,7 +1456,8 @@ export default function App(){
                 ))}
               </div></>
             ):(
-              <><input value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 Search ${ALL.length} fandoms…`} style={{width:"100%",background:"#0c0c1c",border:"1px solid rgba(0,245,255,.15)",borderRadius:5,padding:"5px 10px",color:"#b0b8e0",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:4}}/>
+              <><input value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 Search ${allFandoms.length} fandoms…`} style={{width:"100%",background:"#0c0c1c",border:"1px solid rgba(0,245,255,.15)",borderRadius:5,padding:"5px 10px",color:"#b0b8e0",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:4}}/>
+              <button onClick={()=>setShowFandomModal(true)} style={{width:"100%",marginBottom:6,padding:"8px",background:"rgba(200,255,0,.1)",border:"2px solid rgba(200,255,0,.5)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#C8FF00",letterSpacing:1,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>➕ <span>REQUEST A FANDOM</span></button>
               <div style={{display:"flex",gap:3,marginBottom:3,flexWrap:"wrap"}}>
                 {["All","🎮 Gaming","🎌 Anime","🎵 Music"].map(c=>{const acc=c==="All"?"#5566AA":CAT_ACCENT[c],on=selCat===c;return(<button key={c} className="chip" onClick={()=>setSelCat(c)} style={{padding:"3px 8px",borderRadius:4,border:`1px solid ${on?acc:acc+"33"}`,background:on?rgba(acc,.15):"transparent",color:on?acc:acc+"77",fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:"'Orbitron',monospace",letterSpacing:.5,transition:"all .1s"}}>{c}</button>);})}
               </div>
