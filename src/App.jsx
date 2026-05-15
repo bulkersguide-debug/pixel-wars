@@ -1457,7 +1457,6 @@ export default function App(){
               </div></>
             ):(
               <><input value={q} onChange={e=>setQ(e.target.value)} placeholder={`🔍 Search ${allFandoms.length} fandoms…`} style={{width:"100%",background:"#0c0c1c",border:"1px solid rgba(0,245,255,.15)",borderRadius:5,padding:"5px 10px",color:"#b0b8e0",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none",marginBottom:4}}/>
-              <button onClick={()=>setShowFandomModal(true)} style={{width:"100%",marginBottom:6,padding:"8px",background:"rgba(200,255,0,.1)",border:"2px solid rgba(200,255,0,.5)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#C8FF00",letterSpacing:1,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>➕ <span>REQUEST A FANDOM</span></button>
               <div style={{display:"flex",gap:3,marginBottom:3,flexWrap:"wrap"}}>
                 {["All","🎮 Gaming","🎌 Anime","🎵 Music"].map(c=>{const acc=c==="All"?"#5566AA":CAT_ACCENT[c],on=selCat===c;return(<button key={c} className="chip" onClick={()=>setSelCat(c)} style={{padding:"3px 8px",borderRadius:4,border:`1px solid ${on?acc:acc+"33"}`,background:on?rgba(acc,.15):"transparent",color:on?acc:acc+"77",fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:"'Orbitron',monospace",letterSpacing:.5,transition:"all .1s"}}>{c}</button>);})}
               </div>
@@ -1483,8 +1482,9 @@ export default function App(){
                     </div>}
                   </div>
                 );})}
-              </div></>
-            )}
+              </div>
+              <button onClick={()=>setShowFandomModal(true)} style={{width:"100%",marginTop:8,padding:"9px",background:"rgba(200,255,0,.08)",border:"2px solid rgba(200,255,0,.4)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST A FANDOM</button>
+              </>            )}
           </div>
         </div>
 
