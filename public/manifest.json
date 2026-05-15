@@ -1,0 +1,27 @@
+{
+  "name": "Pixels of War",
+  "short_name": "PixelWar",
+  "description": "Fandom territory battle. Claim pixels. Raid enemies. Dominate the grid.",
+  "start_url": "/?source=pwa",
+  "display": "standalone",
+  "background_color": "#040408",
+  "theme_color": "#040408",
+  "orientation": "any",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "/icons/icon-72.png",  "sizes": "72x72",   "type": "image/png" },
+    { "src": "/icons/icon-96.png",  "sizes": "96x96",   "type": "image/png" },
+    { "src": "/icons/icon-128.png", "sizes": "128x128", "type": "image/png" },
+    { "src": "/icons/icon-144.png", "sizes": "144x144", "type": "image/png" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Play Now",      "url": "/?source=shortcut",  "description": "Jump back into the war" },
+    { "name": "Leaderboard",  "url": "/?tab=war",           "description": "See who is winning" }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/desktop.png", "sizes": "1280x720", "type": "image/png", "form_factor": "wide"   },
+    { "src": "/screenshots/mobile.png",  "sizes": "390x844",  "type": "image/png", "form_factor": "narrow" }
+  ]
+}
