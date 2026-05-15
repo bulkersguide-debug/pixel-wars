@@ -1139,8 +1139,6 @@ export default function App(){
           <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{display:"block",padding:"11px",background:"linear-gradient(90deg,#5865F2,#7289DA)",textAlign:"center",textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#fff",letterSpacing:1}}>JOIN SERVER →</a>
       </div>}
 
-      {/* RESET BUTTON */}
-      <button onClick={()=>setShowReset(true)} style={{position:"fixed",bottom:12,left:12,zIndex:500,background:"rgba(10,5,5,.92)",border:"1px solid rgba(255,60,60,.3)",borderRadius:7,padding:"6px 12px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#ff6b6b",letterSpacing:1,backdropFilter:"blur(6px)"}}>🔄 RESET GRID</button>
     </div>
   );
 }
