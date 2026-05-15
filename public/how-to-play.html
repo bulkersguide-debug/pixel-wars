@@ -4,332 +4,204 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>How to Play — Pixels of War</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
 <style>
-  :root{--cyan:#00F5FF;--red:#FF4400;--green:#C8FF00;--pink:#FF2D78;--purple:#BB88FF;--gold:#FFD700;--bg:#040408;--bg2:#07070f;--bg3:#0a0a18;--border:#1a1a30}
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth}
-  body{background:var(--bg);color:#e0e8ff;font-family:'Rajdhani',sans-serif;line-height:1.6;overflow-x:hidden}
-  body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:1000}
-  header{background:linear-gradient(180deg,#06060e,var(--bg));border-bottom:1px solid var(--border);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
-  .logo{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;letter-spacing:4px;background:linear-gradient(90deg,var(--cyan),var(--red),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-  .play-btn{padding:8px 20px;background:linear-gradient(90deg,var(--cyan),var(--green));color:#040408;border:none;border-radius:6px;font-family:'Orbitron',monospace;font-weight:900;font-size:11px;letter-spacing:2px;cursor:pointer;text-decoration:none;display:inline-block;transition:transform .15s,box-shadow .15s}
-  .play-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,245,255,.3)}
-  .hero{padding:60px 24px 40px;text-align:center;position:relative;overflow:hidden}
-  .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(0,245,255,.06),transparent 70%)}
-  .hero-tag{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:4px;color:rgba(0,245,255,.5);margin-bottom:12px}
-  .hero h1{font-family:'Orbitron',monospace;font-size:clamp(28px,6vw,52px);font-weight:900;letter-spacing:4px;line-height:1.1;margin-bottom:16px}
-  .hero h1 span{background:linear-gradient(90deg,var(--cyan),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-  .hero p{font-size:15px;color:rgba(255,255,255,.5);max-width:560px;margin:0 auto 32px;font-family:'Share Tech Mono',monospace;line-height:1.7}
-  .hero-stats{display:flex;gap:32px;justify-content:center;flex-wrap:wrap}
-  .stat{text-align:center}
-  .stat-num{font-family:'Orbitron',monospace;font-size:28px;font-weight:900;color:var(--cyan)}
-  .stat-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,255,255,.3);letter-spacing:2px;margin-top:2px}
-  main{max-width:960px;margin:0 auto;padding:0 24px 80px}
-  section{margin-bottom:60px}
-  .section-tag{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:4px;color:rgba(255,255,255,.25);margin-bottom:8px}
-  .section-title{font-family:'Orbitron',monospace;font-size:20px;font-weight:900;letter-spacing:3px;margin-bottom:24px;display:flex;align-items:center;gap:12px}
-  .section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
-  .steps{display:grid;gap:12px}
-  .step{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px;display:flex;gap:16px;align-items:flex-start;transition:border-color .2s,transform .2s}
-  .step:hover{border-color:rgba(0,245,255,.25);transform:translateX(4px)}
-  .step-num{width:36px;height:36px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:13px;font-weight:900;flex-shrink:0}
-  .step-content h3{font-family:'Orbitron',monospace;font-size:13px;font-weight:900;letter-spacing:1px;margin-bottom:5px}
-  .step-content p{font-size:13px;color:rgba(255,255,255,.5);line-height:1.6}
-  .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-  .mode-card{border-radius:10px;padding:20px;border:1px solid;position:relative;overflow:hidden}
-  .mode-icon{font-size:28px;margin-bottom:10px}
-  .mode-name{font-family:'Orbitron',monospace;font-size:14px;font-weight:900;letter-spacing:2px;margin-bottom:6px}
-  .mode-price{font-family:'Share Tech Mono',monospace;font-size:11px;margin-bottom:10px;opacity:.7}
-  .mode-desc{font-size:13px;color:rgba(255,255,255,.5);line-height:1.6}
-  .powerups{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
-  .pu{background:var(--bg2);border-radius:8px;padding:14px;border:1px solid var(--border);position:relative}
-  .pu-rarity{position:absolute;top:8px;right:8px;font-family:'Share Tech Mono',monospace;font-size:7px;letter-spacing:1px}
-  .pu-icon{font-size:22px;margin-bottom:6px}
-  .pu-name{font-family:'Orbitron',monospace;font-size:9px;font-weight:900;letter-spacing:1px;margin-bottom:4px}
-  .pu-desc{font-size:11px;color:rgba(255,255,255,.4);line-height:1.5;margin-bottom:8px}
-  .pu-price{font-family:'Orbitron',monospace;font-size:14px;font-weight:900;color:var(--green)}
-  .seasons{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
-  .season-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}
-  .season-icon{font-size:32px;margin-bottom:8px}
-  .season-num{font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,255,255,.3);letter-spacing:2px;margin-bottom:4px}
-  .season-name{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:var(--gold);letter-spacing:1px;margin-bottom:6px}
-  .season-desc{font-size:11px;color:rgba(255,255,255,.4)}
-  .ranks{display:flex;gap:8px;flex-wrap:wrap}
-  .rank{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:8px;flex:1;min-width:130px}
-  .rank-icon{font-size:18px}
-  .rank-name{font-family:'Orbitron',monospace;font-size:10px;font-weight:900;letter-spacing:1px}
-  .rank-range{font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,255,255,.3);margin-top:2px}
-  .events{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
-  .event{background:var(--bg2);border-radius:8px;padding:14px;border-left:3px solid}
-  .event-icon{font-size:20px;margin-bottom:6px}
-  .event-name{font-family:'Orbitron',monospace;font-size:9px;font-weight:900;letter-spacing:1px;margin-bottom:4px}
-  .event-desc{font-size:11px;color:rgba(255,255,255,.4);line-height:1.5}
-  .event-dur{font-family:'Share Tech Mono',monospace;font-size:9px;margin-top:6px;opacity:.5}
-  .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-  .info-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px}
-  .info-card h4{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;letter-spacing:2px;margin-bottom:12px;color:var(--cyan)}
-  .info-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px}
-  .info-row:last-child{border-bottom:none}
-  .info-row .label{color:rgba(255,255,255,.4);font-family:'Share Tech Mono',monospace}
-  .info-row .value{font-family:'Orbitron',monospace;font-weight:700;font-size:11px}
-  .tips{display:grid;gap:8px}
-  .tip{background:var(--bg2);border:1px solid rgba(255,215,0,.15);border-radius:8px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
-  .tip-icon{font-size:16px;flex-shrink:0;margin-top:2px}
-  .tip p{font-size:13px;color:rgba(255,255,255,.55);line-height:1.6}
-  .tip p strong{color:var(--gold)}
-  .highlight{background:rgba(0,245,255,.04);border:1px solid rgba(0,245,255,.2);border-radius:10px;padding:20px;margin-bottom:24px}
-  .highlight p{font-size:14px;color:rgba(255,255,255,.6);line-height:1.7}
-  .highlight strong{color:var(--cyan)}
-  .note{margin-top:10px;padding:12px 16px;background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.2);border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(255,255,255,.4)}
-  footer{border-top:1px solid var(--border);padding:32px 24px;text-align:center}
-  .footer-logo{font-family:'Orbitron',monospace;font-size:16px;font-weight:900;letter-spacing:4px;background:linear-gradient(90deg,var(--cyan),var(--red),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px}
-  footer p{font-family:'Share Tech Mono',monospace;font-size:10px;color:rgba(255,255,255,.2);letter-spacing:1px}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-  .live-dot{width:6px;height:6px;border-radius:50%;background:#00FF88;display:inline-block;animation:pulse 1.5s infinite;margin-right:6px;vertical-align:middle}
+  ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#222240;border-radius:2px}
+  body{background:#040408;color:#c0c8e8;font-family:'Rajdhani',sans-serif;line-height:1.6}
+  a{color:#00F5FF;text-decoration:none}a:hover{text-decoration:underline}
+  .header{background:#06060e;border-bottom:1px solid #1a1a30;padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100}
+  .logo{font-family:'Orbitron',monospace;font-size:18px;font-weight:900;letter-spacing:3px;background:linear-gradient(90deg,#00F5FF,#FF4400,#C8FF00);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .back-btn{background:rgba(0,245,255,.08);border:1px solid rgba(0,245,255,.25);border-radius:6px;padding:6px 14px;cursor:pointer;font-family:'Orbitron',monospace;font-size:9px;color:#00F5FF;letter-spacing:1px;text-decoration:none}
+  .wrap{max-width:800px;margin:0 auto;padding:40px 20px 80px}
+  .hero{text-align:center;padding:48px 20px;border-bottom:1px solid #1a1a30;margin-bottom:48px}
+  .hero-title{font-family:'Orbitron',monospace;font-size:36px;font-weight:900;letter-spacing:4px;background:linear-gradient(90deg,#00F5FF,#C8FF00,#FF4400);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px}
+  .hero-sub{font-family:'Share Tech Mono',monospace;font-size:12px;color:rgba(255,255,255,.35);letter-spacing:3px;margin-bottom:24px}
+  .play-btn{display:inline-block;padding:14px 36px;background:linear-gradient(90deg,#00F5FF,#C8FF00);color:#040408;font-family:'Orbitron',monospace;font-weight:900;font-size:13px;letter-spacing:2px;border-radius:8px;text-decoration:none}
+  .section{margin-bottom:48px}
+  .section-title{font-family:'Orbitron',monospace;font-size:13px;font-weight:900;color:#00F5FF;letter-spacing:3px;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+  .section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(0,245,255,.3),transparent)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .card{background:#09091a;border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:18px;transition:border-color .2s}
+  .card:hover{border-color:rgba(0,245,255,.3)}
+  .card-icon{font-size:28px;margin-bottom:10px}
+  .card-title{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;letter-spacing:1px;margin-bottom:6px}
+  .card-desc{font-size:13px;color:rgba(192,200,232,.65);line-height:1.7}
+  .step{display:flex;gap:16px;margin-bottom:20px;padding:16px;background:#09091a;border-radius:10px;border:1px solid rgba(255,255,255,.06)}
+  .step-num{font-family:'Orbitron',monospace;font-size:24px;font-weight:900;color:rgba(0,245,255,.3);flex-shrink:0;width:40px}
+  .step-title{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:#e0e8ff;letter-spacing:1px;margin-bottom:5px}
+  .step-desc{font-size:13px;color:rgba(192,200,232,.65);line-height:1.7}
+  .powerup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .powerup{background:#09091a;border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,.06);display:flex;gap:12px;align-items:flex-start}
+  .powerup-icon{font-size:22px;flex-shrink:0}
+  .powerup-name{font-family:'Orbitron',monospace;font-size:9px;font-weight:900;letter-spacing:1px;margin-bottom:3px}
+  .powerup-desc{font-size:12px;color:rgba(192,200,232,.55);line-height:1.5}
+  .powerup-price{font-family:'Orbitron',monospace;font-size:12px;font-weight:900;color:#C8FF00;margin-top:4px}
+  .tip{background:rgba(0,245,255,.05);border:1px solid rgba(0,245,255,.15);border-radius:8px;padding:12px 16px;margin-bottom:8px;font-size:13px;color:rgba(192,200,232,.7);display:flex;gap:10px}
+  .badge{display:inline-block;padding:3px 8px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;margin:3px}
+  .rank-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#09091a;border-radius:8px;margin-bottom:6px;border:1px solid rgba(255,255,255,.05)}
+  @media(max-width:600px){.hero-title{font-size:24px}.cards{grid-template-columns:1fr}.powerup-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 
-<header>
+<div class="header">
+  <a href="/" class="back-btn">← PLAY NOW</a>
   <div class="logo">⚔ PIXELS OF WAR</div>
-  <a href="/" class="play-btn">▶ PLAY NOW</a>
-</header>
-
-<div class="hero">
-  <div class="hero-tag">GAME GUIDE · SEASON 1</div>
-  <h1>HOW TO<br><span>DOMINATE</span> THE GRID</h1>
-  <p>A 2000×2000 pixel battlefield. Every pixel costs real money. Fandoms fight for territory. Only one survives each season.</p>
-  <div class="hero-stats">
-    <div class="stat"><div class="stat-num">4M</div><div class="stat-label">TOTAL PIXELS</div></div>
-    <div class="stat"><div class="stat-num">90</div><div class="stat-label">DAYS PER SEASON</div></div>
-    <div class="stat"><div class="stat-num">90+</div><div class="stat-label">FANDOMS</div></div>
-    <div class="stat"><div class="stat-num">€1+</div><div class="stat-label">PER PIXEL</div></div>
-  </div>
 </div>
 
-<main>
+<div class="wrap">
 
-  <section>
-    <div class="section-tag">GETTING STARTED</div>
-    <div class="section-title">⚡ QUICK START</div>
-    <div class="highlight">
-      <p><strong>Pixels of War</strong> is a real-time multiplayer territory game. Pick your fandom, buy pixels on the shared grid, and fight to keep your territory before the season ends. The fandom with the most pixels when the 90-day season timer hits zero wins the season and earns a permanent champion badge.</p>
-    </div>
-    <div class="steps">
-      <div class="step">
-        <div class="step-num" style="background:rgba(0,245,255,.1);color:var(--cyan);border:1px solid rgba(0,245,255,.3)">01</div>
-        <div class="step-content"><h3 style="color:var(--cyan)">SELECT YOUR FANDOM</h3><p>Browse 90+ fandoms across Gaming, Anime and Music. Search by name or filter by category. Click any fandom card to activate it — your color lights up on the grid.</p></div>
-      </div>
-      <div class="step">
-        <div class="step-num" style="background:rgba(200,255,0,.1);color:var(--green);border:1px solid rgba(200,255,0,.3)">02</div>
-        <div class="step-content"><h3 style="color:var(--green)">DRAG TO CLAIM PIXELS</h3><p>Click and drag on the canvas to select empty pixels. Release to claim them. Cost shows live in the action bar based on which sector you're in and how full it is. You must be in an unlocked sector.</p></div>
-      </div>
-      <div class="step">
-        <div class="step-num" style="background:rgba(255,68,0,.1);color:var(--red);border:1px solid rgba(255,68,0,.3)">03</div>
-        <div class="step-content"><h3 style="color:var(--red)">DEFEND YOUR TERRITORY</h3><p>Every claimed pixel gets a free 24-hour shield (cyan glow on canvas). After that it's vulnerable to raids. Use power-ups, Fortress shields, and Renewal Shields to protect what you've built.</p></div>
-      </div>
-      <div class="step">
-        <div class="step-num" style="background:rgba(255,215,0,.1);color:var(--gold);border:1px solid rgba(255,215,0,.3)">04</div>
-        <div class="step-content"><h3 style="color:var(--gold)">WIN THE SEASON</h3><p>The fandom holding the most pixels at season end is crowned champion and earns a permanent badge. The grid resets, a new season begins with a new theme, and the war starts over.</p></div>
-      </div>
-    </div>
-  </section>
+  <!-- HERO -->
+  <div class="hero">
+    <div style="font-size:52px;margin-bottom:16px">⚔️</div>
+    <div class="hero-title">HOW TO PLAY</div>
+    <div class="hero-sub">CLAIM · RAID · DOMINATE</div>
+    <p style="font-size:15px;color:rgba(192,200,232,.6);max-width:500px;margin:0 auto 28px">A 2000×2000 pixel grid. Hundreds of fandoms. One war. Claim territory for your fandom, raid your enemies, and survive until season end.</p>
+    <a href="/" class="play-btn">⚔️ START PLAYING →</a>
+  </div>
 
-  <section>
-    <div class="section-tag">GAMEPLAY</div>
-    <div class="section-title">🎮 THREE MODES</div>
-    <div class="modes">
-      <div class="mode-card" style="border-color:rgba(0,245,255,.3);background:rgba(0,245,255,.04)">
-        <div class="mode-icon">🏗</div>
-        <div class="mode-name" style="color:var(--cyan)">BUILD</div>
-        <div class="mode-price" style="color:var(--cyan)">€1–€3 base per pixel</div>
-        <div class="mode-desc">Claim empty pixels for your fandom. Price depends on the sector location and fill level — center sectors cost more. Drag to select multiple pixels at once.</div>
+  <!-- THE BASICS -->
+  <div class="section">
+    <div class="section-title">⚡ THE BASICS</div>
+    <div class="cards">
+      <div class="card" style="border-color:rgba(0,245,255,.2)">
+        <div class="card-icon">🏴</div>
+        <div class="card-title" style="color:#00F5FF">CLAIM</div>
+        <div class="card-desc">Pick a fandom. Drag on the grid to select empty pixels. Hit CLAIM and pay to lock them in. Your fandom's color fills the territory.</div>
       </div>
-      <div class="mode-card" style="border-color:rgba(255,68,0,.3);background:rgba(255,68,0,.04)">
-        <div class="mode-icon">⚔️</div>
-        <div class="mode-name" style="color:var(--red)">RAID</div>
-        <div class="mode-price" style="color:var(--red)">2× sector price</div>
-        <div class="mode-desc">Steal enemy pixels and repaint them in your color. Raids cost double and cannot target shielded pixels. Shielded pixels glow cyan — check before raiding.</div>
+      <div class="card" style="border-color:rgba(255,68,0,.2)">
+        <div class="card-icon">⚔️</div>
+        <div class="card-title" style="color:#FF4400">RAID</div>
+        <div class="card-desc">Switch to RAID mode and drag over enemy pixels to steal them. Raids cost 2× the normal price. Shielded pixels cannot be raided.</div>
       </div>
-      <div class="mode-card" style="border-color:rgba(200,255,0,.3);background:rgba(200,255,0,.04)">
-        <div class="mode-icon">💥</div>
-        <div class="mode-name" style="color:var(--green)">SHOP</div>
-        <div class="mode-price" style="color:var(--green)">€3–€50 per power-up</div>
-        <div class="mode-desc">Buy special weapons and shields. Bombs, nukes, airdrops, fortresses and more. Each has different rarity and impact — use them at the right moment.</div>
+      <div class="card" style="border-color:rgba(200,255,0,.2)">
+        <div class="card-icon">👑</div>
+        <div class="card-title" style="color:#C8FF00">DOMINATE</div>
+        <div class="card-desc">The fandom with the most pixels at season end wins and enters the Hall of Fame permanently. Seasons last ~90 days.</div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <section>
-    <div class="section-tag">ECONOMY</div>
-    <div class="section-title">💰 DYNAMIC PRICING</div>
-    <div class="info-grid">
-      <div class="info-card">
-        <h4>BASE PRICE BY LOCATION</h4>
-        <div class="info-row"><span class="label">Center sectors</span><span class="value" style="color:var(--red)">€3 / px</span></div>
-        <div class="info-row"><span class="label">Mid-ring sectors</span><span class="value" style="color:var(--gold)">€2 / px</span></div>
-        <div class="info-row"><span class="label">Inner sectors</span><span class="value" style="color:var(--cyan)">€1.50 / px</span></div>
-        <div class="info-row"><span class="label">Outer sectors</span><span class="value" style="color:var(--green)">€1 / px</span></div>
-      </div>
-      <div class="info-card">
-        <h4>FILL MULTIPLIER</h4>
-        <div class="info-row"><span class="label">0–25% full</span><span class="value" style="color:var(--green)">×1.0</span></div>
-        <div class="info-row"><span class="label">25–50% full</span><span class="value" style="color:var(--cyan)">×1.3</span></div>
-        <div class="info-row"><span class="label">50–75% full</span><span class="value" style="color:var(--gold)">×1.7</span></div>
-        <div class="info-row"><span class="label">75–90% full</span><span class="value" style="color:var(--red)">×2.5</span></div>
-        <div class="info-row"><span class="label">90–100% full</span><span class="value" style="color:var(--pink)">×4.0</span></div>
-      </div>
-    </div>
-    <div class="note">💡 Toggle the <strong>💰 PRICES</strong> button in the season banner to see live prices overlaid on every sector of the canvas.</div>
-  </section>
+  <!-- STEP BY STEP -->
+  <div class="section">
+    <div class="section-title">📋 STEP BY STEP</div>
+    <div class="step"><div class="step-num">01</div><div><div class="step-title">PICK YOUR FANDOM</div><div class="step-desc">Browse the fandom list on the left panel. Search by name or filter by Gaming, Anime, or Music. Click a fandom to select it — your active fandom is shown in the bar below the canvas.</div></div></div>
+    <div class="step"><div class="step-num">02</div><div><div class="step-title">NAVIGATE THE GRID</div><div class="step-desc">Use the arrow pad to pan around the 2000×2000 grid. Click the minimap to jump to any location. The grid starts with the center sectors unlocked — more sectors open as the grid fills up.</div></div></div>
+    <div class="step"><div class="step-num">03</div><div><div class="step-title">SELECT PIXELS</div><div class="step-desc">In BUILD mode, click and drag to select empty pixels. The cost is calculated in real time and shown in the active bar. Bigger areas in busier sectors cost more.</div></div></div>
+    <div class="step"><div class="step-num">04</div><div><div class="step-title">CLAIM & PAY</div><div class="step-desc">Hit CLAIM to see the confirmation — pixels claimed, free pixels used, combo bonus if any, and final cost. Confirm to lock in your territory. Freshly claimed pixels get a 24h shield automatically.</div></div></div>
+    <div class="step"><div class="step-num">05</div><div><div class="step-title">DEFEND YOUR TERRITORY</div><div class="step-desc">Log in daily to check if your pixels are being raided. Enable push notifications and we'll alert you instantly when someone attacks. Use the Fortress power-up for extra protection.</div></div></div>
+  </div>
 
-  <section>
-    <div class="section-tag">GRID SYSTEM</div>
-    <div class="section-title">🔓 EXPANDING GRID</div>
-    <div class="highlight">
-      <p>The grid starts with only the <strong>4 center sectors unlocked</strong>. As players fill those sectors, new sectors automatically unlock — expanding outward ring by ring. When average fill hits <strong>70%</strong> the next ring opens with a big announcement. All 400 sectors can eventually unlock, growing the total battlefield to 2000×2000 pixels.</p>
+  <!-- PRICING -->
+  <div class="section">
+    <div class="section-title">💰 PRICING</div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">📍</div><div class="card-title" style="color:#FFD700">LOCATION</div><div class="card-desc">Center pixels cost €3/px. Mid-range €1.50–2/px. Outer sectors from €1/px. Fighting for prime territory costs more.</div></div>
+      <div class="card"><div class="card-icon">📊</div><div class="card-title" style="color:#FF2D78">FILL LEVEL</div><div class="card-desc">As sectors fill up, prices rise — up to 4× the base price at 90%+ full. Grab territory early while it's cheap.</div></div>
+      <div class="card"><div class="card-icon">⚔️</div><div class="card-title" style="color:#FF4400">RAID COST</div><div class="card-desc">Raiding always costs 2× the normal sector price. Wars are expensive — but so is losing territory.</div></div>
+      <div class="card"><div class="card-icon">🎁</div><div class="card-title" style="color:#00FFAA">FREE PIXELS</div><div class="card-desc">Daily login rewards give free pixels. 10+ pixel combos grant bonus pixels. Referrals give +10 free pixels to both parties.</div></div>
     </div>
-    <div class="info-grid">
-      <div class="info-card">
-        <h4>GRID FACTS</h4>
-        <div class="info-row"><span class="label">Total sectors</span><span class="value" style="color:var(--cyan)">400</span></div>
-        <div class="info-row"><span class="label">Pixels per sector</span><span class="value" style="color:var(--cyan)">100 × 100</span></div>
-        <div class="info-row"><span class="label">Starting sectors</span><span class="value" style="color:var(--green)">4 (center)</span></div>
-        <div class="info-row"><span class="label">Unlock threshold</span><span class="value" style="color:var(--gold)">70% avg fill</span></div>
-        <div class="info-row"><span class="label">Total pixels</span><span class="value" style="color:var(--pink)">4,000,000</span></div>
-      </div>
-      <div class="info-card">
-        <h4>LOCKED SECTORS</h4>
-        <div class="info-row"><span class="label">Visual</span><span class="value" style="color:rgba(255,255,255,.4)">Dark + hatch pattern</span></div>
-        <div class="info-row"><span class="label">Can claim?</span><span class="value" style="color:var(--red)">NO</span></div>
-        <div class="info-row"><span class="label">How to unlock</span><span class="value" style="color:var(--green)">Fill active sectors</span></div>
-        <div class="info-row"><span class="label">Unlock alert</span><span class="value" style="color:var(--gold)">Popup + toast</span></div>
-      </div>
-    </div>
-  </section>
+  </div>
 
-  <section>
-    <div class="section-tag">DEFENSE</div>
-    <div class="section-title">⚠️ TERRITORY DECAY</div>
-    <div class="info-grid">
-      <div class="info-card">
-        <h4>DECAY STAGES</h4>
-        <div class="info-row"><span class="label">0–30 days</span><span class="value" style="color:var(--green)">Fresh · Safe</span></div>
-        <div class="info-row"><span class="label">30–60 days</span><span class="value" style="color:var(--gold)">⚠️ Fading · Orange dots</span></div>
-        <div class="info-row"><span class="label">60+ days</span><span class="value" style="color:var(--red)">❌ Expired · Claimable</span></div>
-        <div class="info-row"><span class="label">Decay stats</span><span class="value" style="color:var(--cyan)">Shown in season banner</span></div>
-      </div>
-      <div class="info-card">
-        <h4>SHIELD TYPES</h4>
-        <div class="info-row"><span class="label">Auto-shield</span><span class="value" style="color:var(--cyan)">24h on every claim</span></div>
-        <div class="info-row"><span class="label">Fortress power-up</span><span class="value" style="color:var(--cyan)">1h on last 30px</span></div>
-        <div class="info-row"><span class="label">Shielded look</span><span class="value" style="color:var(--cyan)">Cyan glow on canvas</span></div>
-        <div class="info-row"><span class="label">♻️ Renewal Shield</span><span class="value" style="color:var(--green)">Resets 50 oldest px</span></div>
-      </div>
-    </div>
-  </section>
+  <!-- SHIELDS -->
+  <div class="section">
+    <div class="section-title">🛡️ SHIELDS & DEFENCE</div>
+    <div class="tip"><span>🔵</span><span><strong>24h Auto-Shield</strong> — every pixel you claim gets a 24-hour shield automatically. Shielded pixels show a cyan shimmer and cannot be raided.</span></div>
+    <div class="tip"><span>🏰</span><span><strong>Fortress Power-Up</strong> — shields your last 30 pixels for 1 hour. Use it when you're under active attack.</span></div>
+    <div class="tip"><span>♻️</span><span><strong>Renewal Shield</strong> — renews 50 of your oldest pixels, resetting their decay timer and adding a fresh shield.</span></div>
+    <div class="tip"><span>⏳</span><span><strong>Pixel Decay</strong> — pixels older than 30 days start fading (yellow warning). After 60 days they expire and can be claimed by anyone. Log in regularly to renew your territory.</span></div>
+  </div>
 
-  <section>
-    <div class="section-tag">SHOP</div>
+  <!-- POWER-UPS -->
+  <div class="section">
     <div class="section-title">💥 POWER-UPS</div>
-    <div class="powerups">
-      <div class="pu" style="border-color:rgba(255,68,0,.3)"><div class="pu-rarity" style="color:#0088FF">RARE</div><div class="pu-icon">💣</div><div class="pu-name" style="color:#FF4400">CLUSTER BOMB</div><div class="pu-desc">Destroys an 8×8 zone of unshielded enemy pixels</div><div class="pu-price">€10</div></div>
-      <div class="pu" style="border-color:rgba(255,204,0,.3)"><div class="pu-rarity" style="color:#AA00FF">EPIC</div><div class="pu-icon">⚡</div><div class="pu-name" style="color:#FFCC00">PIXEL STORM</div><div class="pu-desc">Claims 50 random empty pixels in viewport + shields them</div><div class="pu-price">€15</div></div>
-      <div class="pu" style="border-color:rgba(0,170,255,.3)"><div class="pu-rarity" style="color:#00CC44">UNCOMMON</div><div class="pu-icon">🛡️</div><div class="pu-name" style="color:#00AAFF">FORTRESS</div><div class="pu-desc">Shields your last 30 claimed pixels for 1 hour</div><div class="pu-price">€8</div></div>
-      <div class="pu" style="border-color:rgba(255,45,120,.3)"><div class="pu-rarity" style="color:#aaaaaa">COMMON</div><div class="pu-icon">🎯</div><div class="pu-name" style="color:#FF2D78">SNIPER</div><div class="pu-desc">Steals 1 unshielded enemy pixel anywhere</div><div class="pu-price">€3</div></div>
-      <div class="pu" style="border-color:rgba(200,255,0,.3)"><div class="pu-rarity" style="color:#FFD700">LEGENDARY</div><div class="pu-icon">🪂</div><div class="pu-name" style="color:#C8FF00">AIRDROP</div><div class="pu-desc">Claims 15×15 zone in your viewport + shields all</div><div class="pu-price">€25</div></div>
-      <div class="pu" style="border-color:rgba(255,0,0,.3)"><div class="pu-rarity" style="color:#FFD700">LEGENDARY</div><div class="pu-icon">☢️</div><div class="pu-name" style="color:#FF0000">NUKE</div><div class="pu-desc">Wipes a 20×20 unshielded zone anywhere on the grid</div><div class="pu-price">€50</div></div>
-      <div class="pu" style="border-color:rgba(0,255,170,.3)"><div class="pu-rarity" style="color:#00CC44">UNCOMMON</div><div class="pu-icon">♻️</div><div class="pu-name" style="color:#00FFAA">RENEWAL SHIELD</div><div class="pu-desc">Resets decay timer on your 50 oldest pixels</div><div class="pu-price">€5</div></div>
-      <div class="pu" style="border-color:rgba(187,136,255,.3)"><div class="pu-rarity" style="color:#00CC44">UNCOMMON</div><div class="pu-icon">✨</div><div class="pu-name" style="color:#BB88FF">DOUBLE OR NOTHING</div><div class="pu-desc">50/50 gamble — win double territory or lose it all</div><div class="pu-price">€5</div></div>
+    <div class="powerup-grid">
+      <div class="powerup"><div class="powerup-icon">💣</div><div><div class="powerup-name" style="color:#FF4400">CLUSTER BOMB</div><div class="powerup-desc">Destroys an 8×8 zone of unshielded enemy pixels.</div><div class="powerup-price">€10</div></div></div>
+      <div class="powerup"><div class="powerup-icon">⚡</div><div><div class="powerup-name" style="color:#FFCC00">PIXEL STORM</div><div class="powerup-desc">Claims 50 random empty pixels in your current viewport.</div><div class="powerup-price">€15</div></div></div>
+      <div class="powerup"><div class="powerup-icon">🛡️</div><div><div class="powerup-name" style="color:#00AAFF">FORTRESS</div><div class="powerup-desc">Shields your last 30 pixels for 1 full hour.</div><div class="powerup-price">€8</div></div></div>
+      <div class="powerup"><div class="powerup-icon">🎯</div><div><div class="powerup-name" style="color:#FF2D78">SNIPER</div><div class="powerup-desc">Steals 1 random unshielded enemy pixel anywhere on the grid.</div><div class="powerup-price">€3</div></div></div>
+      <div class="powerup"><div class="powerup-icon">🪂</div><div><div class="powerup-name" style="color:#C8FF00">AIRDROP</div><div class="powerup-desc">Claims a 15×15 zone of empty pixels in your current viewport.</div><div class="powerup-price">€25</div></div></div>
+      <div class="powerup"><div class="powerup-icon">☢️</div><div><div class="powerup-name" style="color:#FF0000">NUKE</div><div class="powerup-desc">Wipes a 20×20 zone of unshielded enemy pixels anywhere.</div><div class="powerup-price">€50</div></div></div>
+      <div class="powerup"><div class="powerup-icon">♻️</div><div><div class="powerup-name" style="color:#00FFAA">RENEWAL SHIELD</div><div class="powerup-desc">Renews 50 of your oldest decaying pixels.</div><div class="powerup-price">€5</div></div></div>
+      <div class="powerup"><div class="powerup-icon">✨</div><div><div class="powerup-name" style="color:#BB88FF">DOUBLE OR NOTHING</div><div class="powerup-desc">50/50 gamble — win double territory or lose it all.</div><div class="powerup-price">€5</div></div></div>
     </div>
-  </section>
+  </div>
 
-  <section>
-    <div class="section-tag">SEASONS</div>
-    <div class="section-title">🏆 SEASON THEMES</div>
-    <div class="highlight">
-      <p>Each season lasts <strong>90 days</strong>. When the timer hits zero, the fandom with the most pixels wins and earns a <strong>permanent season badge</strong>. The grid resets completely and a new season begins with a fresh theme and new fandom categories.</p>
+  <!-- ALLIANCES & WARS -->
+  <div class="section">
+    <div class="section-title">🤝 ALLIANCES & WARS</div>
+    <div class="cards">
+      <div class="card" style="border-color:rgba(0,255,170,.2)">
+        <div class="card-icon">🤝</div>
+        <div class="card-title" style="color:#00FFAA">ALLIANCES</div>
+        <div class="card-desc">Propose an alliance with another fandom. If accepted, neither side can raid the other. Use it to coordinate against a common enemy — or betray them at the perfect moment for maximum drama.</div>
+      </div>
+      <div class="card" style="border-color:rgba(255,68,0,.2)">
+        <div class="card-icon">⚔️</div>
+        <div class="card-title" style="color:#FF4400">WAR DECLARATIONS</div>
+        <div class="card-desc">Formally declare war on a fandom. It appears in every player's live feed as a big announcement, rallying both sides. Wars create the narrative that keeps fans engaged.</div>
+      </div>
     </div>
-    <div class="seasons">
-      <div class="season-card"><div class="season-icon">⚔️</div><div class="season-num">SEASON 1</div><div class="season-name">GAMING vs ANIME vs MUSIC</div><div class="season-desc">The original culture war — three worlds collide</div></div>
-      <div class="season-card"><div class="season-icon">🌍</div><div class="season-num">SEASON 2</div><div class="season-name">WORLD CUP</div><div class="season-desc">Nation vs nation — which country dominates?</div></div>
-      <div class="season-card"><div class="season-icon">🎬</div><div class="season-num">SEASON 3</div><div class="season-name">POP CULTURE</div><div class="season-desc">Movies, TV and streaming franchises battle it out</div></div>
-      <div class="season-card"><div class="season-icon">🏆</div><div class="season-num">SEASON 4</div><div class="season-name">SPORTS EMPIRES</div><div class="season-desc">Football clubs, NBA teams and esports orgs go to war</div></div>
-    </div>
-  </section>
+  </div>
 
-  <section>
-    <div class="section-tag">PROGRESSION</div>
+  <!-- DAILY REWARDS -->
+  <div class="section">
+    <div class="section-title">🔥 DAILY REWARDS & STREAKS</div>
+    <div class="step"><div class="step-num">🎁</div><div><div class="step-title">DAILY LOGIN</div><div class="step-desc">Claim your daily reward every 24 hours. The longer your streak, the bigger the reward — up to 30 free pixels on Day 30+.</div></div></div>
+    <div class="step"><div class="step-num">🔥</div><div><div class="step-title">STREAK MILESTONES</div><div class="step-desc">Day 3: +2px · Day 5: +5px + badge · Day 7: +10px · Day 14: +15px · Day 30: +30px. Miss a day and your streak resets to zero.</div></div></div>
+    <div class="step"><div class="step-num">💥</div><div><div class="step-title">COMBO BONUS</div><div class="step-desc">Claim 10+ pixels in a single drag and get +15% free. Claim 15+ and get +30% free. Always drag big.</div></div></div>
+  </div>
+
+  <!-- MISSIONS -->
+  <div class="section">
+    <div class="section-title">🎯 WEEKLY MISSIONS</div>
+    <p style="font-size:14px;color:rgba(192,200,232,.6);margin-bottom:16px">New missions every Monday. Complete them for free pixels.</p>
+    <div class="cards">
+      <div class="card"><div class="card-icon">🏴</div><div class="card-title" style="color:#00F5FF">CLAIM 50PX</div><div class="card-desc">+10 free pixels</div></div>
+      <div class="card"><div class="card-icon">🏆</div><div class="card-title" style="color:#FFD700">CLAIM 200PX</div><div class="card-desc">+30 free pixels</div></div>
+      <div class="card"><div class="card-icon">⚔️</div><div class="card-title" style="color:#FF4400">RAID 10PX</div><div class="card-desc">+15 free pixels</div></div>
+      <div class="card"><div class="card-icon">💀</div><div class="card-title" style="color:#FF0000">RAID 50PX</div><div class="card-desc">+40 free pixels</div></div>
+      <div class="card"><div class="card-icon">🤝</div><div class="card-title" style="color:#00FFAA">FORM ALLIANCE</div><div class="card-desc">+20 free pixels</div></div>
+      <div class="card"><div class="card-icon">💥</div><div class="card-title" style="color:#C8FF00">USE 3 POWER-UPS</div><div class="card-desc">+15 free pixels</div></div>
+    </div>
+  </div>
+
+  <!-- RANKS -->
+  <div class="section">
     <div class="section-title">👑 RANK SYSTEM</div>
-    <div class="ranks">
-      <div class="rank"><div class="rank-icon">🥉</div><div><div class="rank-name" style="color:#CD7F32">BRONZE</div><div class="rank-range">0–49 pixels</div></div></div>
-      <div class="rank"><div class="rank-icon">🥈</div><div><div class="rank-name" style="color:#C0C0C0">SILVER</div><div class="rank-range">50–199 pixels</div></div></div>
-      <div class="rank"><div class="rank-icon">🥇</div><div><div class="rank-name" style="color:#FFD700">GOLD</div><div class="rank-range">200–499 pixels</div></div></div>
-      <div class="rank"><div class="rank-icon">💎</div><div><div class="rank-name" style="color:#00EAFF">PLATINUM</div><div class="rank-range">500–999 pixels</div></div></div>
-      <div class="rank"><div class="rank-icon">💠</div><div><div class="rank-name" style="color:#BB88FF">DIAMOND</div><div class="rank-range">1000–2499 pixels</div></div></div>
-      <div class="rank"><div class="rank-icon">👑</div><div><div class="rank-name" style="color:#FF2D78">LEGEND</div><div class="rank-range">2500+ pixels</div></div></div>
+    <div class="rank-row"><span style="font-size:20px">🥉</span><div style="font-family:'Orbitron',monospace;font-size:11px;color:#CD7F32;width:90px">BRONZE</div><div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(192,200,232,.5)">0 – 49 pixels</div></div>
+    <div class="rank-row"><span style="font-size:20px">🥈</span><div style="font-family:'Orbitron',monospace;font-size:11px;color:#C0C0C0;width:90px">SILVER</div><div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(192,200,232,.5)">50 – 199 pixels</div></div>
+    <div class="rank-row"><span style="font-size:20px">🥇</span><div style="font-family:'Orbitron',monospace;font-size:11px;color:#FFD700;width:90px">GOLD</div><div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(192,200,232,.5)">200 – 499 pixels</div></div>
+    <div class="rank-row"><span style="font-size:20px">💎</span><div style="font-family:'Orbitron',monospace;font-size:11px;color:#00EAFF;width:90px">PLATINUM</div><div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(192,200,232,.5)">500 – 999 pixels</div></div>
+    <div class="rank-row"><span style="font-size:20px">💠</span><div style="font-family:'Orbitron',monospace;font-size:11px;color:#BB88FF;width:90px">DIAMOND</div><div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(192,200,232,.5)">1000 – 2499 pixels</div></div>
+    <div class="rank-row"><span style="font-size:20px">👑</span><div style="font-family:'Orbitron',monospace;font-size:11px;color:#FF2D78;width:90px">LEGEND</div><div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(192,200,232,.5)">2500+ pixels</div></div>
+  </div>
+
+  <!-- PRO TIPS -->
+  <div class="section">
+    <div class="section-title">⚡ PRO TIPS</div>
+    <div class="tip"><span>🗺️</span><span>Start in the <strong>center sectors</strong> — they're more expensive but contested, which means more drama and visibility.</span></div>
+    <div class="tip"><span>💰</span><span>Always drag to select <strong>15+ pixels at once</strong> to trigger the +30% combo bonus. Never click one at a time.</span></div>
+    <div class="tip"><span>🔔</span><span>Enable <strong>push notifications</strong> — you'll be alerted the moment someone raids your territory.</span></div>
+    <div class="tip"><span>🤝</span><span>Alliances are strategic. Ally with a small fandom against a giant, then betray them when they're weakened.</span></div>
+    <div class="tip"><span>🎯</span><span>The <strong>Sniper</strong> (€3) is the best value power-up for early players. One pixel stolen is one pixel less for your enemy.</span></div>
+    <div class="tip"><span>📅</span><span>Log in every day even if you don't buy — the free pixels from streaks add up fast.</span></div>
+    <div class="tip"><span>🔗</span><span>Share your referral link. Every new player you recruit gives both of you +10 free pixels.</span></div>
+  </div>
+
+  <!-- CTA -->
+  <div style="text-align:center;padding:48px 20px;border-top:1px solid #1a1a30">
+    <div style="font-size:40px;margin-bottom:16px">⚔️</div>
+    <div style="font-family:'Orbitron',monospace;font-size:22px;font-weight:900;color:#e0e8ff;letter-spacing:3px;margin-bottom:12px">READY FOR WAR?</div>
+    <p style="font-size:14px;color:rgba(192,200,232,.5);margin-bottom:24px">Your fandom needs you. Every pixel counts.</p>
+    <a href="/" class="play-btn">⚔️ ENTER THE WAR →</a>
+    <div style="margin-top:20px;display:flex;justify-content:center;gap:20px">
+      <a href="/terms" style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#2a2a4a;letter-spacing:1px">TERMS</a>
+      <a href="/privacy" style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#2a2a4a;letter-spacing:1px">PRIVACY</a>
     </div>
-  </section>
+  </div>
 
-  <section>
-    <div class="section-tag">FREE REWARDS</div>
-    <div class="section-title">🔥 DAILY STREAK</div>
-    <div class="highlight">
-      <p>Log in every day to claim <strong>free pixels</strong>. Your streak grows the longer you keep going. Free pixels are spent automatically before real money. Miss a day and your streak resets to 1. Drag 10+ pixels in a single move to trigger a <strong>COMBO bonus</strong> of extra free pixels.</p>
-    </div>
-    <div class="info-grid">
-      <div class="info-card">
-        <h4>STREAK REWARDS</h4>
-        <div class="info-row"><span class="label">Day 1</span><span class="value" style="color:var(--green)">+1 free pixel</span></div>
-        <div class="info-row"><span class="label">Day 3</span><span class="value" style="color:var(--green)">+2 free pixels</span></div>
-        <div class="info-row"><span class="label">Day 5</span><span class="value" style="color:var(--gold)">+5px 🔥 Warrior badge</span></div>
-        <div class="info-row"><span class="label">Day 7</span><span class="value" style="color:var(--gold)">+10px 🏆 Week Legend</span></div>
-        <div class="info-row"><span class="label">Day 30</span><span class="value" style="color:var(--pink)">+30px 👑 Month Champion</span></div>
-      </div>
-      <div class="info-card">
-        <h4>COMBO BONUS</h4>
-        <div class="info-row"><span class="label">Drag 10–14 pixels</span><span class="value" style="color:var(--gold)">+15% free bonus</span></div>
-        <div class="info-row"><span class="label">Drag 15+ pixels</span><span class="value" style="color:var(--gold)">+30% free bonus</span></div>
-        <div class="info-row"><span class="label">Visual</span><span class="value" style="color:var(--cyan)">🔥 COMBO! animation</span></div>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-tag">LIVE EVENTS</div>
-    <div class="section-title">⚡ BATTLE EVENTS</div>
-    <div class="events">
-      <div class="event" style="border-color:#FF4400"><div class="event-icon">⚡</div><div class="event-name" style="color:#FF4400">CHAOS HOUR</div><div class="event-desc">All raids cost 50% less — perfect time to attack enemies.</div><div class="event-dur">10 minutes</div></div>
-      <div class="event" style="border-color:#FFD700"><div class="event-icon">💎</div><div class="event-name" style="color:#FFD700">MEGA BONUS</div><div class="event-desc">Buy 10 pixels, get 5 extra free pixels on top.</div><div class="event-dur">5 minutes</div></div>
-      <div class="event" style="border-color:#FF6B35"><div class="event-icon">🔥</div><div class="event-name" style="color:#FF6B35">FRENZY</div><div class="event-desc">Double territory gains for 3 minutes. Claim fast!</div><div class="event-dur">3 minutes</div></div>
-      <div class="event" style="border-color:#FFD700"><div class="event-icon">👑</div><div class="event-name" style="color:#FFD700">CROWN BATTLE</div><div class="event-desc">Top fandom gets a 50 pixel bonus if they hold their lead.</div><div class="event-dur">15 minutes</div></div>
-      <div class="event" style="border-color:#00AAFF"><div class="event-icon">🔓</div><div class="event-name" style="color:#00AAFF">SECTOR SALE</div><div class="event-desc">All sector prices halved — best time to expand territory.</div><div class="event-dur">10 minutes</div></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-tag">STRATEGY</div>
-    <div class="section-title">💡 PRO TIPS</div>
-    <div class="tips">
-      <div class="tip"><div class="tip-icon">🎯</div><p><strong>Claim center sectors first.</strong> They cost more but they're the most visible on the minimap and hardest to retake. Controlling the center dominates the leaderboard.</p></div>
-      <div class="tip"><div class="tip-icon">🛡️</div><p><strong>Shield your most valuable territory.</strong> Auto-shield lasts 24h. After that use Fortress power-ups on your densest clusters — especially before going offline.</p></div>
-      <div class="tip"><div class="tip-icon">⚡</div><p><strong>Wait for Sector Sale to expand.</strong> Prices halve during Sector Sale — the best time to claim expensive center pixels for half price.</p></div>
-      <div class="tip"><div class="tip-icon">♻️</div><p><strong>Renew before pixels expire.</strong> Orange dots mean 30 days old — buy a Renewal Shield (€5) to reset your 50 oldest pixels before they hit 60 days and become claimable by anyone.</p></div>
-      <div class="tip"><div class="tip-icon">🔥</div><p><strong>Log in every day.</strong> A 30-day streak earns 30 free pixels — €30 of territory for free. Free pixels are automatically used first before real money.</p></div>
-      <div class="tip"><div class="tip-icon">💣</div><p><strong>Nuke dense unshielded clusters.</strong> A €50 Nuke destroys up to 400 pixels in a 20×20 zone. Most effective against enemies who haven't used Fortress.</p></div>
-      <div class="tip"><div class="tip-icon">🗺️</div><p><strong>Use the minimap to navigate.</strong> Click anywhere on the minimap to jump to that location. The cyan rectangle shows your current viewport. Locked sectors appear dark on the minimap.</p></div>
-    </div>
-  </section>
-
-</main>
-
-<footer>
-  <div class="footer-logo">⚔ PIXELS OF WAR</div>
-  <p><span class="live-dot"></span>LIVE MULTIPLAYER · REAL-TIME · SEASON 1 · pixelsofwar.com</p>
-  <br/>
-  <a href="/" class="play-btn" style="margin-top:16px;display:inline-block">▶ START PLAYING NOW</a>
-</footer>
-
+</div>
 </body>
 </html>
