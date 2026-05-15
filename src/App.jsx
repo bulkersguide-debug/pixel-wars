@@ -97,8 +97,10 @@ export default function App(){
   const cvs=useRef(null),mmCvs=useRef(null);
   const navigate=useNavigate();
   const channelRef=useRef(null),presenceRef=useRef(null);
+  const crateRef=useRef(null);
   const heatmapRef=useRef({});
   const prevPixelCounts=useRef({});
+  const vxRef=useRef(900),vyRef=useRef(900);
 
   // Core state
   const [pixels,setPixels]=useState({});
@@ -158,6 +160,35 @@ export default function App(){
   const currentSeasonNum=season.num;
 
   const pushToast=useCallback((msg,color,dur=3000)=>{const id=Date.now()+Math.random();setToasts(t=>[...t,{id,msg,color}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),dur);},[]);
+  useEffect(()=>{vxRef.current=vx;},[vx]);
+  useEffect(()=>{vyRef.current=vy;},[vy]);
+
+  const spawnParticles=useCallback((color,gx,gy,count=12,big=false)=>{
+    const c=cvs.current;if(!c)return;
+    const rc=c.getBoundingClientRect();
+    const scaleX=rc.width/CW,scaleY=rc.height/CH;
+    const sx=(gx-vxRef.current)*CELL*scaleX,sy=(gy-vyRef.current)*CELL*scaleY;
+    const container=c.parentElement;if(!container)return;
+    for(let i=0;i<count;i++){
+      const p=document.createElement("div");
+      const angle=(Math.PI*2*i/count)+Math.random()*.6;
+      const dist=(big?50:22)+Math.random()*28;
+      p.style.cssText=`position:absolute;width:${2+Math.random()*3}px;height:${2+Math.random()*3}px;background:${color};border-radius:2px;left:${sx}px;top:${sy}px;pointer-events:none;z-index:30;animation:particleBurst ${.35+Math.random()*.3}s ease-out forwards;--pdx:${Math.cos(angle)*dist}px;--pdy:${Math.sin(angle)*dist}px`;
+      container.appendChild(p);setTimeout(()=>p.remove(),700);
+    }
+  },[]);
+
+  const spawnShockwave=useCallback((color,gx,gy)=>{
+    const c=cvs.current;if(!c)return;
+    const rc=c.getBoundingClientRect();
+    const scaleX=rc.width/CW,scaleY=rc.height/CH;
+    const sx=(gx-vxRef.current)*CELL*scaleX,sy=(gy-vyRef.current)*CELL*scaleY;
+    const container=c.parentElement;if(!container)return;
+    const el=document.createElement("div");
+    el.style.cssText=`position:absolute;width:12px;height:12px;border:2px solid ${color};border-radius:50%;left:${sx-6}px;top:${sy-6}px;pointer-events:none;z-index:30;animation:shockwaveExp .7s ease-out forwards`;
+    container.appendChild(el);setTimeout(()=>el.remove(),800);
+  },[]);
+
   const trackHeatmap=useCallback((idx)=>{const[sx,sy]=sectorOf(idx);const k=sectorKey(sx,sy);heatmapRef.current[k]=(heatmapRef.current[k]||0)+1;setHeatmapTick(t=>t+1);},[]);
 
   // Territory trend
@@ -280,23 +311,35 @@ export default function App(){
   useEffect(()=>{const start=()=>{const ev=EVENTS[randInt(0,EVENTS.length-1)];setEvent(ev);setEventTimer(ev.duration);pushToast(`${ev.icon} ${ev.label}! ${ev.desc}`,"#FFD700",4000);};const iv=setInterval(()=>setEventTimer(t=>{if(t<=1){setEvent(null);setTimeout(start,randInt(15000,30000));return 0;}return t-1;}),1000);setTimeout(start,6000);return()=>clearInterval(iv);},[]);
   useEffect(()=>{const f=(e)=>{if(e.key==="Escape"){setActive(null);setPending(new Set());}};window.addEventListener("keydown",f);return()=>window.removeEventListener("keydown",f);},[]);
 
+  // Load WidgetBot Crate (floating Discord chat)
+  useEffect(()=>{
+    // Using Discord's official widget — no bot needed
+    // Just enable Widget in Discord Server Settings → Widget
+  },[]);
+
 
   // ── CANVAS DRAW ────────────────────────────────────────────────────────────
   useEffect(()=>{
     const c=cvs.current;if(!c)return;
     const ctx=c.getContext("2d");const now=Date.now();
     ctx.fillStyle="#050510";ctx.fillRect(0,0,CW,CH);
+    const frame=Math.floor(Date.now()/60);
     for(let dy=0;dy<VH;dy++){for(let dx=0;dx<VW;dx++){
       const gx=vx+dx,gy=vy+dy;if(gx>=GW||gy>=GH)continue;
       const idx=gy*GW+gx;const sx=Math.floor(gx/SECTOR),sy=Math.floor(gy/SECTOR);
       const isUnlocked=unlockedSet.has(sectorKey(sx,sy));
       const px=pixels[idx];const isShielded=shields[idx]&&shields[idx]>now;
-      const age=px?now-px.at:0;
+      const age=px?now-px.at:0;const isMyPixel=px&&px.t===active;
       if(!isUnlocked){ctx.fillStyle=(dx+dy)%3===0?"#0a0a16":"#080810";ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);}
       else if(px){
+        if(isMyPixel&&at){ctx.fillStyle=rgba(at.color,.2);ctx.fillRect(dx*CELL-1,dy*CELL-1,CELL+1,CELL+1);}
         ctx.fillStyle=`#${cv(TM[px.t]?.color||"#888")}`;ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
         if(age>DECAY_EXPIRE*86400000){ctx.fillStyle="rgba(255,0,0,.15)";ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);}
-        if(isShielded){ctx.fillStyle="rgba(0,245,255,0.22)";ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);if(dx%2===0&&dy%2===0){ctx.fillStyle="rgba(0,245,255,0.5)";ctx.fillRect(dx*CELL,dy*CELL,1,1);}}
+        if(isShielded){
+          const phase=Math.sin((frame+dx*3+dy*3)*0.25)*0.5+0.5;
+          ctx.fillStyle=`rgba(0,245,255,${0.1+phase*0.15})`;ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
+          if((dx+dy+frame)%5===0){ctx.fillStyle=`rgba(0,245,255,${0.4+phase*0.3})`;ctx.fillRect(dx*CELL,dy*CELL,1,1);}
+        }
         if(age>DECAY_WARN*86400000&&age<=DECAY_EXPIRE*86400000&&(dx+dy)%4===0){ctx.fillStyle="rgba(255,200,0,.3)";ctx.fillRect(dx*CELL,dy*CELL,1,1);}
       }else if(pending.has(idx)){ctx.fillStyle=rgba(active?TM[active]?.color||"#888":"#888",mode==="RAID"?.4:.6);ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);}
       else{ctx.fillStyle=(dx+dy)%2===0?"#0c0c1e":"#0a0a18";ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);}
@@ -308,17 +351,19 @@ export default function App(){
     ctx.strokeStyle="rgba(0,245,255,.12)";ctx.lineWidth=1.5;
     for(let x=0;x<=CW;x+=CELL*SECTOR){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,CH);ctx.stroke();}
     for(let y=0;y<=CH;y+=CELL*SECTOR){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(CW,y);ctx.stroke();}
-    // Heatmap overlay
+    // Gradient heatmap
     if(showHeatmap){
-      for(let sy2=Math.floor(vy/SECTOR);sy2<=Math.floor((vy+VH)/SECTOR);sy2++){
-        for(let sx2=Math.floor(vx/SECTOR);sx2<=Math.floor((vx+VW)/SECTOR);sx2++){
+      for(let sy2=Math.floor(vy/SECTOR);sy2<=Math.floor((vy+VH)/SECTOR)+1;sy2++){
+        for(let sx2=Math.floor(vx/SECTOR);sx2<=Math.floor((vx+VW)/SECTOR)+1;sx2++){
           const k=sectorKey(sx2,sy2);const heat=heatmapRef.current[k]||0;
           if(heat>0){
-            const intensity=Math.min(1,heat/30);
-            const dx2=(sx2*SECTOR-vx)*CELL,dy2=(sy2*SECTOR-vy)*CELL;
-            ctx.fillStyle=`rgba(255,${Math.floor(80*(1-intensity))},0,${0.12+intensity*0.42})`;
-            ctx.fillRect(dx2,dy2,SECTOR*CELL,SECTOR*CELL);
-            if(intensity>0.5){ctx.fillStyle=`rgba(255,255,255,${intensity*0.06})`;ctx.font="bold 9px monospace";ctx.textAlign="center";ctx.fillText("🔥",dx2+SECTOR*CELL/2,dy2+SECTOR*CELL/2);}
+            const intensity=Math.min(1,heat/25);
+            const cx2=(sx2*SECTOR+SECTOR/2-vx)*CELL,cy2=(sy2*SECTOR+SECTOR/2-vy)*CELL;
+            const grad=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,SECTOR*CELL*.9);
+            grad.addColorStop(0,`rgba(255,${Math.floor(50*(1-intensity))},0,${0.2+intensity*0.4})`);
+            grad.addColorStop(0.5,`rgba(255,80,0,${intensity*0.12})`);
+            grad.addColorStop(1,"rgba(255,40,0,0)");
+            ctx.fillStyle=grad;ctx.fillRect((sx2*SECTOR-vx)*CELL-CELL,(sy2*SECTOR-vy)*CELL-CELL,SECTOR*CELL+CELL*2,SECTOR*CELL+CELL*2);
           }
         }
       }
@@ -346,6 +391,10 @@ export default function App(){
         ctx.fillStyle="rgba(255,215,0,.06)";ctx.fillRect(dx2,dy2,SECTOR*CELL,SECTOR*CELL);
       }
     }
+    // Canvas vignette
+    const vig=ctx.createRadialGradient(CW/2,CH/2,CW*0.28,CW/2,CH/2,CW*0.72);
+    vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,10,0.55)");
+    ctx.fillStyle=vig;ctx.fillRect(0,0,CW,CH);
   },[pixels,shields,pending,active,mode,vx,vy,unlockedSet,sectorFills,showPriceMap,showHeatmap,heatmapTick,miniSeason]);
 
   // ── MINIMAP ────────────────────────────────────────────────────────────────
@@ -388,6 +437,11 @@ export default function App(){
     const toClaim=new Set(pending);setPending(new Set());
     if(isOnline)await dbUpsertPixels(toClaim,active,currentSeasonNum);else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
     toClaim.forEach(idx=>trackHeatmap(idx));
+    // Particle effects
+    const claimArr=Array.from(toClaim);
+    const sample=claimArr.filter((_,i)=>i%Math.max(1,Math.floor(claimArr.length/6))===0).slice(0,6);
+    sample.forEach(idx=>spawnParticles(t.color,idx%GW,Math.floor(idx/GW),isRaid?14:9,isRaid));
+    if(claimArr.length>0){const mid=claimArr[Math.floor(claimArr.length/2)];spawnShockwave(t.color,mid%GW,Math.floor(mid/GW));}
     if(isRaid){triggerFlash("#FF0000",true);pushToast(`⚔️ RAID! ${toClaim.size}px conquered!`,"#FF4400",4000);}else triggerFlash(t.color);
     if(freeUsed>0)pushToast(`🎁 ${freeUsed} free pixels used!`,"#FFD700",3000);
     if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
@@ -398,12 +452,12 @@ export default function App(){
   // ── POWER-UPS ──────────────────────────────────────────────────────────────
   const usePowerup=async(pu)=>{
     const next={...pixels};const newShields={...shields};const now=Date.now();const toDelete=[];const toUpsert=[];
-    if(pu.id==="bomb"){const ex=randInt(vx,vx+100),ey=randInt(vy,vy+60);let d=0;for(let dy=0;dy<8;dy++)for(let dx=0;dx<8;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)&&!isAllied(next[idx].t)){toDelete.push(idx);delete next[idx];delete newShields[idx];d++;}}triggerFlash("#FF4400",true);pushToast(`💣 BOMB! Destroyed ${d} pixels!`,"#FF4400",5000);}
-    else if(pu.id==="storm"){let cl=0;for(let dy=0;dy<VH&&cl<50;dy++)for(let dx=0;dx<VW&&cl<50;dx++){const idx=(vy+dy)*GW+(vx+dx);const sx=Math.floor((vx+dx)/SECTOR),sy=Math.floor((vy+dy)/SECTOR);if(unlockedSet.has(sectorKey(sx,sy))&&!next[idx]){next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;toUpsert.push(idx);cl++;}}triggerFlash("#FFCC00");pushToast(`⚡ STORM! ${cl}px claimed!`,"#FFCC00",5000);}
-    else if(pu.id==="fortress"){const fp=now+60*60*1000;const myPx=Object.entries(pixels).filter(([,v])=>v?.t===active).map(([k])=>parseInt(k)).slice(-30);myPx.forEach(idx=>{newShields[idx]=Math.max(newShields[idx]||0,fp);});triggerFlash("#00AAFF");pushToast(`🛡️ FORTRESS! ${myPx.length}px shielded!`,"#00AAFF",6000);}
-    else if(pu.id==="snipe"){const e=Object.entries(next).find(([k,v])=>v?.t&&v.t!==active&&!(shields[k]&&shields[k]>now)&&!isAllied(v.t));if(e){const victim=TM[next[e[0]].t];toDelete.push(parseInt(e[0]));next[parseInt(e[0])]={t:active,at:now};toUpsert.push(parseInt(e[0]));newShields[parseInt(e[0])]=now+24*60*60*1000;pushToast(`🎯 SNIPED from ${victim?.name}!`,"#FF2D78",5000);triggerFlash("#FF2D78");}else pushToast("🎯 No unshielded targets!","#FF2D78",3000);}
-    else if(pu.id==="airdrop"){const sx=vx+randInt(0,VW-16),sy=vy+randInt(0,VH-16);let cl=0;for(let dy=0;dy<15;dy++)for(let dx=0;dx<15;dx++){const idx=(sy+dy)*GW+(sx+dx);const ssX=Math.floor((sx+dx)/SECTOR),ssY=Math.floor((sy+dy)/SECTOR);if(unlockedSet.has(sectorKey(ssX,ssY))&&!next[idx]){next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;toUpsert.push(idx);cl++;}}triggerFlash("#C8FF00");pushToast(`🪂 AIRDROP! ${cl}px claimed!`,"#C8FF00",5000);}
-    else if(pu.id==="nuke"){const ex=randInt(0,GW-21),ey=randInt(0,GH-21);let d=0;for(let dy=0;dy<20;dy++)for(let dx=0;dx<20;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)&&!isAllied(next[idx].t)){toDelete.push(idx);delete next[idx];delete newShields[idx];d++;}}triggerFlash("#FF0000",true);pushToast(`☢️ NUKE! Obliterated ${d} pixels!`,"#FF0000",6000);}
+    if(pu.id==="bomb"){const ex=randInt(vx,vx+100),ey=randInt(vy,vy+60);let d=0;for(let dy=0;dy<8;dy++)for(let dx=0;dx<8;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)&&!isAllied(next[idx].t)){toDelete.push(idx);delete next[idx];delete newShields[idx];d++;}}spawnShockwave("#FF4400",ex+4,ey+4);spawnParticles("#FF4400",ex+4,ey+4,20,true);triggerFlash("#FF4400",true);pushToast(`💣 BOMB! Destroyed ${d} pixels!`,"#FF4400",5000);}
+    else if(pu.id==="storm"){let cl=0;for(let dy=0;dy<VH&&cl<50;dy++)for(let dx=0;dx<VW&&cl<50;dx++){const idx=(vy+dy)*GW+(vx+dx);const sx=Math.floor((vx+dx)/SECTOR),sy=Math.floor((vy+dy)/SECTOR);if(unlockedSet.has(sectorKey(sx,sy))&&!next[idx]){next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;toUpsert.push(idx);cl++;}}spawnParticles(TM[active]?.color||"#FFCC00",vx+VW/2,vy+VH/2,30,true);triggerFlash("#FFCC00");pushToast(`⚡ STORM! ${cl}px claimed!`,"#FFCC00",5000);}
+    else if(pu.id==="fortress"){const fp=now+60*60*1000;const myPx=Object.entries(pixels).filter(([,v])=>v?.t===active).map(([k])=>parseInt(k)).slice(-30);myPx.forEach(idx=>{newShields[idx]=Math.max(newShields[idx]||0,fp);});spawnParticles("#00AAFF",vx+VW/2,vy+VH/2,16);triggerFlash("#00AAFF");pushToast(`🛡️ FORTRESS! ${myPx.length}px shielded!`,"#00AAFF",6000);}
+    else if(pu.id==="snipe"){const e=Object.entries(next).find(([k,v])=>v?.t&&v.t!==active&&!(shields[k]&&shields[k]>now)&&!isAllied(v.t));if(e){const victim=TM[next[e[0]].t];toDelete.push(parseInt(e[0]));next[parseInt(e[0])]={t:active,at:now};toUpsert.push(parseInt(e[0]));newShields[parseInt(e[0])]=now+24*60*60*1000;spawnParticles("#FF2D78",parseInt(e[0])%GW,Math.floor(parseInt(e[0])/GW),12);pushToast(`🎯 SNIPED from ${victim?.name}!`,"#FF2D78",5000);triggerFlash("#FF2D78");}else pushToast("🎯 No unshielded targets!","#FF2D78",3000);}
+    else if(pu.id==="airdrop"){const sx=vx+randInt(0,VW-16),sy=vy+randInt(0,VH-16);let cl=0;for(let dy=0;dy<15;dy++)for(let dx=0;dx<15;dx++){const idx=(sy+dy)*GW+(sx+dx);const ssX=Math.floor((sx+dx)/SECTOR),ssY=Math.floor((sy+dy)/SECTOR);if(unlockedSet.has(sectorKey(ssX,ssY))&&!next[idx]){next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;toUpsert.push(idx);cl++;}}spawnShockwave("#C8FF00",sx+7,sy+7);spawnParticles("#C8FF00",sx+7,sy+7,18,true);triggerFlash("#C8FF00");pushToast(`🪂 AIRDROP! ${cl}px claimed!`,"#C8FF00",5000);}
+    else if(pu.id==="nuke"){const ex=randInt(0,GW-21),ey=randInt(0,GH-21);let d=0;for(let dy=0;dy<20;dy++)for(let dx=0;dx<20;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)&&!isAllied(next[idx].t)){toDelete.push(idx);delete next[idx];delete newShields[idx];d++;}}spawnShockwave("#FF0000",vx+VW/2,vy+VH/2);spawnShockwave("#FF4400",vx+VW/2,vy+VH/2);spawnParticles("#FF0000",vx+VW/2,vy+VH/2,30,true);triggerFlash("#FF0000",true);pushToast(`☢️ NUKE! Obliterated ${d} pixels!`,"#FF0000",6000);}
     else if(pu.id==="renew"){let r=0;const myPx=Object.entries(next).filter(([,v])=>v?.t===active).sort((a,b)=>a[1].at-b[1].at).slice(0,50);myPx.forEach(([k])=>{if(next[k]){next[k]={...next[k],at:now};toUpsert.push(parseInt(k));r++;}});pushToast(`♻️ RENEWED ${r} pixels!`,"#00FFAA",5000);triggerFlash("#00FFAA");}
     else if(pu.id==="double"){const win=Math.random()>.5;pushToast(win?"✨ WIN! Bonus territory!":"✨ LOST 💀","#BB88FF",5000);triggerFlash("#BB88FF",win);}
     setPixels(next);setShields(newShields);try{localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
@@ -434,6 +488,13 @@ export default function App(){
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return(
     <div style={{background:"#040408",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif",color:"#e0e8ff",userSelect:"none",position:"relative",overflow:"hidden"}}>
+      {/* Animated background orbs */}
+      <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:0,overflow:"hidden"}}>
+        {[{c:"#00F5FF",x:"10%",y:"20%",s:300,d:"8s"},{c:"#FF4400",x:"85%",y:"60%",s:250,d:"12s"},{c:"#C8FF00",x:"50%",y:"80%",s:200,d:"10s"},{c:at?.color||"#9747FF",x:"70%",y:"15%",s:280,d:"9s"}].map((o,i)=>(
+          <div key={i} style={{position:"absolute",left:o.x,top:o.y,width:o.s,height:o.s,borderRadius:"50%",background:`radial-gradient(circle,${rgba(o.c,.06)} 0%,transparent 70%)`,animation:`bgDrift ${o.d} ease-in-out infinite`,animationDelay:`${i*2}s`,transform:"translate(-50%,-50%)"}}/>
+        ))}
+        <div style={{position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(0,245,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,245,255,.015) 1px,transparent 1px)",backgroundSize:"40px 40px"}}/>
+      </div>
       <style>{`
         @keyframes slideDown{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
         @keyframes pop{0%{transform:scale(.85);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
@@ -444,6 +505,10 @@ export default function App(){
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes sectorPop{0%{transform:scale(0);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
         @keyframes raid{0%{background:rgba(255,50,0,.35)}100%{background:transparent}}
+        @keyframes particleBurst{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--pdx),var(--pdy)) scale(0);opacity:0}}
+        @keyframes shockwaveExp{0%{transform:scale(1);opacity:.9;box-shadow:0 0 8px currentColor}100%{transform:scale(22);opacity:0}}
+        @keyframes bgDrift{0%,100%{transform:translateY(0) translateX(0) rotate(0deg);opacity:.4}33%{transform:translateY(-18px) translateX(8px) rotate(120deg);opacity:.7}66%{transform:translateY(10px) translateX(-6px) rotate(240deg);opacity:.3}}
+        @keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
         .chip:hover{filter:brightness(1.4)!important}.tbtn:hover{filter:brightness(1.15);transform:translateY(-1px)}.pubtn:hover{filter:brightness(1.2);transform:scale(1.02)}.nav-btn:hover{background:rgba(255,255,255,.12)!important}
         ::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-thumb{background:#222240;border-radius:2px}*{box-sizing:border-box}input::placeholder{color:#2a2a4a}
       `}</style>
@@ -451,8 +516,8 @@ export default function App(){
       {flashColor&&<div style={{position:"fixed",inset:0,background:rgba(flashColor,.22),zIndex:50,pointerEvents:"none",animation:"raid .3s ease forwards"}}/>}
 
       {/* TOASTS */}
-      <div style={{position:"fixed",top:68,right:12,zIndex:200,display:"flex",flexDirection:"column",gap:6,pointerEvents:"none",maxWidth:300}}>
-        {toasts.map(t=><div key={t.id} style={{background:rgba(t.color,.12),border:`1px solid ${rgba(t.color,.5)}`,borderRadius:8,padding:"7px 12px",fontSize:11,fontWeight:700,color:t.color,fontFamily:"'Orbitron',monospace",animation:"slideDown .25s ease",lineHeight:1.4}}>{t.msg}</div>)}
+      <div style={{position:"fixed",top:68,right:12,zIndex:200,display:"flex",flexDirection:"column",gap:6,pointerEvents:"none",maxWidth:310}}>
+        {toasts.map(t=><div key={t.id} style={{background:`linear-gradient(135deg,${rgba(t.color,.15)},${rgba(t.color,.06)})`,border:`1px solid ${rgba(t.color,.6)}`,borderRadius:10,padding:"8px 14px",fontSize:11,fontWeight:700,color:t.color,fontFamily:"'Orbitron',monospace",animation:"slideDown .3s cubic-bezier(.34,1.56,.64,1)",lineHeight:1.4,backdropFilter:"blur(12px)",boxShadow:`0 4px 20px ${rgba(t.color,.2)},0 0 0 1px ${rgba(t.color,.1)}`}}>{t.msg}</div>)}
       </div>
 
       {/* RAID ALERT */}
@@ -486,8 +551,8 @@ export default function App(){
       </div>}
 
       {/* CONFIRM CLAIM MODAL */}
-      {showConfirm&&confirmPayload&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}} onClick={e=>e.target===e.currentTarget&&(setShowConfirm(false),setPending(new Set()))}>
-        <div style={{background:"#09091c",border:`1px solid ${rgba(confirmPayload.teamColor,.4)}`,borderRadius:16,padding:"28px 26px",width:380,maxWidth:"94vw",textAlign:"center",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>
+      {showConfirm&&confirmPayload&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(16px)"}} onClick={e=>e.target===e.currentTarget&&(setShowConfirm(false),setPending(new Set()))}>
+        <div style={{background:"rgba(9,9,30,.9)",border:`1px solid ${rgba(confirmPayload.teamColor,.5)}`,borderRadius:16,padding:"28px 26px",width:380,maxWidth:"94vw",textAlign:"center",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)",backdropFilter:"blur(20px)",boxShadow:`0 0 60px ${rgba(confirmPayload.teamColor,.15)},0 20px 40px rgba(0,0,0,.5)`}}>
           <div style={{fontSize:36,marginBottom:10}}>{confirmPayload.isRaid?"⚔️":"🏴"}</div>
           <div style={{fontFamily:"'Orbitron',monospace",fontSize:15,fontWeight:900,color:confirmPayload.teamColor,letterSpacing:2,marginBottom:4}}>{confirmPayload.modeLabel}</div>
           <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.35)",marginBottom:18}}>for {confirmPayload.teamName}</div>
@@ -505,8 +570,8 @@ export default function App(){
       </div>}
 
       {/* WAR DECLARATION MODAL */}
-      {showWarModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}} onClick={e=>e.target===e.currentTarget&&setShowWarModal(false)}>
-        <div style={{background:"#09091c",border:"1px solid rgba(255,68,0,.5)",borderRadius:16,padding:"28px 26px",width:400,maxWidth:"94vw",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>
+      {showWarModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(16px)"}} onClick={e=>e.target===e.currentTarget&&setShowWarModal(false)}>
+        <div style={{background:"rgba(9,9,30,.92)",border:"1px solid rgba(255,68,0,.6)",borderRadius:16,padding:"28px 26px",width:400,maxWidth:"94vw",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)",backdropFilter:"blur(20px)",boxShadow:"0 0 60px rgba(255,68,0,.15),0 20px 40px rgba(0,0,0,.5)"}}>
           <div style={{fontSize:36,textAlign:"center",marginBottom:8}}>⚔️</div>
           <div style={{fontFamily:"'Orbitron',monospace",fontSize:15,fontWeight:900,color:"#FF4400",letterSpacing:2,textAlign:"center",marginBottom:6}}>DECLARE WAR</div>
           <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",textAlign:"center",marginBottom:16}}>Declarations appear in the live feed. Allied fandoms are protected.</div>
@@ -523,8 +588,8 @@ export default function App(){
       </div>}
 
       {/* ALLIANCE MODAL */}
-      {showAllianceModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}} onClick={e=>e.target===e.currentTarget&&setShowAllianceModal(false)}>
-        <div style={{background:"#09091c",border:"1px solid rgba(0,255,170,.4)",borderRadius:16,padding:"28px 26px",width:400,maxWidth:"94vw",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>
+      {showAllianceModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(16px)"}} onClick={e=>e.target===e.currentTarget&&setShowAllianceModal(false)}>
+        <div style={{background:"rgba(9,9,30,.92)",border:"1px solid rgba(0,255,170,.5)",borderRadius:16,padding:"28px 26px",width:400,maxWidth:"94vw",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)",backdropFilter:"blur(20px)",boxShadow:"0 0 60px rgba(0,255,170,.12),0 20px 40px rgba(0,0,0,.5)"}}>
           <div style={{fontSize:36,textAlign:"center",marginBottom:8}}>🤝</div>
           <div style={{fontFamily:"'Orbitron',monospace",fontSize:15,fontWeight:900,color:"#00FFAA",letterSpacing:2,textAlign:"center",marginBottom:6}}>PROPOSE ALLIANCE</div>
           <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",textAlign:"center",marginBottom:16}}>Allied fandoms cannot raid each other. Alliances can be betrayed at any time.</div>
@@ -684,7 +749,7 @@ export default function App(){
 
           {/* CANVAS */}
           <div style={{padding:"5px 5px 0",flexShrink:0}}>
-            <div style={{border:`2px solid ${rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"default",position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 24px ${rgba(modeColor,.08)}`}}>
+            <div style={{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"default",position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 30px ${rgba(at?.color||modeColor,.12)},0 0 60px ${rgba(at?.color||modeColor,.06)},inset 0 0 30px rgba(0,0,0,.3)`}}>
               <canvas ref={cvs} width={CW} height={CH} style={{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"38vh"}}
                 onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onDragStart={e=>e.preventDefault()}/>
               <div style={{position:"absolute",top:5,left:5,background:rgba(modeColor,.12),border:`1px solid ${rgba(modeColor,.4)}`,borderRadius:4,padding:"2px 7px",fontFamily:"'Orbitron',monospace",fontSize:7,color:modeColor,pointerEvents:"none",letterSpacing:2}}>
@@ -929,36 +994,50 @@ export default function App(){
           </div>}
 
           {/* DISCORD TAB */}
-          {tab==="DISC"&&<div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16,gap:12,textAlign:"center"}}>
-            <svg width="40" height="30" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#5865F2",letterSpacing:2}}>WAR COUNCIL</div>
-            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",lineHeight:1.7}}>Chat opens as a<br/>floating panel →</div>
-            <button onClick={()=>setShowDiscord(s=>!s)} style={{padding:"10px 16px",background:"linear-gradient(90deg,#5865F2,#7289DA)",border:"none",color:"#fff",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,letterSpacing:1}}>{showDiscord?"CLOSE CHAT":"OPEN CHAT"}</button>
+          {tab==="DISC"&&<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div style={{padding:"8px 8px 6px",borderBottom:"1px solid #1a1a30",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <svg width="16" height="12" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
+                <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#5865F2",letterSpacing:1}}>WAR COUNCIL</span>
+              </div>
+              <button onClick={()=>setShowDiscord(s=>!s)} style={{padding:"3px 8px",background:"rgba(88,101,242,.15)",border:"1px solid rgba(88,101,242,.4)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#7289DA",letterSpacing:1}}>{showDiscord?"HIDE":"FLOAT"}</button>
+            </div>
+            <iframe src={`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`} width="100%" height="100%" style={{border:"none",flex:1}} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" title="Discord"/>
+            <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{display:"block",padding:"9px",background:"linear-gradient(90deg,#5865F2,#7289DA)",textAlign:"center",textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#fff",letterSpacing:1,flexShrink:0}}>JOIN SERVER →</a>
           </div>}
 
         </div>
       </div>
 
-      {/* DISCORD FLOATING CHAT */}
-      <div style={{position:"fixed",bottom:56,right:12,zIndex:600,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
-        {showDiscord&&<div style={{width:340,height:480,background:"#36393f",borderRadius:12,overflow:"hidden",border:"2px solid #5865F2",boxShadow:"0 8px 40px rgba(88,101,242,.4),0 0 0 1px rgba(88,101,242,.2)",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)",display:"flex",flexDirection:"column"}}>
-          <div style={{background:"#202225",padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+      {/* DISCORD FLOATING PANEL — Discord official widget, no bot needed */}
+      <div style={{position:"fixed",bottom:56,right:12,zIndex:600}}>
+        {showDiscord&&<div style={{position:"absolute",bottom:60,right:0,width:320,background:"#2f3136",borderRadius:12,overflow:"hidden",border:"2px solid #5865F2",boxShadow:"0 8px 40px rgba(88,101,242,.45)",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)",display:"flex",flexDirection:"column"}}>
+          {/* Header */}
+          <div style={{background:"#202225",padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <svg width="18" height="14" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
-              <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#fff",letterSpacing:1}}>PIXELS OF WAR</span>
+              <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#fff",letterSpacing:1}}>WAR COUNCIL</span>
             </div>
-            <button onClick={()=>setShowDiscord(false)} style={{background:"none",border:"none",color:"#72767d",cursor:"pointer",fontSize:16,lineHeight:1,padding:"2px 4px"}}>✕</button>
+            <button onClick={()=>setShowDiscord(false)} style={{background:"none",border:"none",color:"#72767d",cursor:"pointer",fontSize:16,lineHeight:1}}>✕</button>
           </div>
+          {/* Discord official widget iframe */}
           <iframe
-            src={`https://e.widgetbot.io/channels/${DISCORD_ID}/${DISCORD_CHANNEL}`}
-            style={{flex:1,border:"none",width:"100%"}}
+            src={`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`}
+            width="320"
+            height="380"
+            style={{border:"none",display:"block"}}
             sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
-            title="Discord Chat"
+            title="Discord"
           />
+          {/* Join button */}
+          <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer"
+            style={{display:"block",padding:"11px",background:"linear-gradient(90deg,#5865F2,#7289DA)",textAlign:"center",textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#fff",letterSpacing:1}}>
+            JOIN SERVER →
+          </a>
         </div>}
-        <button onClick={()=>setShowDiscord(s=>!s)} style={{width:48,height:48,borderRadius:"50%",background:showDiscord?"#5865F2":"linear-gradient(135deg,#5865F2,#7289DA)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 20px rgba(88,101,242,${showDiscord?.6:.3})`,transition:"all .2s",transform:showDiscord?"scale(1.1)":"scale(1)"}}>
+        <button onClick={()=>setShowDiscord(s=>!s)} title="Discord" style={{width:48,height:48,borderRadius:"50%",background:showDiscord?"#5865F2":"linear-gradient(135deg,#5865F2,#7289DA)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 4px 20px rgba(88,101,242,${showDiscord?.6:.35})`,transition:"all .2s",transform:showDiscord?"rotate(90deg)":"none"}}>
           {showDiscord
-            ?<span style={{color:"#fff",fontSize:18,lineHeight:1}}>✕</span>
+            ?<span style={{color:"#fff",fontSize:20}}>✕</span>
             :<svg width="24" height="18" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="white"/></svg>
           }
         </button>
