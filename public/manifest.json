@@ -10,15 +10,13 @@
   "orientation": "any",
   "categories": ["games", "entertainment"],
   "icons": [
-    { "src": "/icons/icon-72.png",  "sizes": "72x72",   "type": "image/png" },
-    { "src": "/icons/icon-96.png",  "sizes": "96x96",   "type": "image/png" },
-    { "src": "/icons/icon-128.png", "sizes": "128x128", "type": "image/png" },
-    { "src": "/icons/icon-144.png", "sizes": "144x144", "type": "image/png" },
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/favicon-96x96.png",           "sizes": "96x96",   "type": "image/png" },
+    { "src": "/apple-touch-icon.png",         "sizes": "180x180", "type": "image/png" },
+    { "src": "/web-app-manifest-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/web-app-manifest-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "shortcuts": [
-    { "name": "Play Now",    "url": "/", "description": "Jump back into the war" },
-    { "name": "Leaderboard", "url": "/", "description": "See who is winning"     }
+    { "name": "Play Now",     "url": "/", "description": "Jump back into the war" },
+    { "name": "Leaderboard",  "url": "/", "description": "See who is winning"     }
   ]
 }
