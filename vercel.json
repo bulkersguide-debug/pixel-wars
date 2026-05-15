@@ -1,5 +1,8 @@
 {
   "rewrites": [
+    { "source": "/advertise.html", "destination": "/advertise.html" },
+    { "source": "/how-to-play.html", "destination": "/how-to-play.html" },
+    { "source": "/request-fandom.html", "destination": "/request-fandom.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
