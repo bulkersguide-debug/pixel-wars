@@ -16,7 +16,7 @@ export default function AuthModal({ onClose, reason = "claim" }) {
         provider: "discord",
         options: {
           redirectTo: window.location.origin + "/",
-          scopes: "identify",
+          scopes: "identify email",
         },
       });
       if (err) throw err;

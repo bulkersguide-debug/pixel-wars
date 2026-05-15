@@ -6,9 +6,9 @@ const rgba=(hex,a)=>{try{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slic
 
 const PRICES={hours:{"1":2,"6":8,"12":14,"24":20},days:{"1":20,"3":50,"7":100,"30":350}};
 
-export default function SponsorModal({onClose}){
+export default function SponsorModal({onClose, userEmail}){
   const [msg,setMsg]=useState("");
-  const [email,setEmail]=useState("");
+  const [email,setEmail]=useState(userEmail||"");
   const [durType,setDurType]=useState("hours");
   const [durAmt,setDurAmt]=useState("1");
   const [loading,setLoading]=useState(false);
@@ -16,10 +16,13 @@ export default function SponsorModal({onClose}){
   const [error,setError]=useState("");
 
   const price=PRICES[durType]?.[durAmt]||2;
+  const emailLocked=!!userEmail;
+
+  const validEmail=e=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 
   const send=async()=>{
     if(msg.trim().length<5){setError("Message too short (min 5 chars)");return;}
-    if(!email.includes("@")){setError("Enter a valid email");return;}
+    if(!validEmail(email)){setError("Enter a valid email address (e.g. you@example.com)");return;}
     setLoading(true);setError("");
     try{
       const{error:err}=await supabase.from("sponsored_banners").insert({
@@ -68,9 +71,12 @@ export default function SponsorModal({onClose}){
             </div>
 
             <div style={{marginBottom:14}}>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",letterSpacing:2,marginBottom:6}}>YOUR EMAIL</div>
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"
-                style={{width:"100%",background:"#0c0c1c",border:"1px solid rgba(255,215,0,.25)",borderRadius:7,padding:"10px 14px",color:"#e0e8ff",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",letterSpacing:2,marginBottom:6}}>CONTACT EMAIL {emailLocked&&"(from your Discord)"}</div>
+              <input type="email" value={email} onChange={e=>!emailLocked&&setEmail(e.target.value)}
+                readOnly={emailLocked}
+                placeholder="you@example.com"
+                style={{width:"100%",background:emailLocked?"#08081a":"#0c0c1c",border:`1px solid ${emailLocked?"rgba(88,101,242,.4)":"rgba(255,215,0,.25)"}`,borderRadius:7,padding:"10px 14px",color:emailLocked?"#7289DA":"#e0e8ff",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none",cursor:emailLocked?"not-allowed":"text"}}/>
+              {emailLocked&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#3a3a5a",marginTop:3}}>🔒 Locked to your Discord email for security</div>}
             </div>
 
             <div style={{marginBottom:14}}>
@@ -109,8 +115,8 @@ export default function SponsorModal({onClose}){
 
             {error&&<div style={{marginBottom:12,padding:"8px 12px",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.3)",borderRadius:6,fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FF4400"}}>{error}</div>}
 
-            <button onClick={send} disabled={loading||msg.trim().length<5||!email.includes("@")} style={{width:"100%",padding:"13px",background:(msg.trim().length>=5&&email.includes("@"))?"linear-gradient(90deg,#FFD700,#FF9900)":"rgba(255,255,255,.05)",border:"none",color:(msg.trim().length>=5&&email.includes("@"))?"#040408":"rgba(255,255,255,.15)",borderRadius:9,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:11,letterSpacing:1}}>
-              {loading?"⏳ SUBMITTING...":msg.trim().length>=5&&email.includes("@")?`📣 REQUEST BANNER — €${price}`:"📣 REQUEST BANNER SLOT"}
+            <button onClick={send} disabled={loading||msg.trim().length<5||!validEmail(email)} style={{width:"100%",padding:"13px",background:(msg.trim().length>=5&&validEmail(email))?"linear-gradient(90deg,#FFD700,#FF9900)":"rgba(255,255,255,.05)",border:"none",color:(msg.trim().length>=5&&validEmail(email))?"#040408":"rgba(255,255,255,.15)",borderRadius:9,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:11,letterSpacing:1}}>
+              {loading?"⏳ SUBMITTING...":msg.trim().length>=5&&validEmail(email)?`📣 REQUEST BANNER — €${price}`:"📣 REQUEST BANNER SLOT"}
             </button>
             <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a",textAlign:"center",marginTop:8}}>Reviewed before going live · Goes live within 2h of payment</div>
           </>
