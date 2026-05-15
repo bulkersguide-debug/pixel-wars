@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Advertise — Pixels of War</title>
+<style>
+body{background:#040408;color:#FFD700;font-family:monospace;padding:40px;min-height:100vh}
+h1{font-size:28px;margin-bottom:20px}
+p{color:#c0c8e8;margin-bottom:16px;line-height:1.6}
+input{width:100%;padding:12px;background:#0c0c1c;border:1px solid #FFD700;color:#fff;font-size:14px;margin-bottom:12px;border-radius:6px;box-sizing:border-box}
+select{width:100%;padding:12px;background:#0c0c1c;border:1px solid #FFD700;color:#fff;font-size:14px;margin-bottom:12px;border-radius:6px}
+button{width:100%;padding:14px;background:#FFD700;color:#040408;font-size:14px;font-weight:900;border:none;border-radius:6px;cursor:pointer;margin-bottom:8px}
+a{color:#00F5FF}
+.price{font-size:24px;font-weight:900;color:#C8FF00;margin:16px 0}
+</style>
+</head>
+<body>
+<a href="/">← Back to Game</a>
+<h1>📣 ADVERTISE ON PIXELS OF WAR</h1>
+<p>Your message scrolls across the top of the game — seen by every player in real time.</p>
+
+<label>Your message (max 120 chars):</label>
+<input type="text" id="msg" maxlength="120" placeholder="Join our BTS Discord! discord.gg/example" oninput="upd()"/>
+
+<label>Your email:</label>
+<input type="email" id="email" placeholder="you@example.com" oninput="upd()"/>
+
+<label>Duration:</label>
+<select id="dur" onchange="upd()">
+  <option value="1h|2">1 hour — €2</option>
+  <option value="6h|8">6 hours — €8</option>
+  <option value="12h|14">12 hours — €14</option>
+  <option value="24h|20">24 hours — €20</option>
+  <option value="1d|20">1 day — €20</option>
+  <option value="3d|50">3 days — €50</option>
+  <option value="7d|100">7 days — €100</option>
+  <option value="30d|350">30 days — €350</option>
+</select>
+
+<div class="price" id="price">€2</div>
+
+<button onclick="send()" id="btn" disabled>📣 REQUEST BANNER SLOT</button>
+<p style="font-size:12px;color:#3a3a5a">We'll email you payment details. Banner goes live within 2h of payment.</p>
+
+<div id="ok" style="display:none;background:#00FF8822;border:1px solid #00FF88;padding:20px;border-radius:8px;text-align:center">
+  <h2 style="color:#00FF88">✅ Request Submitted!</h2>
+  <p>We'll contact you at <span id="em"></span> with payment details.</p>
+  <a href="/">← Back to Game</a>
+</div>
+
+<script>
+const URL='https://bvafgptmjvggbbjbicfw.supabase.co';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2YWZncHRtanZnZ2JiamJpY2Z3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NTk4NjEsImV4cCI6MjA5NDMzNTg2MX0.dI7JqhHHR6wxdxpcz2GJuVszOVcRsaXQj21eopwzXrI';
+
+function upd(){
+  const msg=document.getElementById('msg').value.trim();
+  const em=document.getElementById('email').value.trim();
+  const dur=document.getElementById('dur').value;
+  const price=dur.split('|')[1];
+  document.getElementById('price').textContent='€'+price;
+  const ok=msg.length>=5&&em.includes('@');
+  const btn=document.getElementById('btn');
+  btn.disabled=!ok;
+  btn.textContent=ok?'📣 REQUEST BANNER — €'+price:'📣 REQUEST BANNER SLOT';
+}
+
+async function send(){
+  const msg=document.getElementById('msg').value.trim();
+  const em=document.getElementById('email').value.trim();
+  const dur=document.getElementById('dur').value.split('|');
+  const btn=document.getElementById('btn');
+  btn.disabled=true;btn.textContent='Submitting...';
+  try{
+    const durType=dur[0].includes('h')?'hours':'days';
+    const durAmt=parseInt(dur[0]);
+    const r=await fetch(URL+'/rest/v1/sponsored_banners',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},
+      body:JSON.stringify({message:msg,contact_email:em,duration_type:durType,duration_amount:durAmt,price_eur:parseFloat(dur[1]),status:'pending'})
+    });
+    if(!r.ok)throw new Error(await r.text());
+    document.getElementById('em').textContent=em;
+    document.querySelector('form')||document.getElementById('btn').parentElement;
+    document.getElementById('ok').style.display='block';
+    btn.style.display='none';
+  }catch(e){
+    alert('Error: '+e.message);
+    btn.disabled=false;
+  }
+}
+</script>
+</body>
+</html>
