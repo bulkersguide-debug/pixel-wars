@@ -524,16 +524,42 @@ export default function App(){
         }
       }
     }
-    // Price map overlay
+    // Price map overlay — clean pill badges
     if(showPriceMap){
-      for(let sy2=Math.floor(vy/SECTOR);sy2<=Math.floor((vy+VH)/SECTOR);sy2++){
-        for(let sx2=Math.floor(vx/SECTOR);sx2<=Math.floor((vx+VW)/SECTOR);sx2++){
-          const key=sectorKey(sx2,sy2);const unlocked=unlockedSet.has(key);const fill=sectorFills[key]||0;const price=unlocked?sectorBasePrice(sx2,sy2)*fillMultiplier(fill):0;
-          const dx2=(sx2*SECTOR-vx)*CELL,dy2=(sy2*SECTOR-vy)*CELL;
-          ctx.fillStyle="rgba(0,0,0,.6)";ctx.fillRect(dx2+2,dy2+2,58,22);
-          ctx.fillStyle=unlocked?"#00F5FF":"rgba(255,255,255,.2)";ctx.font="bold 9px monospace";ctx.textAlign="left";
-          ctx.fillText(unlocked?`€${price.toFixed(1)}/px`:"LOCKED",dx2+4,dy2+13);
-          if(unlocked)ctx.fillText(`${(fill*100).toFixed(0)}% full`,dx2+4,dy2+22);
+      for(let sy2=Math.floor(vy/SECTOR);sy2<=Math.floor((vy+VH)/SECTOR)+1;sy2++){
+        for(let sx2=Math.floor(vx/SECTOR);sx2<=Math.floor((vx+VW)/SECTOR)+1;sx2++){
+          const key=sectorKey(sx2,sy2);
+          const unlocked=unlockedSet.has(key);
+          const fill=sectorFills[key]||0;
+          const price=unlocked?sectorBasePrice(sx2,sy2)*fillMultiplier(fill):0;
+          const cx2=(sx2*SECTOR+SECTOR/2-vx)*CELL;
+          const cy2=(sy2*SECTOR+SECTOR/2-vy)*CELL;
+          if(!unlocked){
+            ctx.fillStyle="rgba(255,255,255,.1)";
+            ctx.font="bold 13px monospace";ctx.textAlign="center";
+            ctx.fillText("🔒",cx2,cy2+5);
+            continue;
+          }
+          // Color by price tier
+          const tColor=price>=4?"#FF4400":price>=2?"#FFB400":price>=1.5?"#C8FF00":"#00F5FF";
+          // Pill background
+          ctx.fillStyle="rgba(4,4,14,.88)";
+          ctx.beginPath();
+          if(ctx.roundRect)ctx.roundRect(cx2-34,cy2-18,68,36,8);
+          else ctx.rect(cx2-34,cy2-18,68,36);
+          ctx.fill();
+          // Pill border
+          ctx.strokeStyle=tColor+"99";ctx.lineWidth=1.5;
+          ctx.beginPath();
+          if(ctx.roundRect)ctx.roundRect(cx2-34,cy2-18,68,36,8);
+          else ctx.rect(cx2-34,cy2-18,68,36);
+          ctx.stroke();
+          // Price
+          ctx.fillStyle=tColor;ctx.font="bold 14px monospace";ctx.textAlign="center";
+          ctx.fillText(`€${price.toFixed(1)}`,cx2,cy2-1);
+          // Fill %
+          ctx.fillStyle="rgba(255,255,255,.4)";ctx.font="10px monospace";
+          ctx.fillText(`${Math.round(fill*100)}% full`,cx2,cy2+13);
         }
       }
     }
