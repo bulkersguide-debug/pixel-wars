@@ -49,6 +49,8 @@ export default function AdminPage(){
     const{error}=await supabase.from("sponsored_banners").update({status:"rejected"}).eq("id",b.id);
     if(!error){setBanners(r=>r.map(x=>x.id===b.id?{...x,status:"rejected"}:x));addLog(`❌ Banner rejected`,"#FF4400");}
   };
+
+  const approveFandom=async(req)=>{
     const{error}=await supabase.from("fandom_requests").update({status:"approved",reviewed_at:new Date().toISOString()}).eq("id",req.id);
     if(!error){setFandomRequests(r=>r.map(x=>x.id===req.id?{...x,status:"approved"}:x));addLog(`✅ Approved: ${req.name}`,"#00FF88");}
     else addLog("Error approving: "+error.message,"#FF4400");
