@@ -1,15 +1,20 @@
 // src/AdminPage.jsx
-// Access at: /admin
-// PIN protected — change ADMIN_PIN below before going live
+// Access at: /admin?s=YOUR_VITE_ADMIN_SECRET
+// Set VITE_ADMIN_SECRET in Vercel environment variables
 
 import { useState, useEffect } from "react";
 import { supabase, isOnline } from "./supabase";
 
-const ADMIN_PIN = "StamMike2009@@1"; // ← CHANGE THIS before going live
+const ADMIN_PIN = "StamMike2009@@1"; // ← change this
+const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || "";
 
 const rgba=(hex,a)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;};
 
 export default function AdminPage(){
+  // URL secret check
+  const urlSecret = new URLSearchParams(window.location.search).get("s")||"";
+  const secretOk = !ADMIN_SECRET || urlSecret === ADMIN_SECRET;
+
   const [pin,setPin]=useState("");
   const [auth,setAuth]=useState(false);
   const [stats,setStats]=useState(null);
@@ -18,6 +23,12 @@ export default function AdminPage(){
   const [seasons,setSeasons]=useState([]);
   const [fandoms,setFandoms]=useState([]);
   const [selectedFandom,setSelectedFandom]=useState("");
+  // Mini-season form
+  const [msLabel,setMsLabel]=useState("");
+  const [msSectorX,setMsSectorX]=useState("9");
+  const [msSectorY,setMsSectorY]=useState("9");
+  const [msDays,setMsDays]=useState("7");
+  const [msPrize,setMsPrize]=useState("🏅 Mini Champion");
 
   const addLog=(msg,color="#00F5FF")=>setLog(l=>[{id:Date.now(),msg,color,ts:new Date().toLocaleTimeString()},...l].slice(0,50));
 
@@ -159,6 +170,17 @@ export default function AdminPage(){
 
   // ── LOGIN SCREEN ───────────────────────────────────────────────────────────
   if(!auth){
+    // Block access if secret is wrong
+    if(!secretOk){
+      return(
+        <div style={{background:"#040408",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Rajdhani',sans-serif"}}>
+          <div style={{textAlign:"center",color:"#1a1a2a"}}>
+            <div style={{fontSize:48,marginBottom:16}}>404</div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:12,letterSpacing:2}}>PAGE NOT FOUND</div>
+          </div>
+        </div>
+      );
+    }
     return(
       <div style={{background:"#040408",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Rajdhani',sans-serif"}}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap');@keyframes pop{0%{transform:scale(.85);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}`}</style>
@@ -275,6 +297,48 @@ export default function AdminPage(){
               </div>
             ))}
           </div>}
+
+          {/* MINI-SEASON CREATOR */}
+          <div style={{background:"#09091a",border:"1px solid rgba(255,215,0,.3)",borderRadius:12,padding:"18px"}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#FFD700",letterSpacing:3,marginBottom:14}}>⚡ CREATE MINI SEASON</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+              <div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",marginBottom:4,letterSpacing:1}}>LABEL</div>
+                <input value={msLabel} onChange={e=>setMsLabel(e.target.value)} placeholder="Battle for Sector 5" style={{width:"100%",background:"#0c0c1c",border:"1px solid #1a1a2e",borderRadius:5,padding:"7px 10px",color:"#e0e8ff",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
+              </div>
+              <div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",marginBottom:4,letterSpacing:1}}>PRIZE TEXT</div>
+                <input value={msPrize} onChange={e=>setMsPrize(e.target.value)} placeholder="🏅 Mini Champion" style={{width:"100%",background:"#0c0c1c",border:"1px solid #1a1a2e",borderRadius:5,padding:"7px 10px",color:"#e0e8ff",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
+              </div>
+              <div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",marginBottom:4,letterSpacing:1}}>SECTOR X (0-19)</div>
+                <input type="number" min="0" max="19" value={msSectorX} onChange={e=>setMsSectorX(e.target.value)} style={{width:"100%",background:"#0c0c1c",border:"1px solid #1a1a2e",borderRadius:5,padding:"7px 10px",color:"#e0e8ff",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
+              </div>
+              <div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",marginBottom:4,letterSpacing:1}}>SECTOR Y (0-19)</div>
+                <input type="number" min="0" max="19" value={msSectorY} onChange={e=>setMsSectorY(e.target.value)} style={{width:"100%",background:"#0c0c1c",border:"1px solid #1a1a2e",borderRadius:5,padding:"7px 10px",color:"#e0e8ff",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
+              </div>
+              <div style={{gridColumn:"1/-1"}}>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",marginBottom:4,letterSpacing:1}}>DURATION (DAYS)</div>
+                <input type="number" min="1" max="30" value={msDays} onChange={e=>setMsDays(e.target.value)} style={{width:"100%",background:"#0c0c1c",border:"1px solid #1a1a2e",borderRadius:5,padding:"7px 10px",color:"#e0e8ff",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
+              </div>
+            </div>
+            <button onClick={async()=>{
+              if(!msLabel.trim()){addLog("Enter a label","#FF4400");return;}
+              setLoading(true);
+              try{
+                const{data:season}=await supabase.from("seasons").select("num").order("num",{ascending:false}).limit(1);
+                const sNum=season?.[0]?.num||1;
+                const endDate=new Date(Date.now()+parseInt(msDays)*86400000).toISOString();
+                await supabase.from("mini_seasons").insert({label:msLabel.trim(),sector_x:parseInt(msSectorX),sector_y:parseInt(msSectorY),end_date:endDate,season_num:sNum,prize:msPrize.trim()||"🏅 Mini Champion"});
+                addLog(`✅ Mini Season "${msLabel}" started! Ends in ${msDays} days`,"#FFD700");
+                setMsLabel("");
+              }catch(e){addLog("Error: "+e.message,"#FF4400");}
+              setLoading(false);
+            }} disabled={loading||!msLabel.trim()} style={{width:"100%",padding:"11px",background:"linear-gradient(90deg,#FFD700,#FF9900)",border:"none",color:"#040408",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:10,letterSpacing:1}}>
+              ⚡ LAUNCH MINI SEASON
+            </button>
+          </div>
         </div>
 
         {/* RIGHT COLUMN — LOG */}

@@ -4,6 +4,40 @@ import { supabase, isOnline } from "./supabase";
 import ShareModal from "./ShareModal";
 import MissionsModal, { MISSIONS } from "./MissionsModal";
 import OnboardingModal from "./OnboardingModal";
+import PixelHistoryModal from "./PixelHistoryModal";
+
+// ── SOUND SYSTEM ──────────────────────────────────────────────────────────────
+let _audioCtx=null;
+const getACtx=()=>{if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();return _audioCtx;};
+const playSound=(type,enabled)=>{
+  if(!enabled)return;
+  try{
+    const ctx=getACtx();if(ctx.state==="suspended")ctx.resume();
+    const now=ctx.currentTime;
+    if(type==="claim"){
+      const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);
+      o.frequency.setValueAtTime(660,now);o.frequency.exponentialRampToValueAtTime(880,now+.08);
+      g.gain.setValueAtTime(.18,now);g.gain.exponentialRampToValueAtTime(.001,now+.12);
+      o.start(now);o.stop(now+.12);
+    }else if(type==="raid"){
+      const buf=ctx.createBuffer(1,ctx.sampleRate*.25,ctx.sampleRate);
+      const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/d.length*8);
+      const src=ctx.createBufferSource(),g=ctx.createGain(),f=ctx.createBiquadFilter();
+      f.type="lowpass";f.frequency.value=180;src.buffer=buf;src.connect(f);f.connect(g);g.connect(ctx.destination);
+      g.gain.setValueAtTime(.4,now);g.gain.exponentialRampToValueAtTime(.001,now+.25);src.start();src.stop(now+.25);
+    }else if(type==="combo"){
+      const o=ctx.createOscillator(),g=ctx.createGain();o.type="sawtooth";o.connect(g);g.connect(ctx.destination);
+      o.frequency.setValueAtTime(220,now);o.frequency.exponentialRampToValueAtTime(1100,now+.35);
+      g.gain.setValueAtTime(.15,now);g.gain.exponentialRampToValueAtTime(.001,now+.4);
+      o.start(now);o.stop(now+.4);
+    }else if(type==="shield"){
+      const o=ctx.createOscillator(),g=ctx.createGain();o.type="sine";o.connect(g);g.connect(ctx.destination);
+      o.frequency.setValueAtTime(1200,now);o.frequency.exponentialRampToValueAtTime(600,now+.15);
+      g.gain.setValueAtTime(.1,now);g.gain.exponentialRampToValueAtTime(.001,now+.2);
+      o.start(now);o.stop(now+.2);
+    }
+  }catch{}
+};
 
 // ── GRID ──────────────────────────────────────────────────────────────────────
 const GW=2000,GH=2000,CELL=5,VW=180,VH=117,CW=VW*CELL,CH=VH*CELL,MM=200,MMS=GW/MM;
@@ -173,6 +207,9 @@ export default function App(){
   const [mobileTab,setMobileTab]=useState("GAME");
   const [showOnboarding,setShowOnboarding]=useState(()=>!localStorage.getItem("pow_onboarded"));
   const [countdownStr,setCountdownStr]=useState("");
+  const [soundEnabled,setSoundEnabled]=useState(()=>localStorage.getItem("pow_sound")!=="0");
+  const [pixelHistory,setPixelHistory]=useState(null);// {pixel, history[], gx, gy}
+  const lastClaimRef=useRef(0);// rate limiting
 
   const alreadyClaimedToday=streakData.last===todayStr();
   const currentSeasonNum=season.num;
@@ -328,7 +365,22 @@ export default function App(){
   const acceptAlliance=async(allianceId)=>{await dbUpdateAlliance(allianceId,"active");setAlliances(prev=>prev.map(a=>a.id===allianceId?{...a,status:"active"}:a));pushToast("🤝 Alliance ACCEPTED!","#00FFAA",4000);};
   const betrayAlliance=async(allianceId,partnerName)=>{if(!confirm(`BETRAY ${partnerName}?`))return;await dbUpdateAlliance(allianceId,"betrayed");setAlliances(prev=>prev.map(a=>a.id===allianceId?{...a,status:"betrayed"}:a));pushToast(`💀 BETRAYAL! Alliance with ${partnerName} broken!`,"#FF4400",6000);setFeed(f=>[{id:Date.now(),icon:"💀",team:TM[active]?.name||"?",msg:`BETRAYED ${partnerName}!`,color:"#FF4400",ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isBetrayal:true},...f].slice(0,40));};
   const declareWar=async(targetId)=>{if(!active||!isOnline)return;if(isAllied(targetId)){pushToast("Break the alliance first!","#FF4400",3000);return;}const already=wars.some(w=>w.attacker===active&&w.defender===targetId);if(already){pushToast("Already at war!","#FF4400",3000);return;}await dbDeclareWar(active,targetId,currentSeasonNum);pushToast(`⚔️ WAR DECLARED on ${TM[targetId]?.name}!`,"#FF4400",6000);setShowWarModal(false);};
-  const sendMessage=async()=>{if(!active||!chatInput.trim()||!isOnline)return;await dbSendMessage(active,chatInput.trim().slice(0,200),currentSeasonNum);setChatInput("");};
+  const sanitizeChat=(text)=>{
+    // Strip HTML, limit URLs, clean whitespace
+    return text
+      .replace(/<[^>]*>/g,"")
+      .replace(/https?:\/\/[^\s]{0,200}/g,"[link]")
+      .replace(/[^\p{L}\p{N}\p{P}\p{Z}\p{Emoji}]/gu,"")
+      .trim()
+      .slice(0,200);
+  };
+  const sendMessage=async()=>{
+    if(!active||!chatInput.trim()||!isOnline)return;
+    const clean=sanitizeChat(chatInput);
+    if(!clean){setChatInput("");return;}
+    await dbSendMessage(active,clean,currentSeasonNum);
+    setChatInput("");
+  };
 
   const claimDaily=()=>{if(!dailyInfo||alreadyClaimedToday)return;const today=todayStr();const ns={days:dailyInfo.days,last:today,total:(streakData.total||0)+1};setStreakData(ns);localStorage.setItem("pow_streak",JSON.stringify(ns));const nf=freePixels+dailyInfo.reward.px;setFreePixels(nf);localStorage.setItem("pow_free",String(nf));pushToast(`🎁 +${dailyInfo.reward.px} FREE PIXELS!`,"#FFD700",5000);if(dailyInfo.reward.bonus)setTimeout(()=>pushToast(dailyInfo.reward.bonus,"#FF2D78",4000),800);setDailyInfo(null);setShowDaily(false);};
   const openDailyModal=()=>{if(alreadyClaimedToday)pushToast("✅ Already claimed!","#FFD700",3000);else setShowDaily(true);};
@@ -517,12 +569,41 @@ export default function App(){
   const pan=(dx,dy)=>{setVx(x=>Math.max(0,Math.min(GW-VW,x+dx)));setVy(y=>Math.max(0,Math.min(GH-VH,y+dy)));};
   const onMmClick=(e)=>{const rc=mmCvs.current.getBoundingClientRect(),mx=Math.floor((e.clientX-rc.left)*MM/rc.width),my=Math.floor((e.clientY-rc.top)*MM/rc.height);setVx(Math.max(0,Math.min(GW-VW,mx*MMS-Math.floor(VW/2))));setVy(Math.max(0,Math.min(GH-VH,my*MMS-Math.floor(VH/2))));};
   const rs=(x1,y1,x2,y2)=>{const s=new Set(),now=Date.now();for(let gy=Math.min(y1,y2);gy<=Math.max(y1,y2);gy++)for(let gx=Math.min(x1,x2);gx<=Math.max(x1,x2);gx++){const idx=gy*GW+gx;const sx=Math.floor(gx/SECTOR),sy=Math.floor(gy/SECTOR);if(!unlockedSet.has(sectorKey(sx,sy)))continue;const isShielded=shields[idx]&&shields[idx]>now;if(mode==="RAID"&&pixels[idx]&&isAllied(pixels[idx].t))continue;if(mode==="BUILD"?!pixels[idx]:(pixels[idx]&&pixels[idx].t!==active&&!isShielded))s.add(idx);}return s;};
-  const onMD=(e)=>{if(!active||mode==="SHOP")return;const g=mouseToGrid(e);if(!g)return;const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);if(!unlockedSet.has(sectorKey(sx,sy))){pushToast("🔒 Locked! Fill the center sectors first.","#FF4400",3000);return;}const now=Date.now(),isShielded=shields[g.idx]&&shields[g.idx]>now;const allyBlock=mode==="RAID"&&pixels[g.idx]&&isAllied(pixels[g.idx].t);setDrag(true);setOrig({x:g.gx,y:g.gy});const ok=mode==="BUILD"?!pixels[g.idx]:(pixels[g.idx]&&pixels[g.idx].t!==active&&!isShielded&&!allyBlock);setPending(ok?new Set([g.idx]):new Set());};
+  const onMD=(e)=>{
+    if(!active||mode==="SHOP")return;
+    const g=mouseToGrid(e);if(!g)return;
+    const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);
+    if(!unlockedSet.has(sectorKey(sx,sy))){pushToast("🔒 Locked! Fill the center sectors first.","#FF4400",3000);return;}
+    const now=Date.now(),isShielded=shields[g.idx]&&shields[g.idx]>now;
+    const allyBlock=mode==="RAID"&&pixels[g.idx]&&isAllied(pixels[g.idx].t);
+    setDrag(true);setOrig({x:g.gx,y:g.gy,time:now});
+    const ok=mode==="BUILD"?!pixels[g.idx]:(pixels[g.idx]&&pixels[g.idx].t!==active&&!isShielded&&!allyBlock);
+    setPending(ok?new Set([g.idx]):new Set());
+  };
   const onMM_h=(e)=>{const g=mouseToGrid(e);if(g){setHov(pixels[g.idx]?TM[pixels[g.idx].t]:null);const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);setHovSector({sx,sy,unlocked:unlockedSet.has(sectorKey(sx,sy)),fill:sectorFills[sectorKey(sx,sy)]||0});}if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}};
   const triggerFlash=(color,shake=false)=>{setFlashColor(color);setTimeout(()=>setFlashColor(null),300);if(shake){setShakeCanvas(true);setTimeout(()=>setShakeCanvas(false),500);}};
   const calcCost=(pendingSet)=>{if(!pendingSet.size)return 0;let total=0;const groups={};pendingSet.forEach(idx=>{const[sx,sy]=sectorOf(idx);const k=sectorKey(sx,sy);if(!groups[k])groups[k]=[];groups[k].push(idx);});Object.entries(groups).forEach(([k,idxs])=>{const[sx,sy]=k.split(",").map(Number);const fill=sectorFills[k]||0;let price=sectorBasePrice(sx,sy)*fillMultiplier(fill);if(mode==="RAID")price*=2;if(event?.label==="CHAOS HOUR"&&mode==="RAID")price*=0.5;if(event?.label==="SECTOR SALE")price*=0.5;total+=idxs.length*price;});return Math.round(total*100)/100;};
   const requestClaim=()=>{if(!active||pending.size===0)return;const t=TM[active];const isRaid=mode==="RAID";const cost=calcCost(pending);const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;setConfirmPayload({count:pending.size,cost,freeUsed,isRaid,bonus,teamName:t.name,teamColor:t.color,modeLabel:isRaid?"⚔️ RAID":"🏴 CLAIM"});setShowConfirm(true);};
-  const onMU=()=>{setDrag(false);if(pending.size>0)requestClaim();};
+  const onMU=()=>{
+    setDrag(false);
+    if(pending.size>0){requestClaim();return;}
+    // Single click with no drag — show pixel history
+    if(orig&&Date.now()-orig.time<200){
+      const g=mouseToGrid({clientX:orig.x*CELL,clientY:orig.y*CELL});
+      const idx=orig.y*GW+orig.x;// use stored grid coords
+      const px=pixels[idx];
+      if(px){
+        // Fetch history from DB
+        if(isOnline&&supabase){
+          supabase.from("pixel_history").select("*").eq("idx",idx).eq("season_num",currentSeasonNum).order("created_at",{ascending:false}).limit(8)
+            .then(({data})=>setPixelHistory({pixel:px,history:data||[],gx:orig.x,gy:orig.y}));
+        }else{
+          setPixelHistory({pixel:px,history:[],gx:orig.x,gy:orig.y});
+        }
+      }
+    }
+    setOrig(null);
+  };
   const onML=()=>{setHov(null);setHovSector(null);if(drag){setDrag(false);if(pending.size>0)requestClaim();}};
 
   // ── TOUCH HANDLERS (defined after mouse handlers) ─────────────────────────
@@ -533,6 +614,9 @@ export default function App(){
   // ── CLAIM ──────────────────────────────────────────────────────────────────
   const handleClaim=async()=>{
     if(!active||pending.size===0)return;
+    // Rate limiting — min 2s between claims
+    const now2=Date.now();if(now2-lastClaimRef.current<2000){pushToast("⏳ Slow down!","#FF4400",2000);return;}
+    lastClaimRef.current=now2;
     const t=TM[active];const isRaid=mode==="RAID";
     const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;
     const cost=calcCost(pending);const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;
@@ -558,9 +642,10 @@ export default function App(){
     const sample=claimArr.filter((_,i)=>i%Math.max(1,Math.floor(claimArr.length/6))===0).slice(0,6);
     sample.forEach(idx=>spawnParticles(t.color,idx%GW,Math.floor(idx/GW),isRaid?14:9,isRaid));
     if(claimArr.length>0){const mid=claimArr[Math.floor(claimArr.length/2)];spawnShockwave(t.color,mid%GW,Math.floor(mid/GW));}
-    if(isRaid){triggerFlash("#FF0000",true);pushToast(`⚔️ RAID! ${toClaim.size}px conquered!`,"#FF4400",4000);}else triggerFlash(t.color);
+    if(isRaid){triggerFlash("#FF0000",true);playSound("raid",soundEnabled);pushToast(`⚔️ RAID! ${toClaim.size}px conquered!`,"#FF4400",4000);}
+    else{triggerFlash(t.color);playSound("claim",soundEnabled);}
     if(freeUsed>0)pushToast(`🎁 ${freeUsed} free pixels used!`,"#FFD700",3000);
-    if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
+    if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);playSound("combo",soundEnabled);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
     else pushToast(`🏴 ${toClaim.size}px for ${t.name}! €${(cost-freeUsed).toFixed(2)}`,"#00F5FF",3000);
     setFeed(f=>[{id:Date.now(),icon:isRaid?"⚔️":"🏴",team:t.name,msg:`${isRaid?"RAIDED":"claimed"} ${toClaim.size}px (€${cost.toFixed(2)})`,color:t.color,ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isMe:true},...f].slice(0,40));
   };
@@ -600,6 +685,27 @@ export default function App(){
   const miniSeasonLeader=useMemo(()=>{if(!miniSeason)return null;const{sector_x:msx,sector_y:msy}=miniSeason;const cnt={};for(let py=msy*SECTOR;py<(msy+1)*SECTOR;py++)for(let px2=msx*SECTOR;px2<(msx+1)*SECTOR;px2++){const p=pixels[py*GW+px2];if(p?.t)cnt[p.t]=(cnt[p.t]||0)+1;}const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];return top?{id:top[0],name:TM[top[0]]?.name||"?",color:TM[top[0]]?.color||"#888",count:top[1]}:null;},[pixels,miniSeason]);
   const miniSeasonDaysLeft=miniSeason?Math.max(0,Math.ceil((new Date(miniSeason.end_date)-Date.now())/86400000)):0;
   const bannerOffset=145+(event?28:0)+(miniSeason?30:0)+(pendingAlliances.length>0?30:0)+(showNotifBanner&&notifPermission==="default"?36:0);
+
+  // Sector leaderboard
+  const sectorLeaderboard=useMemo(()=>{
+    const data={};
+    Object.entries(pixels).forEach(([idxStr,px])=>{
+      if(!px?.t)return;
+      const idx=parseInt(idxStr);const gx=idx%GW;const gy=Math.floor(idx/GW);
+      const sx=Math.floor(gx/SECTOR),sy=Math.floor(gy/SECTOR);
+      const k=sectorKey(sx,sy);
+      if(!data[k])data[k]={sx,sy,counts:{}};
+      data[k].counts[px.t]=(data[k].counts[px.t]||0)+1;
+    });
+    return Object.entries(data).map(([k,{sx,sy,counts}])=>{
+      const top=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+      const total=Object.values(counts).reduce((a,b)=>a+b,0);
+      return{k,sx,sy,leader:top?TM[top[0]]:null,leaderPx:top?top[1]:0,total,contested:Object.keys(counts).length>1};
+    }).sort((a,b)=>b.total-a.total);
+  },[pixels]);
+
+  // Sync sound pref
+  useEffect(()=>{localStorage.setItem("pow_sound",soundEnabled?"1":"0");},[soundEnabled]);
 
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
@@ -856,6 +962,7 @@ export default function App(){
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button onClick={()=>setShowHeatmap(s=>!s)} style={{background:showHeatmap?"rgba(255,100,0,.2)":"rgba(255,100,0,.05)",border:`1px solid ${showHeatmap?"rgba(255,100,0,.6)":"rgba(255,100,0,.2)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF6422",letterSpacing:1,transition:"all .15s"}}>{showHeatmap?"HIDE":"🔥 HEATMAP"}</button>
           <button onClick={()=>setShowPriceMap(s=>!s)} style={{background:showPriceMap?"rgba(0,245,255,.15)":"rgba(0,245,255,.05)",border:`1px solid ${showPriceMap?"rgba(0,245,255,.5)":"rgba(0,245,255,.15)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00F5FF",transition:"all .15s"}}>{showPriceMap?"HIDE":"💰 PRICES"}</button>
+          <button onClick={()=>setSoundEnabled(s=>!s)} style={{background:soundEnabled?"rgba(200,255,0,.1)":"rgba(255,255,255,.04)",border:`1px solid ${soundEnabled?"rgba(200,255,0,.4)":"rgba(255,255,255,.1)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:soundEnabled?"#C8FF00":"#3a3a5a",transition:"all .15s"}}>{soundEnabled?"🔊 ON":"🔇 OFF"}</button>
         </div>
       </div>
 
@@ -897,6 +1004,7 @@ export default function App(){
         onComplete={(fandom)=>{setShowOnboarding(false);if(fandom)setTimeout(()=>setActive(fandom.id),300);pushToast(`⚔️ Welcome to the war, ${fandom?.name||"warrior"}!`,"#00F5FF",5000);}}
         onSkip={()=>setShowOnboarding(false)}
       />}
+      {pixelHistory&&<PixelHistoryModal pixel={pixelHistory.pixel} history={pixelHistory.history} TM={TM} onClose={()=>setPixelHistory(null)} onJumpTo={()=>{setVx(Math.max(0,pixelHistory.gx-VW/2));setVy(Math.max(0,pixelHistory.gy-VH/2));setPixelHistory(null);}}/>}
 
       {/* NOTIFICATION PERMISSION BANNER */}
       {showNotifBanner&&notifPermission==="default"&&<div style={{background:"linear-gradient(90deg,rgba(0,255,136,.1),rgba(0,245,255,.06),transparent)",borderBottom:"1px solid rgba(0,255,136,.25)",padding:"6px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",animation:"slideDown .3s ease"}}>
@@ -1001,7 +1109,7 @@ export default function App(){
                     );})}
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:5}}>
-                    {vis.slice(0,40).map(t=>{const isA=active===t.id;const px=Object.values(pixels).filter(p=>p?.t===t.id).length;const rank=getRank(px);const allied=active&&isAllied(t.id);return(
+                    {vis.map(t=>{const isA=active===t.id;const px=Object.values(pixels).filter(p=>p?.t===t.id).length;const rank=getRank(px);const allied=active&&isAllied(t.id);return(
                       <div key={t.id} onClick={()=>setActive(isA?null:t.id)} style={{padding:"8px 10px",borderRadius:6,cursor:"pointer",border:`1px solid ${isA?t.color:allied?"rgba(0,255,170,.25)":rgba(t.color,.2)}`,background:isA?rgba(t.color,.1):"#0c0c1a",display:"flex",alignItems:"center",gap:7}}>
                         <div style={{width:10,height:10,borderRadius:2,background:t.color,flexShrink:0,boxShadow:isA?`0 0 6px ${t.color}`:undefined}}/>
                         <div style={{minWidth:0}}>
@@ -1237,7 +1345,7 @@ export default function App(){
         {/* ── RIGHT PANEL ── */}
         <div style={{width:194,borderLeft:"1px solid #1a1a30",background:"#05050d",flexShrink:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{display:"flex",borderBottom:"1px solid #1a1a30",flexShrink:0}}>
-            {[["WAR","⚔"],["FEED","📡"],["CHAT","💬"],["WARS","🔥"],["DISC","🎮"]].map(([t,icon])=>{const on=tab===t;return(<button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"5px 0",background:on?"#08081a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,letterSpacing:.5,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",transition:"all .1s"}}>{icon}<br/>{t}</button>);})}
+            {[["WAR","⚔"],["FEED","📡"],["CHAT","💬"],["WARS","🔥"],["SECT","🗺"],["DISC","🎮"]].map(([t,icon])=>{const on=tab===t;return(<button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"5px 0",background:on?"#08081a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:6,fontWeight:900,letterSpacing:.5,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",transition:"all .1s"}}>{icon}<br/>{t}</button>);})}
           </div>
           {/* Missions + Share quick actions */}
           <div style={{display:"flex",gap:4,padding:"5px 5px 0",flexShrink:0}}>
@@ -1391,6 +1499,35 @@ export default function App(){
           </div>}
 
           {/* DISCORD TAB */}
+          {/* SECTOR LEADERBOARD TAB */}
+          {tab==="SECT"&&<div style={{flex:1,overflowY:"auto",padding:"5px 5px"}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#2a2a4a",marginBottom:6}}>🗺 SECTOR CONTROL</div>
+            {sectorLeaderboard.length===0?<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#1a1a2a",paddingTop:6}}>No sectors claimed yet</div>
+            :sectorLeaderboard.slice(0,25).map(s=>{
+              const pct=s.leader?Math.round((s.leaderPx/s.total)*100):0;
+              return(
+                <div key={s.k} onClick={()=>{setVx(Math.max(0,s.sx*SECTOR-40));setVy(Math.max(0,s.sy*SECTOR-30));}} style={{marginBottom:4,padding:"6px 7px",background:"#09091a",borderRadius:5,border:`1px solid ${s.leader?rgba(s.leader.color,.2):"rgba(255,255,255,.06)"}`,cursor:"pointer",transition:"border-color .15s"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      <div style={{width:6,height:6,borderRadius:1,background:s.leader?.color||"#333"}}/>
+                      <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"rgba(255,255,255,.5)"}}>S{s.sx+1}-{s.sy+1}</span>
+                      {s.contested&&<span style={{fontSize:7,animation:"pulse .8s infinite"}}>⚔️</span>}
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{fontSize:7,fontWeight:700,color:s.leader?.color||"#555",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:65}}>{s.leader?.name||"Empty"}</span>
+                      <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.25)"}}>{s.total}px</span>
+                    </div>
+                  </div>
+                  <div style={{height:2,background:"rgba(255,255,255,.06)",borderRadius:1,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:s.leader?.color||"#333",borderRadius:1,transition:"width .5s"}}/>
+                  </div>
+                  {s.contested&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"rgba(255,68,0,.5)",marginTop:2}}>CONTESTED — {Object.keys({}).length} fandoms</div>}
+                </div>
+              );
+            })}
+          </div>}
+
+          {/* DISC TAB */}
           {tab==="DISC"&&<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
             <div style={{padding:"8px 8px 6px",borderBottom:"1px solid #1a1a30",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div style={{display:"flex",alignItems:"center",gap:7}}>
