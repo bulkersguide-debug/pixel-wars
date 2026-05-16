@@ -129,6 +129,8 @@ async function dbLoadMiniSeason(sn){if(!supabase)return null;const now=new Date(
 
 export default function App(){
   const cvs=useRef(null),mmCvs=useRef(null);
+  const remoteAnimRef=useRef([]); // [{idx, color, type, ts}]
+  const mmFlashRef=useRef([]);    // [{mx, my, color, ts}]
   const navigate=useNavigate();
   const channelRef=useRef(null),presenceRef=useRef(null);
   const crateRef=useRef(null);
@@ -149,6 +151,7 @@ export default function App(){
   const [onlineCount,setOnlineCount]=useState(1);
   const [showHeatmap,setShowHeatmap]=useState(false);
   const [heatmapTick,setHeatmapTick]=useState(0);
+  const [animTick,setAnimTick]=useState(0);
   const [chatMessages,setChatMessages]=useState([]);
   const [chatInput,setChatInput]=useState("");
   const [alliances,setAlliances]=useState([]);
@@ -287,6 +290,18 @@ export default function App(){
   // Heatmap decay
   useEffect(()=>{const iv=setInterval(()=>{const h=heatmapRef.current;Object.keys(h).forEach(k=>{h[k]=Math.floor(h[k]*0.85);if(h[k]<=0)delete h[k];});setHeatmapTick(t=>t+1);},[30000]);return()=>clearInterval(iv);},[]);
 
+  // Fast tick for remote claim/raid ripple animations
+  useEffect(()=>{
+    let raf;const tick=()=>{
+      if(remoteAnimRef.current.length>0||mmFlashRef.current.length>0){
+        setAnimTick(t=>t+1);
+      }
+      raf=requestAnimationFrame(tick);
+    };
+    raf=requestAnimationFrame(tick);
+    return()=>cancelAnimationFrame(raf);
+  },[]);
+
   // Data load
   useEffect(()=>{
     async function load(){
@@ -331,7 +346,19 @@ export default function App(){
     if(!supabase)return;
     if(channelRef.current)supabase.removeChannel(channelRef.current);
     const ch=supabase.channel(`game-s${sNum}`)
-      .on("postgres_changes",{event:"INSERT",schema:"public",table:"pixels",filter:`season_num=eq.${sNum}`},(payload)=>{setPixels(prev=>({...prev,[payload.new.idx]:dbRowToPixel(payload.new)}));trackHeatmap(payload.new.idx);})
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"pixels",filter:`season_num=eq.${sNum}`},(payload)=>{
+        setPixels(prev=>({...prev,[payload.new.idx]:dbRowToPixel(payload.new)}));
+        trackHeatmap(payload.new.idx);
+        // Queue remote claim animation
+        const teamColor=TM[payload.new.team_id]?.color||"#00F5FF";
+        remoteAnimRef.current.push({idx:payload.new.idx,color:teamColor,type:"claim",ts:Date.now()});
+        // Minimap flash
+        const mx=Math.floor((payload.new.idx%GW)/MMS),my=Math.floor(Math.floor(payload.new.idx/GW)/MMS);
+        mmFlashRef.current.push({mx,my,color:teamColor,ts:Date.now()});
+        // Keep queues small
+        if(remoteAnimRef.current.length>50)remoteAnimRef.current=remoteAnimRef.current.slice(-50);
+        if(mmFlashRef.current.length>20)mmFlashRef.current=mmFlashRef.current.slice(-20);
+      })
       .on("postgres_changes",{event:"UPDATE",schema:"public",table:"pixels",filter:`season_num=eq.${sNum}`},(payload)=>{
         setActive(myActive=>{
           if(myActive&&payload.old?.team_id===myActive&&payload.new?.team_id!==myActive){
@@ -345,6 +372,13 @@ export default function App(){
           return myActive;
         });
         setPixels(prev=>({...prev,[payload.new.idx]:dbRowToPixel(payload.new)}));trackHeatmap(payload.new.idx);
+        // Queue remote raid animation (red flash)
+        if(payload.old?.team_id!==payload.new?.team_id){
+          const raidColor=TM[payload.new.team_id]?.color||"#FF4400";
+          remoteAnimRef.current.push({idx:payload.new.idx,color:"#FF4400",type:"raid",ts:Date.now()});
+          const mx=Math.floor((payload.new.idx%GW)/MMS),my=Math.floor(Math.floor(payload.new.idx/GW)/MMS);
+          mmFlashRef.current.push({mx,my,color:"#FF4400",ts:Date.now()});
+        }
       })
       .on("postgres_changes",{event:"DELETE",schema:"public",table:"pixels",filter:`season_num=eq.${sNum}`},(payload)=>{setPixels(prev=>{const next={...prev};delete next[payload.old.idx];return next;});})
       .on("postgres_changes",{event:"INSERT",schema:"public",table:"sectors",filter:`season_num=eq.${sNum}`},(payload)=>{setUnlockedSectors(prev=>{const exists=prev.some(([x,y])=>x===payload.new.sx&&y===payload.new.sy);return exists?prev:[...prev,[payload.new.sx,payload.new.sy]];});})
@@ -796,7 +830,29 @@ export default function App(){
         ctx.fillText(label,cx2,cy2+4);
       });
     }
-  },[pixels,shields,pending,active,mode,vx,vy,unlockedSet,sectorFills,showPriceMap,showHeatmap,heatmapTick,miniSeason]);
+    // ── REMOTE ANIMATIONS (other players claiming/raiding) ────────────────────
+    const now2=Date.now();
+    remoteAnimRef.current=remoteAnimRef.current.filter(a=>now2-a.ts<1200);
+    remoteAnimRef.current.forEach(a=>{
+      const gx2=a.idx%GW,gy2=Math.floor(a.idx/GW);
+      const sx2=(gx2-vx)*CELL,sy2=(gy2-vy)*CELL;
+      if(sx2<-CELL*4||sx2>CW+CELL*4||sy2<-CELL*4||sy2>CH+CELL*4)return;
+      const age=(now2-a.ts)/1200; // 0→1
+      const r=CELL*2+age*CELL*8;
+      const alpha=Math.max(0,(1-age)*0.8);
+      // Expanding ring
+      ctx.beginPath();
+      ctx.arc(sx2+CELL/2,sy2+CELL/2,r,0,Math.PI*2);
+      ctx.strokeStyle=a.color+(Math.round(alpha*255).toString(16).padStart(2,"0"));
+      ctx.lineWidth=2*(1-age)+0.5;
+      ctx.stroke();
+      // Inner glow on fresh claims
+      if(age<0.3){
+        ctx.fillStyle=a.color+(Math.round((0.3-age)*255).toString(16).padStart(2,"0"));
+        ctx.fillRect(sx2,sy2,CELL,CELL);
+      }
+    });
+  },[pixels,shields,pending,active,mode,vx,vy,unlockedSet,sectorFills,showPriceMap,showHeatmap,heatmapTick,miniSeason,animTick]);
 
   // ── MINIMAP ────────────────────────────────────────────────────────────────
   useEffect(()=>{
@@ -808,7 +864,20 @@ export default function App(){
     Object.entries(pixels).forEach(([idxStr,px])=>{if(!px?.t)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle=TM[px.t]?.color||"#888";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
     const now=Date.now();Object.entries(shields).forEach(([idxStr,exp])=>{if(exp<=now)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle="rgba(0,245,255,0.4)";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
     ctx.strokeStyle="#00F5FF";ctx.lineWidth=1.5;ctx.strokeRect(Math.floor(vx/MMS),Math.floor(vy/MMS),Math.ceil(VW/MMS),Math.ceil(VH/MMS));
-  },[pixels,shields,unlockedSet,vx,vy]);
+    // Remote activity flashes on minimap
+    const now2=Date.now();
+    mmFlashRef.current=mmFlashRef.current.filter(f=>now2-f.ts<2000);
+    mmFlashRef.current.forEach(f=>{
+      const age=(now2-f.ts)/2000;
+      const alpha=Math.max(0,(1-age)*0.9);
+      const r=2+age*6;
+      ctx.beginPath();ctx.arc(f.mx,f.my,r,0,Math.PI*2);
+      ctx.fillStyle=f.color+(Math.round(alpha*180).toString(16).padStart(2,"0"));
+      ctx.fill();
+      ctx.strokeStyle=f.color+(Math.round(alpha*255).toString(16).padStart(2,"0"));
+      ctx.lineWidth=1;ctx.stroke();
+    });
+  },[pixels,shields,unlockedSet,vx,vy,animTick]);
 
   // ── MOUSE ──────────────────────────────────────────────────────────────────
   const mouseToGrid=(e)=>{const rc=cvs.current.getBoundingClientRect(),cx=(e.clientX-rc.left)*CW/rc.width,cy=(e.clientY-rc.top)*CH/rc.height,gx=vx+Math.floor(cx/CELL),gy=vy+Math.floor(cy/CELL);if(gx<0||gx>=GW||gy<0||gy>=GH)return null;return{gx,gy,idx:gy*GW+gx};};
