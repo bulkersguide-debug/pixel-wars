@@ -217,8 +217,21 @@ export default function App(){
   const [authReason,setAuthReason]=useState("claim");
   const [guestPixelsUsed,setGuestPixelsUsed]=useState(0);
   const [guestSessionId]=useState(()=>{let id=localStorage.getItem("pow_guest_id");if(!id){id=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem("pow_guest_id",id);}return id;});
+  const [guestChecked,setGuestChecked]=useState(false);
   const [showGuestSavePrompt,setShowGuestSavePrompt]=useState(false);
   const GUEST_MAX=3;
+
+  // On load — check fingerprint against Supabase to restore used count
+  useEffect(()=>{
+    if(user){setGuestChecked(true);return;} // logged in users skip
+    if(!supabase){setGuestChecked(true);return;}
+    const fp=getFingerprint();
+    supabase.from("guest_claims").select("pixels_used").eq("fingerprint",fp).gt("expires_at",new Date().toISOString()).order("created_at",{ascending:false}).limit(1)
+      .then(({data})=>{
+        if(data&&data.length>0){setGuestPixelsUsed(data[0].pixels_used||0);}
+        setGuestChecked(true);
+      }).catch(()=>setGuestChecked(true));
+  },[user]);
   const [totalPlayers,setTotalPlayers]=useState(0);
   const [sponsoredBanners,setSponsoredBanners]=useState([]);
   const [showSponsor,setShowSponsor]=useState(false);
@@ -745,6 +758,7 @@ export default function App(){
     if(!user){
       // Guest claiming — allow up to GUEST_MAX pixels
       if(mode==="RAID"){setAuthReason("raid");setShowAuthModal(true);return;}
+      if(!guestChecked)return; // wait for fingerprint check
       const remaining=GUEST_MAX-guestPixelsUsed;
       if(remaining<=0){setAuthReason("claim");setShowAuthModal(true);return;}
       const allowed=Math.min(pending.size,remaining);
