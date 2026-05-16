@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-const EFFECTIVE_DATE = "15 May 2026";
+const EFFECTIVE_DATE = "16 May 2026";
 const COMPANY = "Pixels of War";
 const CONTACT_EMAIL = "info@pixelsofwar.com"; // ← change this
 const WEBSITE = "https://www.pixelsofwar.com";
@@ -51,13 +51,14 @@ export default function TermsOfService() {
         <p>If you do not agree to these Terms, you must stop using the service immediately.</p>
 
         <h2>2. ACCOUNTS AND AUTHENTICATION</h2>
-        <p>To interact with {COMPANY} (claim pixels, send chat messages, form alliances, use power-ups), you must sign in using <strong>Discord OAuth</strong>. By signing in you authorise us to access your Discord username, user ID, and avatar. We do not access your Discord messages, friends list, or any other data.</p>
+        <p>To interact with {COMPANY} (claim pixels, send chat messages, form alliances, use power-ups), you must sign in using <strong>Discord OAuth</strong>. By signing in you authorise us to access your Discord username, user ID, avatar, and email address. We do not access your Discord messages, friends list, or any other data.</p>
         <p>You are responsible for maintaining the security of your Discord account. We are not liable for any loss resulting from unauthorised access to your account.</p>
         <p>We may suspend or permanently ban accounts that violate these Terms, at our sole discretion.</p>
 
         <h2>3. FREE PIXELS AND VIRTUAL ITEMS</h2>
-        <p>New players receive <strong>25 free pixels</strong> upon first login. These pixels are a promotional bonus with <strong>no monetary value</strong>. They cannot be transferred between accounts, redeemed for cash, or carried over between seasons.</p>
-        <p>Additional free pixels may be awarded through daily login streaks, combo bonuses, and referrals. All free pixel bonuses are subject to change at our discretion.</p>
+        <p>New players receive <strong>25 free pixels</strong> upon first login via Discord. These pixels are a promotional bonus with <strong>no monetary value</strong>. They cannot be transferred between accounts, redeemed for cash, or carried over between seasons.</p>
+        <p>Additional free pixels may be awarded through daily login streaks, combo bonuses, referrals, and <strong>admin-granted allocations</strong>. Admin grants are tied to the Discord account email used at registration. Grants are issued at our sole discretion and carry no monetary value. We reserve the right to modify, revoke, or expire any free pixel grant at any time.</p>
+        <p>Free pixel bonuses of any kind are subject to change at our discretion.</p>
 
         <h2>4. ROLES AND MODERATION</h2>
         <p>Players may be assigned roles including <strong>VIP</strong>, <strong>Moderator</strong>, or <strong>Admin</strong> at our discretion. Roles convey no financial value or legal rights.</p>
@@ -67,19 +68,22 @@ export default function TermsOfService() {
         <p>The service is provided on an "as is" and "as available" basis. We reserve the right to modify, suspend, or discontinue any aspect of the service at any time.</p>
 
         <h2>5. VIRTUAL ITEMS AND PAYMENTS</h2>
-        <h3>3.1 Pixels and Virtual Currency</h3>
+        <h3>5.1 Pixels and Virtual Currency</h3>
         <p>Pixels purchased on {COMPANY} are <strong>virtual items with no real-world monetary value</strong>. They cannot be exchanged for real money, transferred between accounts, or redeemed for any tangible goods or services outside the platform.</p>
         <p>All purchases are for virtual, in-game content only. You are purchasing a limited, non-exclusive, revocable licence to use that virtual content within the game.</p>
 
-        <h3>3.2 Pricing</h3>
+        <h3>5.2 Pricing</h3>
         <p>Pixel prices are displayed in Euros (€) and may vary based on grid location, sector fill level, and active in-game events. All prices are clearly shown before payment is required.</p>
 
-        <h3>3.3 Payment Processing</h3>
+        <h3>5.3 Payment Processing</h3>
         <p>All payments are processed securely by <strong>Stripe</strong>, a third-party payment processor. We do not store your card details. By making a purchase, you also agree to <a href="https://stripe.com/legal" target="_blank" rel="noopener noreferrer">Stripe's Terms of Service</a>.</p>
 
-        <h3>3.4 Refund Policy</h3>
+        <h3>5.4 Refund Policy</h3>
         <p>All purchases are <strong>final and non-refundable</strong>, except as required by applicable law. If you experience a technical issue that prevents delivery of purchased content, please contact us at <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> within 48 hours and we will investigate.</p>
         <p>Under EU consumer law, you may have a 14-day right of withdrawal for digital content purchases. By proceeding with a purchase and accessing the digital content immediately, you acknowledge that the right of withdrawal no longer applies once delivery has begun.</p>
+
+        <h3>5.5 Sponsored Banners</h3>
+        <p>Logged-in players may submit a scrolling banner message displayed to all players for a paid duration. Banner submissions are subject to admin review and approval. We reserve the right to reject, edit, or terminate any banner at any time without refund if it violates these Terms or is deemed inappropriate. Banner fees are non-refundable once the banner has been activated.</p>
 
         <h2>6. SEASONAL RESETS</h2>
         <p>The game operates in <strong>seasons</strong> (approximately 90 days each). At the end of each season, all pixel territories are reset and a new season begins. This is a core feature of the game, not a defect. Purchasing pixels constitutes acceptance that your territory will be reset at season end.</p>
