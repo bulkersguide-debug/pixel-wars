@@ -187,6 +187,7 @@ export default function App(){
   const [dailyInfo,setDailyInfo]=useState(null);
   const [showReset,setShowReset]=useState(false);
   const [showSeasonEnd,setShowSeasonEnd]=useState(false);
+  const [showStandings,setShowStandings]=useState(false);
   const [newSectorAlert,setNewSectorAlert]=useState(null);
   const [showPriceMap,setShowPriceMap]=useState(false);
   const [showConfirm,setShowConfirm]=useState(false);
@@ -575,7 +576,22 @@ export default function App(){
     setTimeout(start,8000);
     return()=>{active=false;clearInterval(iv);};
   },[]);
-  useEffect(()=>{const f=(e)=>{if(e.key==="Escape"){setActive(null);setPending(new Set());}};window.addEventListener("keydown",f);return()=>window.removeEventListener("keydown",f);},[]);
+  useEffect(()=>{
+    const f=(e)=>{
+      // Don't fire shortcuts when typing in inputs
+      if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
+      if(e.key==="Escape"){setActive(null);setPending(new Set());setSectorZoom(null);setShowStandings(false);}
+      else if(e.key==="b"||e.key==="B"){gatedSetMode("BUILD");}
+      else if(e.key==="r"||e.key==="R"){gatedSetMode("RAID");}
+      else if(e.key==="s"||e.key==="S"){setMode("SHOP");}
+      else if(e.key==="t"||e.key==="T"){setShowStandings(s=>!s);}
+      else if(e.key==="ArrowLeft"){pan(-10,0);}
+      else if(e.key==="ArrowRight"){pan(10,0);}
+      else if(e.key==="ArrowUp"){pan(0,-10);}
+      else if(e.key==="ArrowDown"){pan(0,10);}
+    };
+    window.addEventListener("keydown",f);return()=>window.removeEventListener("keydown",f);
+  },[]);
 
   // ── RESIZE DETECTION ──────────────────────────────────────────────────────
   useEffect(()=>{
@@ -979,7 +995,29 @@ export default function App(){
   };
   const onMM_h=(e)=>{const g=mouseToGrid(e);if(g){setHov(pixels[g.idx]?TM[pixels[g.idx].t]:null);const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);setHovSector({sx,sy,unlocked:unlockedSet.has(sectorKey(sx,sy)),fill:sectorFills[sectorKey(sx,sy)]||0});}if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}};
   const triggerFlash=(color,shake=false)=>{setFlashColor(color);setTimeout(()=>setFlashColor(null),300);if(shake){setShakeCanvas(true);setTimeout(()=>setShakeCanvas(false),500);}};
-  const calcCost=(pendingSet)=>{if(!pendingSet.size)return 0;let total=0;const groups={};pendingSet.forEach(idx=>{const[sx,sy]=sectorOf(idx);const k=sectorKey(sx,sy);if(!groups[k])groups[k]=[];groups[k].push(idx);});Object.entries(groups).forEach(([k,idxs])=>{const[sx,sy]=k.split(",").map(Number);const fill=sectorFills[k]||0;let price=sectorBasePrice(sx,sy)*fillMultiplier(fill);if(mode==="RAID")price*=2;if(event?.label==="CHAOS HOUR"&&mode==="RAID")price*=0.5;if(event?.label==="SECTOR SALE")price*=0.5;total+=idxs.length*price;});return Math.round(total*100)/100;};
+  const calcCost=(pendingSet)=>{
+    if(!pendingSet.size)return 0;
+    let total=0;
+    const groups={};
+    pendingSet.forEach(idx=>{const[sx,sy]=sectorOf(idx);const k=sectorKey(sx,sy);if(!groups[k])groups[k]=[];groups[k].push(idx);});
+    Object.entries(groups).forEach(([k,idxs])=>{
+      const[sx,sy]=k.split(",").map(Number);
+      const fill=sectorFills[k]||0;
+      let price=sectorBasePrice(sx,sy)*fillMultiplier(fill);
+      if(mode==="RAID")price*=2;
+      if(event?.label==="CHAOS HOUR"&&mode==="RAID")price*=0.5;
+      if(event?.label==="SECTOR SALE")price*=0.5;
+      idxs.forEach(idx=>{
+        // Contiguity bonus — 10% discount if adjacent to own territory
+        if(mode==="BUILD"&&active){
+          const gx=idx%GW,gy=Math.floor(idx/GW);
+          const isAdj=pixels[(gy-1)*GW+gx]?.t===active||pixels[(gy+1)*GW+gx]?.t===active||pixels[gy*GW+(gx-1)]?.t===active||pixels[gy*GW+(gx+1)]?.t===active;
+          total+=isAdj?price*0.9:price;
+        }else{total+=price;}
+      });
+    });
+    return Math.round(total*100)/100;
+  };
   const requestClaim=()=>{
     if(!active||pending.size===0)return;
     if(!user){
@@ -1005,7 +1043,9 @@ export default function App(){
     const t=TM[active];const isRaid=mode==="RAID";const cost=calcCost(pending);
     const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;
     const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;
-    setConfirmPayload({count:pending.size,cost,freeUsed,isRaid,bonus,teamName:t.name,teamColor:t.color,modeLabel:isRaid?"⚔️ RAID":"🏴 CLAIM"});
+    // Check how many pending pixels are adjacent to own territory
+    const adjCount=!isRaid?Array.from(pending).filter(idx=>{const gx=idx%GW,gy=Math.floor(idx/GW);return pixels[(gy-1)*GW+gx]?.t===active||pixels[(gy+1)*GW+gx]?.t===active||pixels[gy*GW+(gx-1)]?.t===active||pixels[gy*GW+(gx+1)]?.t===active;}).length:0;
+    setConfirmPayload({count:pending.size,cost,freeUsed,isRaid,bonus,teamName:t.name,teamColor:t.color,modeLabel:isRaid?"⚔️ RAID":"🏴 CLAIM",adjCount});
     setShowConfirm(true);
   };
   const onMU=()=>{
@@ -1366,6 +1406,7 @@ export default function App(){
           <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.35)",marginBottom:18}}>for {confirmPayload.teamName}</div>
           <div style={{background:rgba(confirmPayload.teamColor,.08),border:`1px solid ${rgba(confirmPayload.teamColor,.2)}`,borderRadius:10,padding:"16px",marginBottom:16}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Pixels</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:confirmPayload.teamColor}}>{confirmPayload.count}px</span></div>
+            {confirmPayload.adjCount>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Territory bonus (-10%)</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#00FF88"}}>🗺️ {confirmPayload.adjCount}px adj.</span></div>}
             {confirmPayload.freeUsed>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Free pixels</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700"}}>-{confirmPayload.freeUsed} 🎁</span></div>}
             {confirmPayload.bonus>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Combo bonus</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700"}}>+{confirmPayload.bonus} 🔥</span></div>}
             <div style={{borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:8,display:"flex",justifyContent:"space-between"}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Total cost</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#C8FF00"}}>€{(confirmPayload.cost-confirmPayload.freeUsed).toFixed(2)}</span></div>
@@ -1771,6 +1812,77 @@ export default function App(){
         );
       })()}
 
+      {/* SEASON STANDINGS MODAL */}
+      {showStandings&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:998,backdropFilter:"blur(10px)"}} onClick={()=>setShowStandings(false)}>
+        <div style={{background:"rgba(9,9,26,.98)",border:"1px solid rgba(255,215,0,.3)",borderRadius:20,padding:"28px",width:480,maxWidth:"96vw",maxHeight:"85vh",overflow:"auto",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",boxShadow:"0 0 60px rgba(255,215,0,.1)"}} onClick={e=>e.stopPropagation()}>
+          {/* Header */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+            <div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#FFD700",letterSpacing:2}}>🏆 SEASON {season.num} STANDINGS</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginTop:2}}>{currentTheme.icon} {currentTheme.name} · {seasonDaysLeft}d remaining · {countdownStr}</div>
+            </div>
+            <button onClick={()=>setShowStandings(false)} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:18}}>✕</button>
+          </div>
+
+          {/* Season progress */}
+          <div style={{marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)"}}>SEASON PROGRESS</span>
+              <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:seasonDaysLeft<=7?"#FF4400":"#FFD700"}}>{Math.round((1-seasonDaysLeft/SEASON_DAYS)*100)}% COMPLETE</span>
+            </div>
+            <div style={{height:6,background:"rgba(255,255,255,.06)",borderRadius:3,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${(1-seasonDaysLeft/SEASON_DAYS)*100}%`,background:seasonDaysLeft<=7?"linear-gradient(90deg,#FF4400,#FF0000)":"linear-gradient(90deg,#FFD700,#C8FF00)",borderRadius:3,transition:"width 1s"}}/>
+            </div>
+          </div>
+
+          {/* Top 20 leaderboard */}
+          <div style={{marginBottom:16}}>
+            {board.slice(0,20).map((t,i)=>{
+              const isMe=t.id===active;
+              const myPx=active?Object.values(pixels).filter(p=>p?.t===active).length:0;
+              const pct=board[0].count?((t.count/board[0].count)*100):0;
+              const gridPct=((t.count/(GW*GH))*100).toFixed(3);
+              return(
+                <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",marginBottom:4,background:isMe?`rgba(${rgba(t.color,.1).slice(5,-1)},.15)`:"rgba(255,255,255,.02)",border:`1px solid ${isMe?t.color+"44":"rgba(255,255,255,.05)"}`,borderRadius:8,transition:"all .2s"}}>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:i<3?"#FFD700":"rgba(255,255,255,.25)",fontWeight:900,width:24,flexShrink:0}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}`}</div>
+                  <div style={{width:8,height:8,borderRadius:2,background:t.color,flexShrink:0}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:isMe?t.color:"#e0e8ff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}{isMe?" (YOU)":""}</div>
+                    <div style={{height:3,background:"rgba(255,255,255,.06)",borderRadius:2,marginTop:3,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:t.color,borderRadius:2}}/>
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:t.color}}>{t.count.toLocaleString()}</div>
+                    <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)"}}>{gridPct}%</div>
+                  </div>
+                  {isMe&&i>0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",flexShrink:0}}>-{(board[i-1].count-t.count).toLocaleString()}</div>}
+                </div>
+              );
+            })}
+            {board.length===0&&<div style={{textAlign:"center",padding:"32px",fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.2)"}}>No pixels claimed yet. Be the first!</div>}
+          </div>
+
+          {/* Hall of Fame */}
+          {season.winners?.length>0&&<div>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:"rgba(255,215,0,.5)",letterSpacing:2,marginBottom:10}}>📜 PAST CHAMPIONS</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {[...season.winners].reverse().map((w,i)=>(
+                <div key={i} style={{background:"rgba(255,215,0,.05)",border:"1px solid rgba(255,215,0,.15)",borderRadius:6,padding:"6px 10px",textAlign:"center",flex:1,minWidth:80}}>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,215,0,.4)",marginBottom:2}}>S{w.season}</div>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#FFD700",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{w.team}</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"rgba(255,255,255,.25)"}}>{w.pixels?.toLocaleString()}px</div>
+                </div>
+              ))}
+            </div>
+          </div>}
+
+          <div style={{marginTop:16,textAlign:"center",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.2)"}}>
+            Press <strong style={{color:"rgba(255,255,255,.4)"}}>T</strong> to toggle · ESC to close
+          </div>
+        </div>
+      </div>}
+
       {/* DECAY ALERT MODAL */}
       {showDecayAlert&&active&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:997,backdropFilter:"blur(8px)"}} onClick={()=>setShowDecayAlert(false)}>
         <div style={{background:"rgba(9,9,26,.98)",border:"1px solid rgba(255,200,0,.5)",borderRadius:18,padding:"32px 28px",width:380,maxWidth:"94vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",textAlign:"center",boxShadow:"0 0 60px rgba(255,200,0,.15)"}} onClick={e=>e.stopPropagation()}>
@@ -1838,6 +1950,7 @@ export default function App(){
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 FANDOMS</button>
           <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
           <a href="/rivalries" style={{marginTop:3,display:"inline-block",background:"rgba(255,68,0,.06)",border:"1px solid rgba(255,68,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",letterSpacing:1,textDecoration:"none"}}>⚔️ RIVALRIES</a>
+          <button onClick={()=>setShowStandings(true)} style={{marginTop:3,background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FFD700",letterSpacing:1,fontWeight:900}}>🏆 STANDINGS</button>
           <button onClick={()=>{if(!requireAuth("fandom"))return;navigate("/request-fandom");}} style={{marginTop:3,background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.5)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST FANDOM</button>
 
           {/* RIVAL WIDGET */}
