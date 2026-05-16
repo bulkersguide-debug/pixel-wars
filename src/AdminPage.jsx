@@ -101,11 +101,13 @@ export default function AdminPage(){
 
   const addLog=(msg,color="#00F5FF")=>setLog(l=>[{id:Date.now(),msg,color,ts:new Date().toLocaleTimeString()},...l].slice(0,50));
 
+  const [roleBonus,setRoleBonus]=useState({admin:500,moderator:200,vip:100,player:0});
+
   const searchRoleUser=async()=>{
     if(!roleSearch.trim())return;
     setRoleLoading(true);setRoleUser(null);
     const q=roleSearch.trim().toLowerCase();
-    const{data,error}=await supabase.from("profiles").select("id,username,email,role,avatar_url,total_claimed")
+    const{data,error}=await supabase.from("profiles").select("id,username,email,role,avatar_url,total_claimed,free_pixels")
       .or(`username.ilike.%${q}%,email.ilike.%${q}%`).limit(1).single();
     if(error||!data){addLog(`❌ No user found: ${q}`,"#FF4400");}
     else{setRoleUser(data);addLog(`✅ Found: ${data.username} (${data.role||"player"})`,"#00FF88");}
@@ -114,9 +116,18 @@ export default function AdminPage(){
 
   const assignRole=async(userId,role)=>{
     setRoleLoading(true);
-    const{error}=await supabase.from("profiles").update({role}).eq("id",userId);
+    const bonus=Number(roleBonus[role])||0;
+    const updates={role};
+    if(bonus>0){
+      const current=roleUser?.free_pixels||0;
+      updates.free_pixels=current+bonus;
+    }
+    const{error}=await supabase.from("profiles").update(updates).eq("id",userId);
     if(error){addLog("❌ Error: "+error.message,"#FF4400");}
-    else{setRoleUser(u=>({...u,role}));addLog(`✅ Role set to ${role} for ${roleUser?.username}`,"#FFD700");}
+    else{
+      setRoleUser(u=>({...u,role,free_pixels:(u.free_pixels||0)+bonus}));
+      addLog(`✅ Role → ${role} for ${roleUser?.username}${bonus>0?` + ${bonus} free pixels`:""}`,  "#FFD700");
+    }
     setRoleLoading(false);
   };
 
@@ -539,9 +550,21 @@ export default function AdminPage(){
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                   {[["admin","⚡ ADMIN","#FFD700"],["moderator","🛡️ MOD","#00AAFF"],["vip","⭐ VIP","#FF2D78"],["player","👤 PLAYER","#555577"]].map(([r,label,color])=>(
-                    <button key={r} onClick={()=>assignRole(roleUser.id,r)} disabled={roleUser.role===r||roleLoading} style={{padding:"9px",background:roleUser.role===r?`rgba(${color==="#FFD700"?"255,215,0":color==="#00AAFF"?"0,170,255":color==="#FF2D78"?"255,45,120":"85,85,119"},.2)`:"rgba(255,255,255,.03)",border:`1px solid ${roleUser.role===r?color+"66":"rgba(255,255,255,.08)"}`,borderRadius:6,cursor:roleUser.role===r?"default":"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:roleUser.role===r?color:"rgba(255,255,255,.3)",fontWeight:900,opacity:roleLoading?.5:1}}>
-                      {label} {roleUser.role===r?"✓":""}
-                    </button>
+                    <div key={r} style={{display:"flex",flexDirection:"column",gap:4}}>
+                      <div style={{display:"flex",alignItems:"center",gap:4}}>
+                        <input
+                          type="number"
+                          min={0}
+                          value={roleBonus[r]}
+                          onChange={e=>setRoleBonus(b=>({...b,[r]:Number(e.target.value)}))}
+                          style={{width:54,background:"#0c0c1c",border:`1px solid ${color}33`,borderRadius:4,padding:"3px 6px",color,fontSize:10,fontFamily:"'Share Tech Mono',monospace",outline:"none",textAlign:"center"}}
+                        />
+                        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)"}}>px</span>
+                      </div>
+                      <button onClick={()=>assignRole(roleUser.id,r)} disabled={roleUser.role===r||roleLoading} style={{padding:"9px",background:roleUser.role===r?`rgba(${color==="#FFD700"?"255,215,0":color==="#00AAFF"?"0,170,255":color==="#FF2D78"?"255,45,120":"85,85,119"},.2)`:"rgba(255,255,255,.03)",border:`1px solid ${roleUser.role===r?color+"66":"rgba(255,255,255,.08)"}`,borderRadius:6,cursor:roleUser.role===r?"default":"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:roleUser.role===r?color:"rgba(255,255,255,.3)",fontWeight:900,opacity:roleLoading?.5:1}}>
+                        {label} {roleUser.role===r?"✓":""}
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
