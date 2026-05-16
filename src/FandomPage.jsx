@@ -52,6 +52,8 @@ export default function FandomPage(){
   const navigate=useNavigate();
   const mmRef=useRef(null);
   const [copied,setCopied]=useState(false);
+  const [outreachTab,setOutreachTab]=useState("discord");
+  const [copiedOutreach,setCopiedOutreach]=useState(false);
   const [pixelCount,setPixelCount]=useState(0);
   const [totalPixels,setTotalPixels]=useState(0);
   const [loading,setLoading]=useState(true);
@@ -434,6 +436,52 @@ export default function FandomPage(){
               ⚔ CLAIM PIXELS FOR {fandom.name.toUpperCase()} →
             </button>
           </div>
+        </div>
+
+        {/* OUTREACH KIT */}
+        <div style={{gridColumn:"1/-1",background:"#08081a",border:`1px solid rgba(200,255,0,.2)`,borderRadius:14,padding:24,position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 50% 0%,rgba(200,255,0,.04),transparent 60%)",pointerEvents:"none"}}/>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#C8FF00",letterSpacing:2,marginBottom:4}}>📢 OUTREACH KIT</div>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",letterSpacing:1,marginBottom:16}}>COPY & PASTE INTO YOUR FANDOM'S DISCORD / REDDIT / TWITTER</div>
+
+          {/* Platform tabs */}
+          <div style={{display:"flex",gap:6,marginBottom:14}}>
+            {[
+              {id:"discord",label:"💬 Discord",color:"#7289DA"},
+              {id:"reddit",label:"🟠 Reddit",color:"#FF4500"},
+              {id:"twitter",label:"🐦 Twitter/X",color:"#1DA1F2"},
+            ].map(t=>(
+              <button key={t.id} onClick={()=>{setOutreachTab(t.id);setCopiedOutreach(false);}} style={{padding:"6px 14px",background:outreachTab===t.id?`rgba(${t.id==="discord"?"114,137,218":t.id==="reddit"?"255,69,0":"29,161,242"},.2)`:"rgba(255,255,255,.04)",border:`1px solid ${outreachTab===t.id?`rgba(${t.id==="discord"?"114,137,218":t.id==="reddit"?"255,69,0":"29,161,242"},.5)`:"rgba(255,255,255,.1)"}`,borderRadius:6,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:outreachTab===t.id?t.color:"rgba(255,255,255,.4)",letterSpacing:1,transition:"all .15s"}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Message content */}
+          {(()=>{
+            const fandomUrl=`https://www.pixelsofwar.com/fandom/${slug}`;
+            const stats=`${pixelCount.toLocaleString()} pixels (${pct}% of the grid)`;
+            const messages={
+              discord:`⚔️ **${fandom.name} fans — we need you on Pixels of War!**\n\nOur fandom currently holds **${stats}** on a 2000×2000 pixel grid. Every pixel counts and anyone can join for free.\n\n🎁 New players get **25 free pixels** just for signing in with Discord — no payment needed to start.\n\n📍 See our territory: ${fandomUrl}\n🔗 Play now: https://www.pixelsofwar.com\n\nHelp us dominate the grid! 🏆`,
+              reddit:`**${fandom.name} fans — our fandom is at war on Pixels of War** ⚔️\n\nPixels of War is a real-time territory battle where fandoms fight for dominance on a 2000×2000 pixel grid. ${fandom.name} currently holds ${stats}.\n\n**How it works:**\n- Sign in with Discord (free)\n- Get 25 free pixels instantly\n- Claim territory, raid enemies, form alliances\n- Season ends in ~90 days — highest pixel count wins\n\n🔗 Our fandom page: ${fandomUrl}\n🔗 Play: https://www.pixelsofwar.com\n\nEvery pixel helps. See you on the battlefield.`,
+              twitter:`⚔️ ${fandom.name} fans — we're at war on Pixels of War!\n\nOur fandom holds ${stats} on a live 2000×2000 grid. Claim territory, raid rivals, dominate the season.\n\n🎁 25 free pixels just for signing in with Discord\n\n🔗 ${fandomUrl}\n\n#PixelsOfWar #${fandom.name.replace(/\s/g,"")} ${fandom.cat.replace(/[^\w\s]/g,"").trim()}`,
+            };
+            const msg=messages[outreachTab];
+            return(
+              <div>
+                <div style={{background:"rgba(0,0,0,.4)",border:"1px solid rgba(255,255,255,.08)",borderRadius:8,padding:"14px 16px",fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.6)",lineHeight:1.8,whiteSpace:"pre-wrap",marginBottom:12,maxHeight:200,overflow:"auto"}}>
+                  {msg}
+                </div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <button onClick={()=>{navigator.clipboard.writeText(msg);setCopiedOutreach(true);setTimeout(()=>setCopiedOutreach(false),2500);}} style={{flex:1,padding:"11px",background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.4)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>
+                    {copiedOutreach?"✅ COPIED!":"📋 COPY MESSAGE"}
+                  </button>
+                  {outreachTab==="twitter"&&<a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(msg.slice(0,280))}`} target="_blank" rel="noopener noreferrer" style={{padding:"11px 16px",background:"rgba(29,161,242,.1)",border:"1px solid rgba(29,161,242,.4)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#1DA1F2",letterSpacing:1,fontWeight:900,textDecoration:"none"}}>🐦 TWEET NOW</a>}
+                  {outreachTab==="reddit"&&<a href={`https://www.reddit.com/submit?title=${encodeURIComponent(`${fandom.name} fans — join us on Pixels of War!`)}&text=${encodeURIComponent(messages.reddit)}`} target="_blank" rel="noopener noreferrer" style={{padding:"11px 16px",background:"rgba(255,69,0,.1)",border:"1px solid rgba(255,69,0,.4)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#FF4500",letterSpacing:1,fontWeight:900,textDecoration:"none"}}>🟠 POST TO REDDIT</a>}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* SHARE */}
