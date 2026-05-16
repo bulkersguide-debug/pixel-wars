@@ -98,6 +98,7 @@ export default function AdminPage(){
   // Sponsored banners
   const [banners,setBanners]=useState([]);
   const [loadingBanners,setLoadingBanners]=useState(false);
+  const [recentUsers,setRecentUsers]=useState([]);
 
   const addLog=(msg,color="#00F5FF")=>setLog(l=>[{id:Date.now(),msg,color,ts:new Date().toLocaleTimeString()},...l].slice(0,50));
 
@@ -178,6 +179,8 @@ export default function AdminPage(){
     setLoadingBanners(true);
     supabase.from("sponsored_banners").select("*").order("created_at",{ascending:false})
       .then(({data})=>{setBanners(data||[]);setLoadingBanners(false);});
+    supabase.from("profiles").select("id,username,email,role,free_pixels,created_at").order("created_at",{ascending:false}).limit(10)
+      .then(({data})=>setRecentUsers(data||[]));
   },[auth]);
 
   const loadStats=async()=>{
@@ -515,6 +518,24 @@ export default function AdminPage(){
                   <button onClick={()=>approveFandom(req)} style={{flex:1,padding:"6px",background:"rgba(0,255,136,.1)",border:"1px solid rgba(0,255,136,.3)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00FF88",fontWeight:900}}>✅ APPROVE</button>
                   <button onClick={()=>rejectFandom(req)} style={{flex:1,padding:"6px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.25)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",fontWeight:900}}>❌ REJECT</button>
                 </div>}
+              </div>
+            ))}
+          </div>
+
+          {/* RECENT SIGNUPS */}
+          <div style={{background:"#09091a",border:"1px solid rgba(0,245,255,.2)",borderRadius:12,padding:"18px"}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#00F5FF",letterSpacing:3,marginBottom:14}}>👥 RECENT SIGNUPS</div>
+            {recentUsers.length===0?<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>No users yet</div>
+            :recentUsers.map(u=>(
+              <div key={u.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+                <div>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#e0e8ff",fontWeight:900}}>{u.username||"—"}</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#3a3a5a"}}>{u.email||"no email"}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:{admin:"#FFD700",moderator:"#00AAFF",vip:"#FF2D78",player:"#3a3a5a"}[u.role]||"#3a3a5a"}}>{u.role||"player"}</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00"}}>{u.free_pixels||0}px free</div>
+                </div>
               </div>
             ))}
           </div>

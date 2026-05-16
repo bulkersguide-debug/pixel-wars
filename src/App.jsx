@@ -106,8 +106,12 @@ const DISCORD_CHANNEL="1504550948541042819";
 const DISCORD_WIDGET=`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`;
 const DISCORD_INVITE="https://discord.gg/4Da2avYyPF";
 const DISCORD_WEBHOOK="https://discord.com/api/webhooks/1505216663786623178/zgC0xopUlfOex7rIIcRos4SxMQrTvtj8-Gjl4cvoqyEukuOP3a-xl9ekt7iIPIj_dBAb";
-
+const _webhookLastSent={};
 const postToDiscord=async(embed)=>{
+  const key=embed.title||"default";
+  const now=Date.now();
+  if(_webhookLastSent[key]&&now-_webhookLastSent[key]<30000)return; // 30s debounce per event type
+  _webhookLastSent[key]=now;
   try{
     await fetch(DISCORD_WEBHOOK,{
       method:"POST",
@@ -420,7 +424,7 @@ export default function App(){
     openDailyModal();
   };
 
-  const claimDaily=()=>{if(!dailyInfo||alreadyClaimedToday)return;const today=todayStr();const ns={days:dailyInfo.days,last:today,total:(streakData.total||0)+1};setStreakData(ns);localStorage.setItem("pow_streak",JSON.stringify(ns));const nf=freePixels+dailyInfo.reward.px;setFreePixels(nf);localStorage.setItem("pow_free",String(nf));pushToast(`🎁 +${dailyInfo.reward.px} FREE PIXELS!`,"#FFD700",5000);if(dailyInfo.reward.bonus)setTimeout(()=>pushToast(dailyInfo.reward.bonus,"#FF2D78",4000),800);setDailyInfo(null);setShowDaily(false);};
+  const claimDaily=()=>{if(!dailyInfo||alreadyClaimedToday)return;const today=todayStr();const ns={days:dailyInfo.days,last:today,total:(streakData.total||0)+1};setStreakData(ns);localStorage.setItem("pow_streak",JSON.stringify(ns));syncFreePixels(freePixels+dailyInfo.reward.px);pushToast(`🎁 +${dailyInfo.reward.px} FREE PIXELS!`,"#FFD700",5000);if(dailyInfo.reward.bonus)setTimeout(()=>pushToast(dailyInfo.reward.bonus,"#FF2D78",4000),800);setDailyInfo(null);setShowDaily(false);};
   const openDailyModal=()=>{if(alreadyClaimedToday)pushToast("✅ Already claimed!","#FFD700",3000);else setShowDaily(true);};
 
   const startNewSeason=async()=>{
@@ -479,7 +483,23 @@ export default function App(){
   const loadProfile=async(userId)=>{
     if(!supabase)return;
     const{data}=await supabase.from("profiles").select("*").eq("id",userId).single();
-    if(data)setProfile(data);
+    if(data){
+      setProfile(data);
+      // Supabase is source of truth for free pixels
+      if(data.free_pixels!=null){
+        setFreePixels(data.free_pixels);
+        localStorage.setItem("pow_free",String(data.free_pixels));
+      }
+    }
+  };
+
+  // Sync free pixels to Supabase
+  const syncFreePixels=async(newAmount)=>{
+    setFreePixels(newAmount);
+    localStorage.setItem("pow_free",String(newAmount));
+    if(supabase&&user){
+      await supabase.from("profiles").update({free_pixels:newAmount}).eq("id",user.id);
+    }
   };
 
   // Load total player count
@@ -554,7 +574,7 @@ export default function App(){
       const next={...prev,[mission.id]:{...prev[mission.id],claimed:true}};
       saveMissions(next);return next;
     });
-    const nf=freePixels+mission.reward;setFreePixels(nf);localStorage.setItem("pow_free",String(nf));
+    const nf=freePixels+mission.reward;syncFreePixels(nf);
     pushToast(`🎯 MISSION COMPLETE! +${mission.reward} free pixels!`,"#FFD700",5000);
   };
   const pendingMissionCount=MISSIONS.filter(m=>{const p=missionProgress[m.id];const cur=m.id==="login7"?streakData.days:(p?.count||0);return cur>=m.goal&&!p?.claimed;}).length;
@@ -779,16 +799,14 @@ export default function App(){
     if(bonus>0){let added=0;for(let dy=0;dy<VH&&added<bonus;dy++)for(let dx=0;dx<VW&&added<bonus;dx++){const idx=(vy+dy)*GW+(vx+dx);const sx=Math.floor((vx+dx)/SECTOR),sy=Math.floor((vy+dy)/SECTOR);if(unlockedSet.has(sectorKey(sx,sy))&&!next[idx]){next[idx]={t:active,at:now};added++;}}}
     setPixels(next);setMyPixels(p=>p+pending.size+bonus);setShields(newShields);
     try{localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
-    if(freeUsed>0){const nf=freePixels-freeUsed;setFreePixels(nf);localStorage.setItem("pow_free",String(nf));}
+    if(freeUsed>0)syncFreePixels(freePixels-freeUsed);
     const toClaim=new Set(pending);setPending(new Set());
     if(isOnline)await dbUpsertPixels(toClaim,active,currentSeasonNum);else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
     toClaim.forEach(idx=>trackHeatmap(idx));
-    // Track missions
     trackMission(isRaid?"raid":"claim", toClaim.size+bonus);
-    // Referral first-purchase bonus
     if(referralCode&&!localStorage.getItem("pow_ref_used")){
       localStorage.setItem("pow_ref_used","1");
-      const nf2=freePixels+10;setFreePixels(nf2);localStorage.setItem("pow_free",String(nf2));
+      syncFreePixels(freePixels+10);
       pushToast("🎁 Welcome bonus! +10 free pixels for joining via referral!","#FFD700",6000);
     }
     // Particle effects
@@ -871,7 +889,9 @@ export default function App(){
     const key=`pow_weekly_report_${wk}`;
     if(localStorage.getItem(key))return;
     const now=new Date();
-    if(now.getDay()!==1)return; // Monday only
+    const isMonday=now.getDay()===1;
+    const devOverride=new URLSearchParams(window.location.search).has("weekly");
+    if(!isMonday&&!devOverride)return; // Monday only (or ?weekly=1 for testing)
     const prevKey=`pow_weekly_snapshot_${wk-1}`;
     const prev=JSON.parse(localStorage.getItem(prevKey)||"null");
     const warCount=wars.filter(w=>w.attacker===active||w.defender===active).length;

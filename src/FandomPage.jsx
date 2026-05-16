@@ -129,11 +129,14 @@ export default function FandomPage(){
   const [lbPos,setLbPos]=useState("—");
   useEffect(()=>{
     if(!fandom)return;
+    const timeout=setTimeout(()=>setLbPos("—"),5000); // fallback after 5s
     supabase.rpc("get_fandom_rankings").then(({data})=>{
+      clearTimeout(timeout);
       if(!data)return;
       const pos=data.findIndex(r=>r.team_id===fandom.id)+1;
       setLbPos(pos||"—");
-    }).catch(()=>setLbPos("—"));
+    }).catch(()=>{clearTimeout(timeout);setLbPos("—");});
+    return()=>clearTimeout(timeout);
   },[fandom?.id]);
 
   const shareUrl=window.location.href;
