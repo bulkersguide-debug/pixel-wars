@@ -2572,25 +2572,25 @@ export default function App(){
         <div style={{display:"flex",flexDirection:"column",height:`calc(100vh - ${bannerOffset}px)`,overflow:"hidden"}}>
 
           {/* CANVAS */}
+          <style>{`
+            .pow-canvas-fs { position:fixed!important; top:0!important; left:0!important; width:100vw!important; height:100vh!important; max-height:100vh!important; z-index:9990!important; background:#040408; image-rendering:pixelated; }
+            .pow-canvas-wrap-fs { position:fixed!important; inset:0!important; z-index:9989!important; background:#040408!important; }
+            .pow-canvas-fs-hint { position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:9999; background:rgba(0,0,0,.75); border:1px solid rgba(255,255,255,.15); border-radius:6px; padding:5px 14px; font-family:'Share Tech Mono',monospace; font-size:9px; color:rgba(255,255,255,.5); pointer-events:none; }
+          `}</style>
+          {gridFullscreen&&<div className="pow-canvas-fs-hint">Double-click or ESC to exit fullscreen</div>}
           <div style={{padding:"3px 3px 0",flexShrink:0}}>
-            {/* Fullscreen backdrop */}
-            {gridFullscreen&&<div style={{position:"fixed",inset:0,zIndex:498,background:"#040408"}} onDoubleClick={()=>setGridFullscreen(false)}/>}
-            <div onDoubleClick={()=>setGridFullscreen(f=>!f)} style={gridFullscreen?{position:"fixed",inset:0,zIndex:499,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}:{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 20px ${rgba(at?.color||modeColor,.1)}`}}>
+            <div className={gridFullscreen?"pow-canvas-wrap-fs":""} style={gridFullscreen?{}:{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 20px ${rgba(at?.color||modeColor,.1)}`}}>
               <canvas ref={cvs} width={CW} height={CH}
-                style={gridFullscreen
-                  ?{width:"100vw",height:"100vh",maxWidth:`${CW/CH*100}vh`,maxHeight:`${CH/CW*100}vw`,display:"block",imageRendering:"pixelated",touchAction:"none",cursor:active&&mode!=="SHOP"?"crosshair":"default",pointerEvents:"all",zIndex:500,position:"relative"}
-                  :{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"40vw",touchAction:"none",cursor:active&&mode!=="SHOP"?"crosshair":"default"}}
+                className={gridFullscreen?"pow-canvas-fs":""}
+                style={gridFullscreen?{}:{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"40vw",touchAction:"none",cursor:active&&mode!=="SHOP"?"crosshair":"default"}}
                 onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML}
                 onDragStart={e=>e.preventDefault()}
+                onDoubleClick={()=>setGridFullscreen(f=>!f)}
                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}/>
-            </div>
-            {/* Fullscreen hint */}
-            {gridFullscreen&&<div style={{position:"fixed",top:10,left:"50%",transform:"translateX(-50%)",zIndex:501,background:"rgba(0,0,0,.7)",border:"1px solid rgba(255,255,255,.15)",borderRadius:6,padding:"4px 12px",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.4)",pointerEvents:"none"}}>Double-click to exit fullscreen · ESC to exit</div>}
-            <div style={{border:`2px solid transparent`,borderRadius:6,overflow:"hidden",lineHeight:0,position:"relative",display:gridFullscreen?"none":"block"}}>
-              <div style={{position:"absolute",top:4,left:4,background:rgba(modeColor,.15),border:`1px solid ${rgba(modeColor,.5)}`,borderRadius:4,padding:"2px 6px",fontFamily:"'Orbitron',monospace",fontSize:7,color:modeColor,pointerEvents:"none",letterSpacing:1}}>{mode==="BUILD"?"🏗":"mode"==="RAID"?"⚔️":"💥"} {mode}</div>
+              {!gridFullscreen&&<div style={{position:"absolute",top:4,left:4,background:rgba(modeColor,.15),border:`1px solid ${rgba(modeColor,.5)}`,borderRadius:4,padding:"2px 6px",fontFamily:"'Orbitron',monospace",fontSize:7,color:modeColor,pointerEvents:"none",letterSpacing:1}}>{mode==="BUILD"?"🏗":"mode"==="RAID"?"⚔️":"💥"} {mode}</div>}
               {/* Zoom controls */}
-              <div style={{position:"absolute",bottom:36,right:4,display:"flex",flexDirection:"column",gap:2,zIndex:10}}>
-                <button onClick={()=>setGridFullscreen(f=>!f)} style={{width:22,height:22,background:"rgba(4,4,12,.9)",border:"1px solid rgba(0,245,255,.3)",borderRadius:4,color:"#00F5FF",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Double-click grid for fullscreen">⛶</button>
+              <div style={{position:gridFullscreen?"fixed":"absolute",bottom:gridFullscreen?20:36,right:gridFullscreen?20:4,display:"flex",flexDirection:"column",gap:2,zIndex:9995}}>
+                <button onClick={()=>setGridFullscreen(f=>!f)} style={{width:22,height:22,background:"rgba(4,4,12,.9)",border:`1px solid ${gridFullscreen?"rgba(255,215,0,.5)":"rgba(0,245,255,.3)"}`,borderRadius:4,color:gridFullscreen?"#FFD700":"#00F5FF",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Double-click grid for fullscreen">{gridFullscreen?"⊡":"⛶"}</button>
                 <button onClick={()=>setZoomLevel(z=>{const L=[0.5,0.75,1,1.5,2,3];const i=L.indexOf(z);return L[Math.min(L.length-1,(i===-1?2:i)+1)];})} style={{width:22,height:22,background:"rgba(4,4,12,.9)",border:"1px solid rgba(0,245,255,.3)",borderRadius:4,color:"#00F5FF",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,lineHeight:1}}>+</button>
                 <button onClick={()=>setZoomLevel(1)} style={{width:22,height:22,background:"rgba(4,4,12,.9)",border:`1px solid ${zoomLevel===1?"rgba(255,215,0,.5)":"rgba(0,245,255,.2)"}`,borderRadius:4,color:zoomLevel===1?"#FFD700":"#00F5FF",fontSize:7,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Orbitron',monospace",fontWeight:900}}>{zoomLevel===1?"1×":`${zoomLevel}×`}</button>
                 <button onClick={()=>setZoomLevel(z=>{const L=[0.5,0.75,1,1.5,2,3];const i=L.indexOf(z);return L[Math.max(0,(i===-1?2:i)-1)];})} style={{width:22,height:22,background:"rgba(4,4,12,.9)",border:"1px solid rgba(0,245,255,.3)",borderRadius:4,color:"#00F5FF",fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,lineHeight:1}}>−</button>
