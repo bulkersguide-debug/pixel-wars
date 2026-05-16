@@ -170,7 +170,8 @@ export default function App(){
   const [showHeatmap,setShowHeatmap]=useState(false);
   const [heatmapTick,setHeatmapTick]=useState(0);
   const [animTick,setAnimTick]=useState(0);
-  const [zoomLevel,setZoomLevel]=useState(1); // 0.5=zoomed out, 1=default, 2=close, 3=max
+  const [zoomLevel,setZoomLevel]=useState(1);
+  const [gridFullscreen,setGridFullscreen]=useState(false);
   const zoomRef=useRef(1);
   useEffect(()=>{zoomRef.current=zoomLevel;},[zoomLevel]);
   // Derived viewport dimensions based on zoom
@@ -681,7 +682,7 @@ export default function App(){
     const f=(e)=>{
       // Don't fire shortcuts when typing in inputs
       if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
-      if(e.key==="Escape"){setActive(null);setPending(new Set());setSectorZoom(null);setShowStandings(false);}
+      if(e.key==="Escape"){setActive(null);setPending(new Set());setSectorZoom(null);setShowStandings(false);setGridFullscreen(false);}
       else if(e.key==="b"||e.key==="B"){gatedSetMode("BUILD");}
       else if(e.key==="r"||e.key==="R"){gatedSetMode("RAID");}
       else if(e.key==="s"||e.key==="S"){setMode("SHOP");}
@@ -2572,9 +2573,16 @@ export default function App(){
 
           {/* CANVAS */}
           <div style={{padding:"3px 3px 0",flexShrink:0}}>
-            <div style={{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"default",position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 20px ${rgba(at?.color||modeColor,.1)}`}}>
-              <canvas ref={cvs} width={CW} height={CH} style={{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"40vw",touchAction:"none"}}
-                onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onDragStart={e=>e.preventDefault()}
+            {/* Fullscreen exit hint */}
+            {gridFullscreen&&<div style={{position:"fixed",top:8,right:8,zIndex:600,display:"flex",gap:6,alignItems:"center"}}>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.4)",background:"rgba(0,0,0,.6)",padding:"3px 8px",borderRadius:4}}>Double-click or ESC to exit fullscreen</span>
+            </div>}
+            <div style={gridFullscreen?{position:"fixed",inset:0,zIndex:500,background:"#040408",display:"flex",alignItems:"center",justifyContent:"center"}:{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 20px ${rgba(at?.color||modeColor,.1)}`}}>
+              <canvas ref={cvs} width={CW} height={CH}
+                style={gridFullscreen?{width:"100vw",height:"100vh",display:"block",imageRendering:"pixelated",objectFit:"contain",touchAction:"none",cursor:active&&mode!=="SHOP"?"crosshair":"default"}:{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"40vw",touchAction:"none",cursor:active&&mode!=="SHOP"?"crosshair":"default"}}
+                onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML}
+                onDragStart={e=>e.preventDefault()}
+                onDoubleClick={()=>setGridFullscreen(f=>!f)}
                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}/>
               <div style={{position:"absolute",top:4,left:4,background:rgba(modeColor,.15),border:`1px solid ${rgba(modeColor,.5)}`,borderRadius:4,padding:"2px 6px",fontFamily:"'Orbitron',monospace",fontSize:7,color:modeColor,pointerEvents:"none",letterSpacing:1}}>{mode==="BUILD"?"🏗":"mode"==="RAID"?"⚔️":"💥"} {mode}</div>
               {/* Zoom controls */}
