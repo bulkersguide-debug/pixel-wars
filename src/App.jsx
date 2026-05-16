@@ -1268,74 +1268,169 @@ export default function App(){
       </div>}
 
       {/* LIVE BATTLE MODE */}
-      {showLiveBattle&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(12px)"}} onClick={()=>setShowLiveBattle(false)}>
-        <div style={{background:"rgba(9,9,26,.98)",border:"1px solid rgba(255,68,0,.5)",borderRadius:20,padding:"28px",width:480,maxWidth:"96vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",boxShadow:"0 0 80px rgba(255,68,0,.2)"}} onClick={e=>e.stopPropagation()}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-            <div>
-              <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#FF4400",letterSpacing:2}}>⚡ LIVE BATTLE</div>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginTop:2}}>200×200 ARENA · RESETS EVERY 24H · FREE TO PLAY</div>
+      {showLiveBattle&&(()=>{
+        const counts={};Object.values(liveBattlePixels).forEach(t=>{counts[t]=(counts[t]||0)+1;});
+        const top=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+        const leader=top[0]?top[0][0]:null;
+        const myCount=active?Object.values(liveBattlePixels).filter(t=>t===active).length:0;
+        const isWinning=leader===active&&active;
+        const timeLeft=liveBattleEndsAt?liveBattleEndsAt-Date.now():0;
+        const isExpired=timeLeft<=0;
+
+        const claimSpots=()=>{
+          if(!active){pushToast("Select a fandom first!","#FF4400",3000);return;}
+          if(myCount>=10){pushToast(`${TM[active]?.name} already has 10 spots! Raid enemies instead.`,"#FF4400",3000);return;}
+          if(Object.keys(liveBattlePixels).length>=40000){pushToast("Arena is full! Raid to take spots.","#FF4400",3000);return;}
+          const next={...liveBattlePixels};
+          let added=0;const toAdd=10-myCount;
+          for(let i=0;i<toAdd;i++){
+            let idx;let tries=0;
+            do{idx=Math.floor(Math.random()*40000);tries++;}while(next[idx]&&tries<300);
+            if(tries<300){next[idx]=active;added++;}
+          }
+          setLiveBattlePixels(next);
+          localStorage.setItem("pow_live_battle",JSON.stringify({pixels:next,endsAt:liveBattleEndsAt}));
+          pushToast(`⚡ +${added} spots for ${TM[active]?.name}! (${myCount+added}/10 used)`,"#FF4400",2500);
+        };
+
+        const raidSpot=()=>{
+          if(!requireAuth("livebattle"))return;
+          if(!active){pushToast("Select a fandom first!","#FF4400",3000);return;}
+          // Find an enemy pixel to steal
+          const enemies=Object.entries(liveBattlePixels).filter(([,t])=>t!==active);
+          if(enemies.length===0){pushToast("No enemy pixels to raid!","#FF4400",3000);return;}
+          const next={...liveBattlePixels};
+          // Raid up to 5 random enemy spots
+          const shuffled=enemies.sort(()=>Math.random()-.5).slice(0,5);
+          shuffled.forEach(([idx])=>{next[idx]=active;});
+          setLiveBattlePixels(next);
+          localStorage.setItem("pow_live_battle",JSON.stringify({pixels:next,endsAt:liveBattleEndsAt}));
+          pushToast(`⚔️ Raided ${shuffled.length} enemy spots for ${TM[active]?.name}!`,"#FF4400",2500);
+        };
+
+        // Check for winner when battle ends
+        if(isExpired&&leader&&!localStorage.getItem(`pow_lb_winner_${liveBattleEndsAt}`)){
+          localStorage.setItem(`pow_lb_winner_${liveBattleEndsAt}`,"1");
+          const winnerName=TM[leader]?.name||leader;
+          const winnerColor=TM[leader]?.color||"#FFD700";
+          // Grant bonus pixels if player's fandom won
+          if(leader===active&&user){
+            syncFreePixels(freePixels+5);
+            pushToast(`🏆 ${winnerName} WON the Live Battle! +5 free pixels!`,"#FFD700",8000);
+          }
+          // Discord announcement
+          postToDiscord({
+            title:`🏆 LIVE BATTLE WINNER!`,
+            description:`**${winnerName}** has won today's Live Battle with **${top[0][1]} pixels**!\n\nAll ${winnerName} players received **+5 free pixels** on the main grid.\n\nA new 24h battle starts now — join the fight!`,
+            color:parseInt((winnerColor||"#FFD700").slice(1),16),
+            fields:top.slice(0,3).map(([tid,cnt],i)=>({name:`${["🥇","🥈","🥉"][i]} ${TM[tid]?.name||tid}`,value:`${cnt} pixels`,inline:true})),
+            url:"https://www.pixelsofwar.com",
+            footer:{text:"Pixels of War Live Battle"},
+            timestamp:new Date().toISOString()
+          });
+          // Reset arena
+          setTimeout(()=>{
+            const endsAt=Date.now()+86400000;
+            const seed={};
+            ["🎮 Gaming|Battle Royale|Fortnite","🎌 Anime|Shonen|Naruto","🎵 Music|K-Pop|BTS","🎮 Gaming|RPG|Pokémon","🎌 Anime|Shonen|One Piece","🎵 Music|Pop|Taylor Swift","🎮 Gaming|Shooter|Valorant","🎌 Anime|Shonen|Dragon Ball Z"].forEach((fid,fi)=>{
+              for(let i=0;i<30;i++){seed[(Math.floor(fi*25+Math.random()*20))+Math.floor(Math.random()*200)*200]=fid;}
+            });
+            setLiveBattlePixels(seed);setLiveBattleEndsAt(endsAt);
+            localStorage.setItem("pow_live_battle",JSON.stringify({pixels:seed,endsAt}));
+          },5000);
+        }
+
+        return(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(12px)"}} onClick={()=>setShowLiveBattle(false)}>
+          <div style={{background:"rgba(9,9,26,.98)",border:`1px solid ${isExpired?"rgba(255,215,0,.5)":"rgba(255,68,0,.5)"}`,borderRadius:20,padding:"28px",width:500,maxWidth:"96vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",boxShadow:`0 0 80px ${isExpired?"rgba(255,215,0,.2)":"rgba(255,68,0,.2)"}`}} onClick={e=>e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+              <div>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:isExpired?"#FFD700":"#FF4400",letterSpacing:2}}>
+                  {isExpired?"🏆 BATTLE OVER":"⚡ LIVE BATTLE"}
+                </div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginTop:2}}>200×200 ARENA · FREE TO PLAY · RESETS EVERY 24H</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:timeLeft<3600000?"#FF4400":"#FF4400"}}>{isExpired?"ENDED":"ENDS IN"}</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:13,color:"#FFD700",fontWeight:900}}>
+                  {isExpired?"🏆 WINNER BELOW":`${Math.max(0,Math.floor(timeLeft/3600000))}h ${Math.floor((timeLeft%3600000)/60000)}m`}
+                </div>
+              </div>
             </div>
-            {liveBattleEndsAt&&<div style={{textAlign:"right"}}>
-              <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:"#FF4400"}}>ENDS IN</div>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"#FFD700"}}>{Math.max(0,Math.floor((liveBattleEndsAt-Date.now())/3600000))}h {Math.floor(((liveBattleEndsAt-Date.now())%3600000)/60000)}m</div>
+
+            {/* Your status */}
+            {active&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"6px 10px",background:isWinning?"rgba(255,215,0,.1)":"rgba(255,255,255,.04)",border:`1px solid ${isWinning?"rgba(255,215,0,.3)":"rgba(255,255,255,.08)"}`,borderRadius:7}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:TM[active]?.color||"#888",boxShadow:`0 0 6px ${TM[active]?.color||"#888"}`}}/>
+              <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:TM[active]?.color||"#888",fontWeight:900}}>{TM[active]?.name}</span>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)"}}>{myCount}/10 spots</span>
+              {isWinning&&<span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700",marginLeft:"auto",animation:"pulse 1s infinite"}}>🥇 LEADING!</span>}
             </div>}
-          </div>
-          {/* Mini battle grid */}
-          <div style={{background:"#06060e",border:"1px solid rgba(255,68,0,.2)",borderRadius:10,padding:12,marginBottom:16}}>
-            <canvas ref={el=>{
-              if(!el)return;
-              const ctx=el.getContext("2d");const W=el.width=440,H=el.height=220;
-              ctx.fillStyle="#06060e";ctx.fillRect(0,0,W,H);
-              const cellW=W/200,cellH=H/200;
-              Object.entries(liveBattlePixels).forEach(([idx,teamId])=>{
-                const x=parseInt(idx)%200,y=Math.floor(parseInt(idx)/200);
-                ctx.fillStyle=TM[teamId]?.color||"#888";
-                ctx.fillRect(x*cellW,y*cellH,Math.max(1,cellW),Math.max(1,cellH));
-              });
-              // Grid lines
-              ctx.strokeStyle="rgba(255,255,255,.03)";ctx.lineWidth=0.5;
-              for(let i=0;i<=20;i++){const px=i*W/20;ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();ctx.beginPath();ctx.moveTo(0,px*H/W);ctx.lineTo(W,px*H/W);ctx.stroke();}
-            }} style={{width:"100%",borderRadius:6,display:"block"}}/>
-          </div>
-          {/* Leaderboard */}
-          {(()=>{
-            const counts={};Object.values(liveBattlePixels).forEach(t=>{counts[t]=(counts[t]||0)+1;});
-            const top=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
-            return top.length>0&&<div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-              {top.map(([tid,cnt],i)=>(
-                <div key={tid} style={{flex:1,minWidth:80,background:`rgba(${i===0?"255,215,0":"255,255,255"},.05)`,border:`1px solid rgba(${i===0?"255,215,0":"255,255,255"},.1)`,borderRadius:6,padding:"6px 8px",textAlign:"center"}}>
-                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:TM[tid]?.color||"#888",fontWeight:900,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{["🥇","🥈","🥉","4","5"][i]} {TM[tid]?.name||tid}</div>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#C8FF00"}}>{cnt}px</div>
+
+            {/* Grid */}
+            <div style={{background:"#06060e",border:"1px solid rgba(255,68,0,.15)",borderRadius:8,marginBottom:12,overflow:"hidden"}}>
+              <canvas ref={el=>{
+                if(!el)return;
+                const ctx=el.getContext("2d");const W=el.width=460,H=el.height=230;
+                ctx.fillStyle="#06060e";ctx.fillRect(0,0,W,H);
+                const cW=W/200,cH=H/200;
+                Object.entries(liveBattlePixels).forEach(([idx,teamId])=>{
+                  const x=parseInt(idx)%200,y=Math.floor(parseInt(idx)/200);
+                  ctx.fillStyle=TM[teamId]?.color||"#888";
+                  ctx.fillRect(x*cW,y*cH,Math.max(1,cW),Math.max(1,cH));
+                });
+                // Highlight active fandom pixels
+                if(active){
+                  ctx.strokeStyle=TM[active]?.color||"#fff";ctx.lineWidth=0.5;
+                  Object.entries(liveBattlePixels).filter(([,t])=>t===active).forEach(([idx])=>{
+                    const x=parseInt(idx)%200,y=Math.floor(parseInt(idx)/200);
+                    ctx.strokeRect(x*cW,y*cH,cW,cH);
+                  });
+                }
+              }} style={{width:"100%",display:"block"}}/>
+            </div>
+
+            {/* Leaderboard */}
+            {top.length>0&&<div style={{display:"flex",gap:5,marginBottom:12,flexWrap:"wrap"}}>
+              {top.slice(0,5).map(([tid,cnt],i)=>(
+                <div key={tid} style={{flex:1,minWidth:70,background:i===0?"rgba(255,215,0,.08)":tid===active?"rgba(0,245,255,.05)":"rgba(255,255,255,.03)",border:`1px solid ${i===0?"rgba(255,215,0,.3)":tid===active?"rgba(0,245,255,.2)":"rgba(255,255,255,.06)"}`,borderRadius:6,padding:"5px 6px",textAlign:"center"}}>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:i===0?"#FFD700":tid===active?"#00F5FF":"rgba(255,255,255,.3)",marginBottom:2}}>{["🥇","🥈","🥉","4th","5th"][i]}</div>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:TM[tid]?.color||"#888",fontWeight:900,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{TM[tid]?.name||tid}</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#C8FF00",fontWeight:900}}>{cnt}px</div>
                 </div>
               ))}
-            </div>;
-          })()}
-          <div style={{display:"flex",gap:8,flexDirection:"column"}}>
-            {!active&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FFD700",textAlign:"center",padding:"8px",background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.2)",borderRadius:6}}>⚠️ Select a fandom from the left panel first</div>}
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{
-                if(!active){pushToast("Select a fandom first!","#FF4400",3000);return;}
-                // Claim up to 10 random spots per click
-                const taken=new Set(Object.keys(liveBattlePixels).map(Number));
-                if(taken.size>=40000){pushToast("Arena is full! Wait for reset.","#FF4400",3000);return;}
-                const next={...liveBattlePixels};
-                let added=0;
-                for(let i=0;i<10&&taken.size+added<40000;i++){
-                  let idx;let tries=0;
-                  do{idx=Math.floor(Math.random()*40000);tries++;}while((taken.has(idx)||next[idx])&&tries<100);
-                  next[idx]=active;added++;
-                }
-                setLiveBattlePixels(next);
-                localStorage.setItem("pow_live_battle",JSON.stringify({pixels:next,endsAt:liveBattleEndsAt}));
-                pushToast(`⚡ +${added}px for ${TM[active]?.name} in Live Battle!`,"#FF4400",2000);
-              }} style={{flex:1,padding:"12px",background:active?`linear-gradient(90deg,${TM[active]?.color||"#FF4400"},#FF2D00)`:"rgba(255,68,0,.3)",border:"none",borderRadius:8,cursor:active?"pointer":"not-allowed",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#fff",letterSpacing:1,fontWeight:900}}>
-                ⚡ CLAIM 10 SPOTS {active?`FOR ${TM[active]?.name?.toUpperCase().slice(0,12)||""}`:""} (FREE)
-              </button>
-              <button onClick={()=>setShowLiveBattle(false)} style={{padding:"12px 16px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)"}}>CLOSE</button>
-            </div>
+            </div>}
+
+            {/* Action buttons */}
+            {!isExpired&&<div style={{display:"flex",gap:8,flexDirection:"column"}}>
+              {!active&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FFD700",textAlign:"center",padding:"7px",background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.15)",borderRadius:6}}>⚠️ Select a fandom from the panel first</div>}
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={claimSpots} disabled={!active||myCount>=10} style={{flex:2,padding:"11px",background:!active||myCount>=10?"rgba(255,255,255,.05)":`linear-gradient(90deg,${TM[active]?.color||"#FF4400"},#FF2D00)`,border:`1px solid ${!active||myCount>=10?"rgba(255,255,255,.1)":`${TM[active]?.color||"#FF4400"}88`}`,borderRadius:8,cursor:!active||myCount>=10?"default":"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:!active||myCount>=10?"rgba(255,255,255,.3)":"#fff",letterSpacing:1,fontWeight:900}}>
+                  {!active?"SELECT FANDOM FIRST":myCount>=10?`✅ FULL — RAID INSTEAD`:`⚡ CLAIM ${10-myCount} SPOTS (FREE)`}
+                </button>
+                <button onClick={raidSpot} disabled={!active} style={{flex:1,padding:"11px",background:!active?"rgba(255,255,255,.03)":"rgba(255,68,0,.12)",border:`1px solid ${!active?"rgba(255,255,255,.06)":"rgba(255,68,0,.4)"}`,borderRadius:8,cursor:!active?"default":"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:!active?"rgba(255,255,255,.2)":"#FF4400",letterSpacing:1,fontWeight:900}}>
+                  ⚔️ RAID 5
+                </button>
+                <button onClick={()=>setShowLiveBattle(false)} style={{padding:"11px 14px",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.08)",borderRadius:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.25)"}}>✕</button>
+              </div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)",textAlign:"center"}}>
+                🏆 Top fandom at reset wins +5 free pixels · ⚔️ Raid requires Discord login
+              </div>
+            </div>}
+
+            {/* Winner screen */}
+            {isExpired&&leader&&<div style={{textAlign:"center",padding:"16px",background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.2)",borderRadius:10}}>
+              <div style={{fontSize:32,marginBottom:8}}>🏆</div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:TM[leader]?.color||"#FFD700",marginBottom:4}}>{TM[leader]?.name} WINS!</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.4)",marginBottom:12}}>{top[0][1]} pixels · {leader===active?"+5 free pixels awarded!":"Select your fandom to win next time"}</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.2)"}}>New battle starting in 5 seconds...</div>
+            </div>}
+
           </div>
         </div>
-      </div>}
+        );
+      })()}
 
       {/* WEEKLY SEASON REPORT */}
       {showWeeklyReport&&weeklyStats&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:997,backdropFilter:"blur(10px)"}} onClick={()=>setShowWeeklyReport(false)}>
