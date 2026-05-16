@@ -216,6 +216,8 @@ export default function App(){
   const [showNotifBanner,setShowNotifBanner]=useState(false);
   const [showDecayAlert,setShowDecayAlert]=useState(false);
   const [rivalId,setRivalId]=useState(null);
+  const [showWeeklyReport,setShowWeeklyReport]=useState(false);
+  const [weeklyStats,setWeeklyStats]=useState(null);
   const [missionProgress,setMissionProgress]=useState(()=>{
     try{const wk=getWeekNum();const saved=JSON.parse(localStorage.getItem("pow_missions")||"{}");return saved.week===wk?saved.data:{};}catch{return{};}
   });
@@ -853,7 +855,6 @@ export default function App(){
       if(w.attacker===active&&w.defender!==active)freq[w.defender]=(freq[w.defender]||0)+1;
       if(w.defender===active&&w.attacker!==active)freq[w.attacker]=(freq[w.attacker]||0)+1;
     });
-    // Also count from pixel feed — who raided us most
     feed.forEach(f=>{
       if(f.isRaid&&f.team&&f.team!==TM[active]?.name){
         const t=Object.values(TM).find(x=>x.name===f.team);
@@ -863,6 +864,39 @@ export default function App(){
     const top=Object.entries(freq).sort((a,b)=>b[1]-a[1])[0];
     setRivalId(top?top[0]:null);
   },[active,wars,feed]);
+
+  // Weekly season report — show on Monday once per week
+  useEffect(()=>{
+    if(!active||loading)return;
+    const wk=getWeekNum();
+    const key=`pow_weekly_report_${wk}`;
+    if(localStorage.getItem(key))return;
+    const now=new Date();
+    if(now.getDay()!==1)return; // Monday only
+    const prevKey=`pow_weekly_snapshot_${wk-1}`;
+    const prev=JSON.parse(localStorage.getItem(prevKey)||"null");
+    const warCount=wars.filter(w=>w.attacker===active||w.defender===active).length;
+    const allianceCount=alliances.filter(a=>(a.proposer===active||a.target===active)&&a.status==="active").length;
+    const completedMissions=Object.values(missionProgress).filter(m=>m?.claimed).length;
+    const stats={
+      fandom:TM[active]?.name||active,
+      color:TM[active]?.color||"#00F5FF",
+      pixels:myPixels,
+      prevPixels:prev?.pixels||0,
+      rank:myRank.name,
+      rankIcon:myRank.icon,
+      streak:streakData.days,
+      wars:warCount,
+      alliances:allianceCount,
+      missions:completedMissions,
+      week:wk,
+    };
+    // Save current as snapshot for next week
+    localStorage.setItem(`pow_weekly_snapshot_${wk}`,JSON.stringify(stats));
+    localStorage.setItem(key,"1");
+    setWeeklyStats(stats);
+    setTimeout(()=>setShowWeeklyReport(true),2000);
+  },[active,loading]);
   const miniSeasonLeader=useMemo(()=>{if(!miniSeason)return null;const{sector_x:msx,sector_y:msy}=miniSeason;const cnt={};for(let py=msy*SECTOR;py<(msy+1)*SECTOR;py++)for(let px2=msx*SECTOR;px2<(msx+1)*SECTOR;px2++){const p=pixels[py*GW+px2];if(p?.t)cnt[p.t]=(cnt[p.t]||0)+1;}const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];return top?{id:top[0],name:TM[top[0]]?.name||"?",color:TM[top[0]]?.color||"#888",count:top[1]}:null;},[pixels,miniSeason]);
   const miniSeasonDaysLeft=miniSeason?Math.max(0,Math.ceil((new Date(miniSeason.end_date)-Date.now())/86400000)):0;
   const bannerOffset=145+(miniSeason?30:0)+(pendingAlliances.length>0?30:0)+(showNotifBanner&&notifPermission==="default"?36:0);
@@ -1112,6 +1146,45 @@ export default function App(){
             <div style={{textAlign:"left"}}><div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>NEXT: {THEMES[(season.theme+1)%THEMES.length].name}</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginTop:2}}>{THEMES[(season.theme+1)%THEMES.length].desc}</div></div>
           </div>
           <button onClick={startNewSeason} style={{width:"100%",padding:"14px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",color:"#040408",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:13,letterSpacing:2}}>🚀 START SEASON {season.num+1} →</button>
+        </div>
+      </div>}
+
+      {/* WEEKLY SEASON REPORT */}
+      {showWeeklyReport&&weeklyStats&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:997,backdropFilter:"blur(10px)"}} onClick={()=>setShowWeeklyReport(false)}>
+        <div style={{background:"rgba(9,9,26,.98)",border:`1px solid ${weeklyStats.color}44`,borderRadius:20,padding:"32px 28px",width:400,maxWidth:"94vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",textAlign:"center",boxShadow:`0 0 60px ${weeklyStats.color}22`}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",letterSpacing:2,marginBottom:4}}>WEEKLY REPORT · WEEK {weeklyStats.week}</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:weeklyStats.color,letterSpacing:2,marginBottom:4,textShadow:`0 0 20px ${weeklyStats.color}`}}>{weeklyStats.fandom}</div>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)",marginBottom:24}}>HERE'S HOW YOUR WEEK WENT</div>
+
+          {/* Pixel change */}
+          <div style={{background:`rgba(255,255,255,.04)`,border:"1px solid rgba(255,255,255,.08)",borderRadius:12,padding:"16px",marginBottom:12,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            {[
+              {label:"PIXELS OWNED",value:weeklyStats.pixels.toLocaleString(),color:"#C8FF00",icon:"🏴"},
+              {label:"CHANGE",value:(weeklyStats.pixels-weeklyStats.prevPixels>=0?"+":"")+((weeklyStats.pixels-weeklyStats.prevPixels)||"—"),color:weeklyStats.pixels>=weeklyStats.prevPixels?"#00FF88":"#FF4400",icon:weeklyStats.pixels>=weeklyStats.prevPixels?"📈":"📉"},
+              {label:"RANK",value:`${weeklyStats.rankIcon} ${weeklyStats.rank}`,color:"#FFD700",icon:""},
+              {label:"LOGIN STREAK",value:`${weeklyStats.streak}d 🔥`,color:"#FF2D78",icon:""},
+              {label:"ACTIVE WARS",value:weeklyStats.wars,color:"#FF4400",icon:"⚔️"},
+              {label:"MISSIONS DONE",value:weeklyStats.missions,color:"#00F5FF",icon:"🎯"},
+            ].map((s,i)=>(
+              <div key={i} style={{textAlign:"center"}}>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:s.color,marginBottom:2}}>{s.icon} {s.value}</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)",letterSpacing:1}}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Motivational message */}
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)",marginBottom:20,lineHeight:1.7}}>
+            {weeklyStats.pixels===0?"🪖 No territory yet — claim your first pixels this week!":
+             weeklyStats.pixels-weeklyStats.prevPixels>50?"🔥 Massive week! Your fandom is dominating.":
+             weeklyStats.pixels-weeklyStats.prevPixels>0?"⚔️ Growing strong. Keep raiding and claiming.":
+             weeklyStats.pixels-weeklyStats.prevPixels<0?"🛡️ You lost ground. Time to fight back!":
+             "📊 Holding steady. Push for more this week."}
+          </div>
+
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>setShowWeeklyReport(false)} style={{flex:1,padding:"12px",background:`linear-gradient(90deg,${weeklyStats.color}22,${weeklyStats.color}11)`,border:`1px solid ${weeklyStats.color}66`,borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:weeklyStats.color,letterSpacing:1,fontWeight:900}}>⚔️ BACK TO WAR</button>
+          </div>
         </div>
       </div>}
 

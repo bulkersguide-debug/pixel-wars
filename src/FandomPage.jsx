@@ -243,6 +243,33 @@ export default function FandomPage(){
     navigate(`/?fandom=${encodeURIComponent(slug)}`);
   };
 
+  // SEO — update document head with fandom-specific meta tags
+  useEffect(()=>{
+    if(!fandom)return;
+    const title=`${fandom.name} Territory · Pixels of War`;
+    const desc=`${fandom.name} owns ${pixelCount.toLocaleString()} pixels (${pct}% of the grid) on Pixels of War. Join the battle and claim territory for ${fandom.name}! ⚔️`;
+    const url=`https://www.pixelsofwar.com/fandom/${slug}`;
+    document.title=title;
+    const setMeta=(name,content,prop=false)=>{
+      const sel=prop?`meta[property="${name}"]`:`meta[name="${name}"]`;
+      let el=document.querySelector(sel);
+      if(!el){el=document.createElement("meta");prop?el.setAttribute("property",name):el.setAttribute("name",name);document.head.appendChild(el);}
+      el.setAttribute("content",content);
+    };
+    setMeta("description",desc);
+    setMeta("keywords",`${fandom.name}, pixels of war, ${fandom.cat}, fandom battle, pixel territory`);
+    setMeta("og:title",title,true);
+    setMeta("og:description",desc,true);
+    setMeta("og:url",url,true);
+    setMeta("og:type","website",true);
+    setMeta("og:image","https://www.pixelsofwar.com/og-image.png",true);
+    setMeta("twitter:card","summary_large_image");
+    setMeta("twitter:title",title);
+    setMeta("twitter:description",desc);
+    setMeta("twitter:image","https://www.pixelsofwar.com/og-image.png");
+    return()=>{document.title="Pixels of War ⚔️";};
+  },[fandom,pixelCount,pct,slug]);
+
   return(
     <div style={{background:"#040408",minHeight:"100vh",fontFamily:"'Rajdhani',sans-serif",color:"#e0e8ff"}}>
       <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
