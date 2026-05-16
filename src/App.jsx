@@ -339,6 +339,8 @@ export default function App(){
             setRaidAlert({attacker:attacker?.name||"Unknown",attackerColor:attacker?.color||"#FF4400",sectorX:sx,sectorY:sy,idx:payload.new.idx});
             setTimeout(()=>setRaidAlert(null),10000);
             sendLocalNotif(`⚔️ ${attacker?.name||"Someone"} is raiding your territory!`,"Tap to defend your pixels now!","raid","/");
+            // Send background push if tab is closed
+            setUser(u=>{if(u)sendPushNotification(u.id,`⚔️ ${attacker?.name||"Someone"} raided your pixels!`,"Tap to defend your territory now!","/","raid");return u;});
           }
           return myActive;
         });
@@ -518,11 +520,17 @@ export default function App(){
     const{data}=await supabase.from("profiles").select("*").eq("id",userId).single();
     if(data){
       setProfile(data);
-      // Supabase is source of truth for free pixels
       if(data.free_pixels!=null){
         setFreePixels(data.free_pixels);
         localStorage.setItem("pow_free",String(data.free_pixels));
       }
+    }
+    // Re-save push subscription on login if already granted
+    if(Notification?.permission==="granted"&&"serviceWorker" in navigator){
+      navigator.serviceWorker.ready.then(async reg=>{
+        const sub=await reg.pushManager.getSubscription();
+        if(sub)await saveSubscription(sub);
+      }).catch(()=>{});
     }
   };
 
@@ -575,15 +583,58 @@ export default function App(){
   },[]);
 
   // ── NOTIFICATION HELPERS ──────────────────────────────────────────────────
+  const VAPID_PUBLIC_KEY="BOCyIKzt2Zc4jFbmrGKwykcG6bNzGBLas_GsPlJC5Zwf7z5xBjGFa_ntQxFEYsEsUH45WhJZQqOsNNM6X4zGazU";
+
   const requestNotifPermission=async()=>{
-    if(!("Notification" in window))return;
+    if(!("Notification" in window)||!("serviceWorker" in navigator))return;
     const result=await Notification.requestPermission();
     setNotifPermission(result);setShowNotifBanner(false);
-    if(result==="granted")pushToast("🔔 Notifications ON! We'll alert you when you're raided.","#00FF88",5000);
+    if(result!=="granted")return;
+    pushToast("🔔 Notifications ON! We'll alert you when you're raided.","#00FF88",5000);
+    try{
+      // Register service worker and get push subscription
+      const reg=await navigator.serviceWorker.ready;
+      const existing=await reg.pushManager.getSubscription();
+      if(existing){await saveSubscription(existing);return;}
+      // Subscribe with VAPID key
+      const sub=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+      await saveSubscription(sub);
+    }catch(e){console.warn("Push subscription failed:",e);}
   };
+
+  const urlBase64ToUint8Array=(base64String)=>{
+    const padding="=".repeat((4-base64String.length%4)%4);
+    const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+    const raw=window.atob(base64);
+    return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+  };
+
+  const saveSubscription=async(sub)=>{
+    if(!supabase)return;
+    const subJson=sub.toJSON();
+    await supabase.from("push_subscriptions").upsert({
+      endpoint:subJson.endpoint,
+      p256dh:subJson.keys?.p256dh,
+      auth:subJson.keys?.auth,
+      user_id:user?.id||null,
+      fandom_id:null,
+      updated_at:new Date().toISOString()
+    },{onConflict:"endpoint"});
+  };
+
+  const sendPushNotification=async(userId,title,body,url="/",tag="pow")=>{
+    if(!supabase)return;
+    try{
+      await supabase.functions.invoke("send-push",{body:{user_id:userId,title,body,url,tag}});
+    }catch(e){console.warn("Push notification failed:",e);}
+  };
+
   const sendLocalNotif=(title,body,tag="pow",url="/")=>{
     if(Notification?.permission!=="granted")return;
-    if(document.visibilityState==="visible")return;// only when tab is hidden
+    if(document.visibilityState==="visible")return;
     try{
       const n=new Notification(title,{body,icon:"/icons/icon-192.png",badge:"/icons/icon-72.png",tag,data:{url}});
       n.onclick=()=>{window.focus();n.close();};
