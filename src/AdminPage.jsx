@@ -7,8 +7,13 @@ import { supabase, isOnline } from "./supabase";
 
 const ADMIN_PIN = "StamMike2009@@1"; // ← change this
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || "";
+const DISCORD_WEBHOOK="https://discord.com/api/webhooks/1505216663786623178/zgC0xopUlfOex7rIIcRos4SxMQrTvtj8-Gjl4cvoqyEukuOP3a-xl9ekt7iIPIj_dBAb";
 
-const rgba=(hex,a)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;};
+const notifyDiscord=async(embed)=>{
+  try{await fetch(DISCORD_WEBHOOK,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({embeds:[embed]})});}catch{}
+};
+
+const rgba=(hex,a)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`;};;
 
 function BannerCountdown({endAt}){
   const [left,setLeft]=useState("");
@@ -179,6 +184,24 @@ export default function AdminPage(){
     setLoadingBanners(true);
     supabase.from("sponsored_banners").select("*").order("created_at",{ascending:false})
       .then(({data})=>{setBanners(data||[]);setLoadingBanners(false);});
+    // Listen for new banner submissions and alert via Discord
+    const ch=supabase.channel("admin-banner-alerts")
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"sponsored_banners"},(payload)=>{
+        const b=payload.new;
+        if(b.status==="pending"){
+          setBanners(r=>[b,...r]);
+          addLog(`📣 New banner submitted by ${b.contact_email}`,"#FFD700");
+          notifyDiscord({
+            title:"📣 NEW SPONSORED BANNER SUBMITTED",
+            description:`A new banner is waiting for approval!\n\n**Message:** ${b.message?.slice(0,100)}\n**Email:** ${b.contact_email}\n**Duration:** ${b.duration_amount} ${b.duration_type}\n**Price:** €${b.price_eur}`,
+            color:0xFFD700,
+            fields:[{name:"Review at",value:"pixelsofwar.com/admin?s=Mike_2012*Smd",inline:false}],
+            footer:{text:"Pixels of War Admin"},
+            timestamp:new Date().toISOString()
+          });
+        }
+      }).subscribe();
+    return()=>supabase.removeChannel(ch);
     supabase.from("profiles").select("id,username,email,role,free_pixels,created_at").order("created_at",{ascending:false}).limit(10)
       .then(({data})=>setRecentUsers(data||[]));
   },[auth]);

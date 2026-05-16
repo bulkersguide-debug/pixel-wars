@@ -198,6 +198,9 @@ export default function App(){
   const [rivalId,setRivalId]=useState(null);
   const [showWeeklyReport,setShowWeeklyReport]=useState(false);
   const [weeklyStats,setWeeklyStats]=useState(null);
+  const [showLiveBattle,setShowLiveBattle]=useState(false);
+  const [liveBattlePixels,setLiveBattlePixels]=useState({});
+  const [liveBattleEndsAt,setLiveBattleEndsAt]=useState(null);
   const [missionProgress,setMissionProgress]=useState(()=>{
     try{const wk=getWeekNum();const saved=JSON.parse(localStorage.getItem("pow_missions")||"{}");return saved.week===wk?saved.data:{};}catch{return{};}
   });
@@ -360,6 +363,18 @@ export default function App(){
     if(p){const f=ALL.find(t=>slugify(t.name)===p);if(f)setTimeout(()=>setActive(f.id),600);}
     const today=todayStr();const saved=JSON.parse(localStorage.getItem("pow_streak")||'{"days":0,"last":"","total":0}');
     if(saved.last!==today){const nd=saved.last===yesterdayStr()?saved.days+1:1;setDailyInfo({days:nd,reward:streakReward(nd)});setTimeout(()=>setShowDaily(true),1400);}
+    // Init live battle
+    try{
+      const lb=JSON.parse(localStorage.getItem("pow_live_battle")||"null");
+      if(lb&&lb.endsAt>Date.now()){setLiveBattlePixels(lb.pixels||{});setLiveBattleEndsAt(lb.endsAt);}
+      else{
+        // New 24h battle
+        const endsAt=Date.now()+86400000;
+        setLiveBattleEndsAt(endsAt);
+        setLiveBattlePixels({});
+        localStorage.setItem("pow_live_battle",JSON.stringify({pixels:{},endsAt}));
+      }
+    }catch{}
   },[]);
 
   // Load chat when fandom changes
@@ -808,9 +823,64 @@ export default function App(){
     if(!user){setAuthReason(reason);setShowAuthModal(true);return false;}
     return true;
   };
-  const onTouchStart=(e)=>{if(e.touches.length!==1)return;e.preventDefault();const t=e.touches[0];onMD({clientX:t.clientX,clientY:t.clientY,preventDefault:()=>{}});};
-  const onTouchMove=(e)=>{if(e.touches.length!==1)return;e.preventDefault();const t=e.touches[0];onMM_h({clientX:t.clientX,clientY:t.clientY});};
-  const onTouchEnd=(e)=>{e.preventDefault();onMU();};
+  // ── IMPROVED MOBILE TOUCH ─────────────────────────────────────────────────
+  const touchStateRef=useRef({lastDist:null,lastMidX:null,lastMidY:null,isPinch:false,panStartX:null,panStartY:null,panVx:null,panVy:null});
+  const onTouchStart=(e)=>{
+    e.preventDefault();
+    if(e.touches.length===2){
+      // Pinch start
+      const t0=e.touches[0],t1=e.touches[1];
+      touchStateRef.current.lastDist=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);
+      touchStateRef.current.lastMidX=(t0.clientX+t1.clientX)/2;
+      touchStateRef.current.lastMidY=(t0.clientY+t1.clientY)/2;
+      touchStateRef.current.isPinch=true;
+      setPending(new Set());
+      return;
+    }
+    touchStateRef.current.isPinch=false;
+    const t=e.touches[0];
+    // Long press detection for pan mode
+    touchStateRef.current.panStartX=t.clientX;
+    touchStateRef.current.panStartY=t.clientY;
+    touchStateRef.current.panVx=vxRef.current;
+    touchStateRef.current.panVy=vyRef.current;
+    onMD({clientX:t.clientX,clientY:t.clientY,preventDefault:()=>{}});
+  };
+  const onTouchMove=(e)=>{
+    e.preventDefault();
+    if(e.touches.length===2){
+      // Pinch-zoom = pan (zoom out/in by moving viewport)
+      const t0=e.touches[0],t1=e.touches[1];
+      const dist=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);
+      const midX=(t0.clientX+t1.clientX)/2;
+      const midY=(t0.clientY+t1.clientY)/2;
+      const ts=touchStateRef.current;
+      if(ts.lastDist){
+        const dx=(midX-ts.lastMidX)/CELL;
+        const dy=(midY-ts.lastMidY)/CELL;
+        pan(-Math.round(dx),-Math.round(dy));
+      }
+      ts.lastDist=dist;ts.lastMidX=midX;ts.lastMidY=midY;
+      return;
+    }
+    if(touchStateRef.current.isPinch)return;
+    const t=e.touches[0];
+    const ts=touchStateRef.current;
+    // If moved far without selecting pixels = pan
+    const dx=t.clientX-ts.panStartX,dy=t.clientY-ts.panStartY;
+    if(!drag&&Math.hypot(dx,dy)>30){
+      // Switch to pan mode
+      setVx(Math.max(0,Math.min(GW-VW,ts.panVx-Math.round(dx/CELL))));
+      setVy(Math.max(0,Math.min(GH-VH,ts.panVy-Math.round(dy/CELL))));
+    }else{
+      onMM_h({clientX:t.clientX,clientY:t.clientY});
+    }
+  };
+  const onTouchEnd=(e)=>{
+    e.preventDefault();
+    if(touchStateRef.current.isPinch){touchStateRef.current.isPinch=false;return;}
+    onMU();
+  };
 
   // ── CLAIM ──────────────────────────────────────────────────────────────────
   const handleClaim=async()=>{
@@ -1187,6 +1257,69 @@ export default function App(){
         </div>
       </div>}
 
+      {/* LIVE BATTLE MODE */}
+      {showLiveBattle&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(12px)"}} onClick={()=>setShowLiveBattle(false)}>
+        <div style={{background:"rgba(9,9,26,.98)",border:"1px solid rgba(255,68,0,.5)",borderRadius:20,padding:"28px",width:480,maxWidth:"96vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",boxShadow:"0 0 80px rgba(255,68,0,.2)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+            <div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#FF4400",letterSpacing:2}}>⚡ LIVE BATTLE</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginTop:2}}>200×200 ARENA · RESETS EVERY 24H · FREE TO PLAY</div>
+            </div>
+            {liveBattleEndsAt&&<div style={{textAlign:"right"}}>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:"#FF4400"}}>ENDS IN</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"#FFD700"}}>{Math.max(0,Math.floor((liveBattleEndsAt-Date.now())/3600000))}h {Math.floor(((liveBattleEndsAt-Date.now())%3600000)/60000)}m</div>
+            </div>}
+          </div>
+          {/* Mini battle grid */}
+          <div style={{background:"#06060e",border:"1px solid rgba(255,68,0,.2)",borderRadius:10,padding:12,marginBottom:16}}>
+            <canvas ref={el=>{
+              if(!el)return;
+              const ctx=el.getContext("2d");const W=el.width=440,H=el.height=220;
+              ctx.fillStyle="#06060e";ctx.fillRect(0,0,W,H);
+              const cellW=W/200,cellH=H/200;
+              Object.entries(liveBattlePixels).forEach(([idx,teamId])=>{
+                const x=parseInt(idx)%200,y=Math.floor(parseInt(idx)/200);
+                ctx.fillStyle=TM[teamId]?.color||"#888";
+                ctx.fillRect(x*cellW,y*cellH,Math.max(1,cellW),Math.max(1,cellH));
+              });
+              // Grid lines
+              ctx.strokeStyle="rgba(255,255,255,.03)";ctx.lineWidth=0.5;
+              for(let i=0;i<=20;i++){const px=i*W/20;ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();ctx.beginPath();ctx.moveTo(0,px*H/W);ctx.lineTo(W,px*H/W);ctx.stroke();}
+            }} style={{width:"100%",borderRadius:6,display:"block"}}/>
+          </div>
+          {/* Leaderboard */}
+          {(()=>{
+            const counts={};Object.values(liveBattlePixels).forEach(t=>{counts[t]=(counts[t]||0)+1;});
+            const top=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+            return top.length>0&&<div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+              {top.map(([tid,cnt],i)=>(
+                <div key={tid} style={{flex:1,minWidth:80,background:`rgba(${i===0?"255,215,0":"255,255,255"},.05)`,border:`1px solid rgba(${i===0?"255,215,0":"255,255,255"},.1)`,borderRadius:6,padding:"6px 8px",textAlign:"center"}}>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:TM[tid]?.color||"#888",fontWeight:900,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{["🥇","🥈","🥉","4","5"][i]} {TM[tid]?.name||tid}</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#C8FF00"}}>{cnt}px</div>
+                </div>
+              ))}
+            </div>;
+          })()}
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{
+              if(!active){pushToast("Select a fandom first!","#FF4400",3000);return;}
+              if(!requireAuth("livebattle"))return;
+              // Claim a random spot in the 200x200 arena
+              const taken=new Set(Object.keys(liveBattlePixels).map(Number));
+              let idx;do{idx=Math.floor(Math.random()*40000);}while(taken.has(idx)&&taken.size<40000);
+              if(taken.size>=40000){pushToast("Arena is full! Wait for reset.","#FF4400",3000);return;}
+              const next={...liveBattlePixels,[idx]:active};
+              setLiveBattlePixels(next);
+              localStorage.setItem("pow_live_battle",JSON.stringify({pixels:next,endsAt:liveBattleEndsAt}));
+              pushToast(`⚡ Claimed spot in Live Battle for ${TM[active]?.name}!`,"#FF4400",3000);
+            }} style={{flex:1,padding:"12px",background:"linear-gradient(90deg,#FF4400,#FF2D00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#fff",letterSpacing:1,fontWeight:900}}>
+              ⚡ CLAIM SPOT (FREE)
+            </button>
+            <button onClick={()=>setShowLiveBattle(false)} style={{padding:"12px 16px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)"}}>CLOSE</button>
+          </div>
+        </div>
+      </div>}
+
       {/* WEEKLY SEASON REPORT */}
       {showWeeklyReport&&weeklyStats&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:997,backdropFilter:"blur(10px)"}} onClick={()=>setShowWeeklyReport(false)}>
         <div style={{background:"rgba(9,9,26,.98)",border:`1px solid ${weeklyStats.color}44`,borderRadius:20,padding:"32px 28px",width:400,maxWidth:"94vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",textAlign:"center",boxShadow:`0 0 60px ${weeklyStats.color}22`}} onClick={e=>e.stopPropagation()}>
@@ -1406,6 +1539,7 @@ export default function App(){
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button onClick={()=>setShowHeatmap(s=>!s)} style={{background:showHeatmap?"rgba(255,100,0,.2)":"rgba(255,100,0,.05)",border:`1px solid ${showHeatmap?"rgba(255,100,0,.6)":"rgba(255,100,0,.2)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF6422",letterSpacing:1,transition:"all .15s"}}>{showHeatmap?"HIDE":"🔥 HEATMAP"}</button>
+          <button onClick={()=>setShowLiveBattle(true)} style={{background:"rgba(255,68,0,.15)",border:"1px solid rgba(255,68,0,.5)",borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400",letterSpacing:1,animation:"pulse 2s infinite"}}>⚡ LIVE BATTLE</button>
           <button onClick={()=>setShowPriceMap(s=>!s)} style={{background:showPriceMap?"rgba(0,245,255,.15)":"rgba(0,245,255,.05)",border:`1px solid ${showPriceMap?"rgba(0,245,255,.5)":"rgba(0,245,255,.15)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00F5FF",transition:"all .15s"}}>{showPriceMap?"HIDE":"💰 PRICES"}</button>
         </div>
       </div>
