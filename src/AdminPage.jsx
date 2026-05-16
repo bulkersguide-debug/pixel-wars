@@ -85,6 +85,9 @@ export default function AdminPage(){
   const [selectedFandom,setSelectedFandom]=useState("");
   // Mini-season form
   const [msLabel,setMsLabel]=useState("");
+  const [roleSearch,setRoleSearch]=useState("");
+  const [roleUser,setRoleUser]=useState(null);
+  const [roleLoading,setRoleLoading]=useState(false);
   const [msSectorX,setMsSectorX]=useState("9");
   const [msSectorY,setMsSectorY]=useState("9");
   const [msDays,setMsDays]=useState("7");
@@ -97,6 +100,25 @@ export default function AdminPage(){
   const [loadingBanners,setLoadingBanners]=useState(false);
 
   const addLog=(msg,color="#00F5FF")=>setLog(l=>[{id:Date.now(),msg,color,ts:new Date().toLocaleTimeString()},...l].slice(0,50));
+
+  const searchRoleUser=async()=>{
+    if(!roleSearch.trim())return;
+    setRoleLoading(true);setRoleUser(null);
+    const q=roleSearch.trim().toLowerCase();
+    const{data,error}=await supabase.from("profiles").select("id,username,email,role,avatar_url,total_claimed")
+      .or(`username.ilike.%${q}%,email.ilike.%${q}%`).limit(1).single();
+    if(error||!data){addLog(`❌ No user found: ${q}`,"#FF4400");}
+    else{setRoleUser(data);addLog(`✅ Found: ${data.username} (${data.role||"player"})`,"#00FF88");}
+    setRoleLoading(false);
+  };
+
+  const assignRole=async(userId,role)=>{
+    setRoleLoading(true);
+    const{error}=await supabase.from("profiles").update({role}).eq("id",userId);
+    if(error){addLog("❌ Error: "+error.message,"#FF4400");}
+    else{setRoleUser(u=>({...u,role}));addLog(`✅ Role set to ${role} for ${roleUser?.username}`,"#FFD700");}
+    setRoleLoading(false);
+  };
 
   const approveBanner=async(b)=>{
     const now=new Date();
@@ -489,13 +511,41 @@ export default function AdminPage(){
           {/* ROLE MANAGEMENT */}
           <div style={{background:"#09091a",border:"1px solid rgba(255,215,0,.2)",borderRadius:12,padding:"18px"}}>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#FFD700",letterSpacing:3,marginBottom:14}}>⚡ ROLE MANAGEMENT</div>
-            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",marginBottom:8,letterSpacing:1}}>Run in SQL Editor to assign roles:</div>
-            {[["admin","⚡ Admin","#FFD700"],["moderator","🛡️ Moderator","#00AAFF"],["vip","⭐ VIP","#FF2D78"],["player","👤 Player","#3a3a5a"]].map(([role,label,color])=>(
-              <div key={role} style={{marginBottom:6,padding:"8px 10px",background:rgba(color,.05),border:`1px solid ${rgba(color,.2)}`,borderRadius:6}}>
-                <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color,marginBottom:3}}>{label}</div>
-                <code style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",display:"block",wordBreak:"break-all"}}>UPDATE profiles SET role='{role}' WHERE username='USERNAME';</code>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a",marginBottom:10,letterSpacing:1}}>SEARCH BY USERNAME OR EMAIL</div>
+            <div style={{display:"flex",gap:8,marginBottom:12}}>
+              <input
+                value={roleSearch}
+                onChange={e=>setRoleSearch(e.target.value)}
+                onKeyDown={e=>{if(e.key==="Enter")searchRoleUser();}}
+                placeholder="username or email..."
+                style={{flex:1,background:"#0c0c1c",border:"1px solid rgba(255,215,0,.2)",borderRadius:6,padding:"8px 12px",color:"#e0e8ff",fontSize:12,fontFamily:"'Share Tech Mono',monospace",outline:"none"}}
+              />
+              <button onClick={searchRoleUser} disabled={roleLoading||!roleSearch.trim()} style={{padding:"8px 14px",background:"rgba(255,215,0,.1)",border:"1px solid rgba(255,215,0,.3)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FFD700",fontWeight:900,opacity:roleLoading||!roleSearch.trim()?0.4:1}}>
+                {roleLoading?"...":"FIND"}
+              </button>
+            </div>
+
+            {roleUser&&(
+              <div style={{background:"rgba(255,215,0,.05)",border:"1px solid rgba(255,215,0,.15)",borderRadius:8,padding:"12px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                  {roleUser.avatar_url&&<img src={roleUser.avatar_url} style={{width:32,height:32,borderRadius:"50%"}} alt="avatar"/>}
+                  <div>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#e0e8ff",fontWeight:900}}>{roleUser.username}</div>
+                    <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#3a3a5a"}}>{roleUser.email||"no email"} · {roleUser.total_claimed||0}px claimed</div>
+                  </div>
+                  <div style={{marginLeft:"auto",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:{admin:"#FFD700",moderator:"#00AAFF",vip:"#FF2D78",player:"#3a3a5a"}[roleUser.role]||"#3a3a5a"}}>
+                    CURRENT: {roleUser.role?.toUpperCase()||"PLAYER"}
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  {[["admin","⚡ ADMIN","#FFD700"],["moderator","🛡️ MOD","#00AAFF"],["vip","⭐ VIP","#FF2D78"],["player","👤 PLAYER","#555577"]].map(([r,label,color])=>(
+                    <button key={r} onClick={()=>assignRole(roleUser.id,r)} disabled={roleUser.role===r||roleLoading} style={{padding:"9px",background:roleUser.role===r?`rgba(${color==="#FFD700"?"255,215,0":color==="#00AAFF"?"0,170,255":color==="#FF2D78"?"255,45,120":"85,85,119"},.2)`:"rgba(255,255,255,.03)",border:`1px solid ${roleUser.role===r?color+"66":"rgba(255,255,255,.08)"}`,borderRadius:6,cursor:roleUser.role===r?"default":"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:roleUser.role===r?color:"rgba(255,255,255,.3)",fontWeight:900,opacity:roleLoading?.5:1}}>
+                      {label} {roleUser.role===r?"✓":""}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ))}
+            )}
           </div>
 
           {/* MINI-SEASON CREATOR */}
