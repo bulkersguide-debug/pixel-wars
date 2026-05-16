@@ -214,6 +214,8 @@ export default function App(){
   const [showHallOfFame,setShowHallOfFame]=useState(false);
   const [notifPermission,setNotifPermission]=useState(Notification?.permission||"default");
   const [showNotifBanner,setShowNotifBanner]=useState(false);
+  const [showDecayAlert,setShowDecayAlert]=useState(false);
+  const [rivalId,setRivalId]=useState(null);
   const [missionProgress,setMissionProgress]=useState(()=>{
     try{const wk=getWeekNum();const saved=JSON.parse(localStorage.getItem("pow_missions")||"{}");return saved.week===wk?saved.data:{};}catch{return{};}
   });
@@ -834,6 +836,33 @@ export default function App(){
   const freeUsedPreview=mode==="BUILD"?Math.min(freePixels,Math.floor(pendingCost)):0;
   const currentTheme=THEMES[season.theme]||THEMES[0];
   const decayStats=useMemo(()=>{const now=Date.now();let warn=0,expired=0;Object.values(pixels).forEach(p=>{if(!p?.at)return;const age=now-p.at;if(age>DECAY_EXPIRE*86400000)expired++;else if(age>DECAY_WARN*86400000)warn++;});return{warn,expired};},[pixels]);
+
+  // Decay alert — show once per day when pixels are fading
+  useEffect(()=>{
+    if(!active||decayStats.warn===0)return;
+    const key=`pow_decay_alert_${active}_${new Date().toDateString()}`;
+    if(localStorage.getItem(key))return;
+    setTimeout(()=>{setShowDecayAlert(true);localStorage.setItem(key,"1");},3000);
+  },[active,decayStats.warn]);
+
+  // Rival system — find most frequent war opponent
+  useEffect(()=>{
+    if(!active||wars.length===0){setRivalId(null);return;}
+    const freq={};
+    wars.forEach(w=>{
+      if(w.attacker===active&&w.defender!==active)freq[w.defender]=(freq[w.defender]||0)+1;
+      if(w.defender===active&&w.attacker!==active)freq[w.attacker]=(freq[w.attacker]||0)+1;
+    });
+    // Also count from pixel feed — who raided us most
+    feed.forEach(f=>{
+      if(f.isRaid&&f.team&&f.team!==TM[active]?.name){
+        const t=Object.values(TM).find(x=>x.name===f.team);
+        if(t)freq[t.id]=(freq[t.id]||0)+0.5;
+      }
+    });
+    const top=Object.entries(freq).sort((a,b)=>b[1]-a[1])[0];
+    setRivalId(top?top[0]:null);
+  },[active,wars,feed]);
   const miniSeasonLeader=useMemo(()=>{if(!miniSeason)return null;const{sector_x:msx,sector_y:msy}=miniSeason;const cnt={};for(let py=msy*SECTOR;py<(msy+1)*SECTOR;py++)for(let px2=msx*SECTOR;px2<(msx+1)*SECTOR;px2++){const p=pixels[py*GW+px2];if(p?.t)cnt[p.t]=(cnt[p.t]||0)+1;}const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];return top?{id:top[0],name:TM[top[0]]?.name||"?",color:TM[top[0]]?.color||"#888",count:top[1]}:null;},[pixels,miniSeason]);
   const miniSeasonDaysLeft=miniSeason?Math.max(0,Math.ceil((new Date(miniSeason.end_date)-Date.now())/86400000)):0;
   const bannerOffset=145+(miniSeason?30:0)+(pendingAlliances.length>0?30:0)+(showNotifBanner&&notifPermission==="default"?36:0);
@@ -1086,6 +1115,23 @@ export default function App(){
         </div>
       </div>}
 
+      {/* DECAY ALERT MODAL */}
+      {showDecayAlert&&active&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:997,backdropFilter:"blur(8px)"}} onClick={()=>setShowDecayAlert(false)}>
+        <div style={{background:"rgba(9,9,26,.98)",border:"1px solid rgba(255,200,0,.5)",borderRadius:18,padding:"32px 28px",width:380,maxWidth:"94vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",textAlign:"center",boxShadow:"0 0 60px rgba(255,200,0,.15)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:48,marginBottom:12,animation:"pulse 1.5s ease-in-out infinite"}}>⚠️</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:15,fontWeight:900,color:"#FFD700",letterSpacing:2,marginBottom:8}}>PIXELS FADING!</div>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.5)",marginBottom:20,lineHeight:1.6}}>
+            <span style={{color:"#FFD700",fontSize:20,fontWeight:900}}>{decayStats.warn}</span> of your pixels are decaying.<br/>
+            {decayStats.expired>0&&<><span style={{color:"#FF4400",fontSize:16,fontWeight:900}}>{decayStats.expired}</span> have already expired.<br/></>}
+            Use a <strong style={{color:"#00FFAA"}}>♻️ Renewal Shield</strong> to save them before they're gone!
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>{setShowDecayAlert(false);setMode("SHOP");}} style={{flex:1,padding:"13px",background:"linear-gradient(90deg,rgba(0,255,170,.2),rgba(0,255,170,.05))",border:"1px solid rgba(0,255,170,.5)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#00FFAA",letterSpacing:1,fontWeight:900}}>♻️ GET RENEWAL SHIELD</button>
+            <button onClick={()=>setShowDecayAlert(false)} style={{padding:"13px 16px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)"}}>LATER</button>
+          </div>
+        </div>
+      </div>}
+
       {/* LOADING */}
       {loading&&<div style={{position:"fixed",inset:0,background:"#040408",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:1000,gap:0}}>
         {/* Animated pixel grid background */}
@@ -1124,6 +1170,38 @@ export default function App(){
           <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
           <a href="/rivalries" style={{marginTop:3,display:"inline-block",background:"rgba(255,68,0,.06)",border:"1px solid rgba(255,68,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",letterSpacing:1,textDecoration:"none"}}>⚔️ RIVALRIES</a>
           <button onClick={()=>{if(!requireAuth("fandom"))return;navigate("/request-fandom");}} style={{marginTop:3,background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.5)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST FANDOM</button>
+
+          {/* RIVAL WIDGET */}
+          {rivalId&&TM[rivalId]&&active&&<div style={{marginTop:8,background:`rgba(255,68,0,.06)`,border:`1px solid rgba(255,68,0,.25)`,borderRadius:8,padding:"8px 10px",animation:"slideDown .3s ease"}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FF4400",letterSpacing:2,marginBottom:6,display:"flex",alignItems:"center",gap:4}}>⚔️ YOUR RIVAL</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:TM[rivalId].color,boxShadow:`0 0 6px ${TM[rivalId].color}`,flexShrink:0}}/>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:TM[rivalId].color,maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{TM[rivalId].name}</div>
+              </div>
+              <div style={{display:"flex",gap:4}}>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)"}}>
+                  {Object.values(pixels).filter(p=>p?.t===active).length}px
+                  <span style={{color:"#FF4400",margin:"0 3px"}}>vs</span>
+                  {Object.values(pixels).filter(p=>p?.t===rivalId).length}px
+                </div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:4,marginTop:6}}>
+              <button onClick={()=>{if(!requireAuth("war"))return;declareWar(rivalId);}} style={{flex:1,padding:"4px",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.3)",borderRadius:4,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FF4400",fontWeight:900}}>⚔️ WAR</button>
+              <button onClick={()=>{setMode("RAID");pushToast(`🎯 Target: ${TM[rivalId].name}!`,"#FF4400",3000);}} style={{flex:1,padding:"4px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.2)",borderRadius:4,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF6644"}}>🗡️ RAID</button>
+            </div>
+          </div>}
+
+          {/* DECAY WARNING */}
+          {decayStats.warn>0&&active&&<div onClick={()=>setShowDecayAlert(true)} style={{marginTop:6,background:"rgba(255,200,0,.06)",border:"1px solid rgba(255,200,0,.3)",borderRadius:6,padding:"5px 8px",cursor:"pointer",display:"flex",alignItems:"center",gap:6,animation:"pulse 2s ease-in-out infinite"}}>
+            <span style={{fontSize:14}}>⚠️</span>
+            <div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FFD700",fontWeight:900}}>{decayStats.warn}px FADING</div>
+              {decayStats.expired>0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#FF4400"}}>{decayStats.expired}px expired</div>}
+            </div>
+            <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)",marginLeft:"auto"}}>TAP →</span>
+          </div>}
           <button onClick={()=>{if(!requireAuth("advertise"))return;setShowSponsor(true);}} style={{marginTop:3,background:"rgba(255,215,0,.1)",border:"1px solid rgba(255,215,0,.4)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FFD700",letterSpacing:1,fontWeight:900}}>📣 ADVERTISE</button>
           <div style={{display:"flex",gap:6,marginTop:3,flexWrap:"wrap"}}>
             <a href="/contact" style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#4a4a6a",textDecoration:"none",letterSpacing:1,border:"1px solid #1a1a30",borderRadius:3,padding:"1px 5px"}}>CONTACT</a>
