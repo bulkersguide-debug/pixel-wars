@@ -27,6 +27,8 @@ function BannerCountdown({endAt}){
   },[endAt]);
   return<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00FF88"}}>⏱ {left}</span>;
 }
+
+function CreateBannerForm({addLog,onCreated}){
   const [msg,setMsg]=useState("");
   const [hours,setHours]=useState("24");
   const [loading,setLoading]=useState(false);
