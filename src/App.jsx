@@ -103,6 +103,16 @@ const EVENTS=[
   {icon:"👑",label:"CROWN BATTLE",desc:"Top fandom wins 50px!",duration:900,color:"#FFD700"},
   {icon:"🔓",label:"SECTOR SALE",desc:"ALL sector prices halved!",duration:600,color:"#00AAFF"},
 ];
+
+// Weekly themed events — rotate by week number
+const WEEKLY_THEMES=[
+  {cat:"🎮 Gaming",label:"GAMING WEEK",desc:"Gaming fandoms: -15% raid cost + +10% claim speed",icon:"🎮",color:"#00F5FF",raidDiscount:0.85,claimBonus:0.9},
+  {cat:"🎌 Anime",label:"ANIME INVASION",desc:"Anime fandoms: -20% build cost + border glow boost",icon:"🎌",color:"#FF2D78",raidDiscount:1,claimBonus:0.8},
+  {cat:"🎵 Music",label:"MUSIC TAKEOVER",desc:"Music fandoms: -15% build + double War Chest income",icon:"🎵",color:"#FFD700",raidDiscount:1,claimBonus:0.85},
+  {cat:"🎬 TV & Film",label:"SCREEN WARS",desc:"TV & Film fandoms: +25% attack power this week",icon:"🎬",color:"#9747FF",raidDiscount:0.75,claimBonus:1},
+  {cat:"⚽ Sports",label:"SPORTS BLITZ",desc:"Sports fandoms: free pixels doubled this week",icon:"⚽",color:"#00FF88",raidDiscount:1,claimBonus:0.85},
+  {cat:"ALL",label:"FREE FOR ALL",desc:"All fandoms: -10% on everything. Let chaos reign!",icon:"💥",color:"#FF4400",raidDiscount:0.9,claimBonus:0.9},
+];
 const SIM_TEAMS=["BTS","Naruto","Fortnite","BLACKPINK","Taylor Swift","Valorant","Attack on Titan","Drake","Minecraft","One Piece"];
 const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const RANKS=[{name:"BRONZE",min:0,max:49,icon:"🥉",color:"#CD7F32"},{name:"SILVER",min:50,max:199,icon:"🥈",color:"#C0C0C0"},{name:"GOLD",min:200,max:499,icon:"🥇",color:"#FFD700"},{name:"PLATINUM",min:500,max:999,icon:"💎",color:"#00EAFF"},{name:"DIAMOND",min:1000,max:2499,icon:"💠",color:"#BB88FF"},{name:"LEGEND",min:2500,max:Infinity,icon:"👑",color:"#FF2D78"}];
@@ -179,6 +189,10 @@ export default function App(){
   const [feed,setFeed]=useState([]);
   const [event,setEvent]=useState(null);
   const [eventTimer,setEventTimer]=useState(0);
+  const [warChest,setWarChest]=useState(()=>{try{return parseInt(localStorage.getItem("pow_war_chest")||"0");}catch{return 0;}});
+  const [fortifiedSectors,setFortifiedSectors]=useState(()=>{try{return JSON.parse(localStorage.getItem("pow_fort_sectors")||"[]");}catch{return [];}});
+  const [showWarChest,setShowWarChest]=useState(false);
+  const weeklyTheme=useMemo(()=>WEEKLY_THEMES[getWeekNum()%WEEKLY_THEMES.length],[]);
   const [flashColor,setFlashColor]=useState(null);
   const [shakeCanvas,setShakeCanvas]=useState(false);
   const [myPixels,setMyPixels]=useState(0);
@@ -297,6 +311,40 @@ export default function App(){
 
   // Heatmap decay
   useEffect(()=>{const iv=setInterval(()=>{const h=heatmapRef.current;Object.keys(h).forEach(k=>{h[k]=Math.floor(h[k]*0.85);if(h[k]<=0)delete h[k];});setHeatmapTick(t=>t+1);},[30000]);return()=>clearInterval(iv);},[]);
+
+  // War Chest — passive gold income every 5 minutes based on pixel count
+  useEffect(()=>{
+    const iv=setInterval(()=>{
+      if(!active)return;
+      setPixels(px=>{
+        const myPx=Object.values(px).filter(p=>p?.t===active).length;
+        if(myPx===0)return px;
+        // 1 gold per 50 pixels per 5 minutes, bonus if weekly theme matches
+        const base=Math.max(1,Math.floor(myPx/50));
+        const themeBonus=(weeklyTheme.cat===active?.split("|")[0]||weeklyTheme.cat==="ALL")?2:1;
+        const income=base*themeBonus;
+        setWarChest(g=>{
+          const next=g+income;
+          localStorage.setItem("pow_war_chest",String(next));
+          if(income>0)pushToast(`💰 +${income} War Chest gold (${next} total)`,"#FFD700",2500);
+          return next;
+        });
+        return px;
+      });
+    },300000); // every 5 minutes
+    return()=>clearInterval(iv);
+  },[active,weeklyTheme]);
+
+  // Init fortified sectors — 4 random unlocked sectors per season
+  useEffect(()=>{
+    if(loading||unlockedSectors.length===0)return;
+    const saved=localStorage.getItem("pow_fort_sectors_season");
+    if(saved===String(currentSeasonNum)&&fortifiedSectors.length>0)return;
+    const shuffled=[...unlockedSectors].sort(()=>Math.random()-.5).slice(0,4);
+    setFortifiedSectors(shuffled);
+    localStorage.setItem("pow_fort_sectors",JSON.stringify(shuffled));
+    localStorage.setItem("pow_fort_sectors_season",String(currentSeasonNum));
+  },[loading,unlockedSectors.length,currentSeasonNum]);
 
   // Fast tick for remote claim/raid ripple animations
   useEffect(()=>{
@@ -890,6 +938,21 @@ export default function App(){
         ctx.fillStyle="rgba(255,215,0,.06)";ctx.fillRect(dx2,dy2,SECTOR*CELL,SECTOR*CELL);
       }
     }
+    // Fortified sectors — red dashed border + shield icon
+    fortifiedSectors.forEach(([fsx,fsy])=>{
+      const dx2=(fsx*SECTOR-vx)*CELL,dy2=(fsy*SECTOR-vy)*CELL;
+      if(dx2<-SECTOR*CELL||dx2>CW||dy2<-SECTOR*CELL||dy2>CH)return;
+      const pulse=0.4+0.3*Math.sin(frame*0.08);
+      ctx.strokeStyle=`rgba(255,68,0,${pulse})`;ctx.lineWidth=2;ctx.setLineDash([6,3]);
+      ctx.strokeRect(dx2,dy2,SECTOR*CELL,SECTOR*CELL);ctx.setLineDash([]);
+      ctx.fillStyle=`rgba(255,68,0,${pulse*0.08})`;ctx.fillRect(dx2,dy2,SECTOR*CELL,SECTOR*CELL);
+      // FORTRESS label
+      const cx2=dx2+SECTOR*CELL/2,cy2=dy2+SECTOR*CELL/2;
+      ctx.fillStyle=`rgba(255,68,0,${pulse*0.9})`;ctx.font="bold 10px monospace";ctx.textAlign="center";
+      ctx.fillText("🏰 FORTRESS",cx2,cy2-6);
+      ctx.fillStyle=`rgba(255,255,255,${pulse*0.4})`;ctx.font="8px monospace";
+      ctx.fillText("3× RAID COST",cx2,cy2+8);
+    });
     // Canvas vignette
     const vig=ctx.createRadialGradient(CW/2,CH/2,CW*0.28,CW/2,CH/2,CW*0.72);
     vig.addColorStop(0,"rgba(0,0,0,0)");vig.addColorStop(1,"rgba(0,0,10,0.55)");
@@ -995,6 +1058,9 @@ export default function App(){
   };
   const onMM_h=(e)=>{const g=mouseToGrid(e);if(g){setHov(pixels[g.idx]?TM[pixels[g.idx].t]:null);const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);setHovSector({sx,sy,unlocked:unlockedSet.has(sectorKey(sx,sy)),fill:sectorFills[sectorKey(sx,sy)]||0});}if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}};
   const triggerFlash=(color,shake=false)=>{setFlashColor(color);setTimeout(()=>setFlashColor(null),300);if(shake){setShakeCanvas(true);setTimeout(()=>setShakeCanvas(false),500);}};
+  const isFortified=(sx,sy)=>fortifiedSectors.some(([fx,fy])=>fx===sx&&fy===sy);
+  const isThemeFandom=(teamId)=>weeklyTheme.cat==="ALL"||teamId?.startsWith(weeklyTheme.cat)||TM[teamId]?.cat===weeklyTheme.cat;
+
   const calcCost=(pendingSet)=>{
     if(!pendingSet.size)return 0;
     let total=0;
@@ -1007,8 +1073,14 @@ export default function App(){
       if(mode==="RAID")price*=2;
       if(event?.label==="CHAOS HOUR"&&mode==="RAID")price*=0.5;
       if(event?.label==="SECTOR SALE")price*=0.5;
+      // Fortified sector — 3x raid cost
+      if(mode==="RAID"&&isFortified(sx,sy))price*=3;
+      // Weekly theme discount for matching fandoms
+      if(active&&isThemeFandom(active)){
+        if(mode==="RAID")price*=weeklyTheme.raidDiscount;
+        else price*=weeklyTheme.claimBonus;
+      }
       idxs.forEach(idx=>{
-        // Contiguity bonus — 10% discount if adjacent to own territory
         if(mode==="BUILD"&&active){
           const gx=idx%GW,gy=Math.floor(idx/GW);
           const isAdj=pixels[(gy-1)*GW+gx]?.t===active||pixels[(gy+1)*GW+gx]?.t===active||pixels[gy*GW+(gx-1)]?.t===active||pixels[gy*GW+(gx+1)]?.t===active;
@@ -1183,6 +1255,17 @@ export default function App(){
     else if(pu.id==="nuke"){const ex=randInt(0,GW-21),ey=randInt(0,GH-21);let d=0;for(let dy=0;dy<20;dy++)for(let dx=0;dx<20;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)&&!isAllied(next[idx].t)){toDelete.push(idx);delete next[idx];delete newShields[idx];d++;}}spawnShockwave("#FF0000",vx+VW/2,vy+VH/2);spawnShockwave("#FF4400",vx+VW/2,vy+VH/2);spawnParticles("#FF0000",vx+VW/2,vy+VH/2,30,true);triggerFlash("#FF0000",true);pushToast(`☢️ NUKE! Obliterated ${d} pixels!`,"#FF0000",6000);}
     else if(pu.id==="renew"){let r=0;const myPx=Object.entries(next).filter(([,v])=>v?.t===active).sort((a,b)=>a[1].at-b[1].at).slice(0,50);myPx.forEach(([k])=>{if(next[k]){next[k]={...next[k],at:now};toUpsert.push(parseInt(k));r++;}});pushToast(`♻️ RENEWED ${r} pixels!`,"#00FFAA",5000);triggerFlash("#00FFAA");}
     else if(pu.id==="double"){const win=Math.random()>.5;pushToast(win?"✨ WIN! Bonus territory!":"✨ LOST 💀","#BB88FF",5000);triggerFlash("#BB88FF",win);}
+    else if(pu.id==="goldraid"){
+      // War Chest gold raid — spend 20 gold to steal 20 random enemy pixels
+      if(warChest<20){pushToast("Need 20💰 gold! Earn more by holding territory.","#FFD700",3000);return;}
+      const enemies=Object.entries(next).filter(([,v])=>v?.t&&v.t!==active&&!isAllied(v.t));
+      if(enemies.length===0){pushToast("No enemy pixels to raid!","#FF4400",3000);return;}
+      const targets=enemies.sort(()=>Math.random()-.5).slice(0,20);
+      targets.forEach(([idx])=>{next[parseInt(idx)]={t:active,at:now};toUpsert.push(parseInt(idx));});
+      const newGold=warChest-20;setWarChest(newGold);localStorage.setItem("pow_war_chest",String(newGold));
+      spawnParticles("#FFD700",vx+VW/2,vy+VH/2,20,true);triggerFlash("#FFD700",true);
+      pushToast(`💰 WAR CHEST RAID! Stole ${targets.length}px! (${newGold}💰 left)`,"#FFD700",5000);
+    }
     setPixels(next);setShields(newShields);try{localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
     trackMission("powerup",1);
     if(isOnline){if(toDelete.length)await dbDeletePixels(toDelete,currentSeasonNum);if(toUpsert.length)await dbUpsertPixels(new Set(toUpsert),active,currentSeasonNum);}else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
@@ -2124,6 +2207,58 @@ export default function App(){
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FFD700"}}>{miniSeasonDaysLeft}d · {miniSeason.prize}</span>
           <button onClick={()=>{setVx(Math.max(0,miniSeason.sector_x*SECTOR-40));setVy(Math.max(0,miniSeason.sector_y*SECTOR-30));}} style={{padding:"2px 7px",background:"rgba(255,215,0,.12)",border:"1px solid rgba(255,215,0,.35)",borderRadius:4,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700"}}>GO →</button>
+        </div>
+      </div>}
+
+      {/* WEEKLY THEME BANNER */}
+      <div style={{background:`linear-gradient(90deg,${weeklyTheme.color}18,${weeklyTheme.color}06,transparent)`,borderBottom:`1px solid ${weeklyTheme.color}33`,padding:"4px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:13}}>{weeklyTheme.icon}</span>
+          <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:weeklyTheme.color,letterSpacing:1}}>{weeklyTheme.label}</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.35)"}}>{weeklyTheme.desc}</span>
+          {active&&isThemeFandom(active)&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:weeklyTheme.color,background:`${weeklyTheme.color}22`,border:`1px solid ${weeklyTheme.color}44`,borderRadius:4,padding:"1px 6px",animation:"pulse 1.5s infinite"}}>✅ YOUR FANDOM BENEFITS!</span>}
+        </div>
+        {/* War Chest display */}
+        {active&&<button onClick={()=>setShowWarChest(s=>!s)} style={{display:"flex",alignItems:"center",gap:5,padding:"3px 10px",background:"rgba(255,215,0,.1)",border:"1px solid rgba(255,215,0,.3)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700",fontWeight:900}}>
+          💰 {warChest} GOLD
+        </button>}
+      </div>
+
+      {/* WAR CHEST PANEL */}
+      {showWarChest&&active&&<div style={{background:"rgba(6,6,18,.97)",borderBottom:"1px solid rgba(255,215,0,.25)",padding:"10px 14px",animation:"slideDown .2s ease"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#FFD700"}}>💰 WAR CHEST — {warChest} GOLD</div>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)"}}>Earns 1 gold per 50px every 5 min</span>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={()=>{
+            if(warChest<20){pushToast("Need 20💰 gold!","#FFD700",2000);return;}
+            if(!active){pushToast("Select a fandom first","#FF4400",2000);return;}
+            // Execute gold raid
+            const now2=Date.now();
+            const enemies=Object.entries(pixels).filter(([,v])=>v?.t&&v.t!==active&&!isAllied(v.t));
+            if(enemies.length===0){pushToast("No enemies to raid!","#FF4400",2000);return;}
+            const targets=enemies.sort(()=>Math.random()-.5).slice(0,20);
+            const next={...pixels};
+            const toUpsert2=[];
+            targets.forEach(([idx])=>{next[parseInt(idx)]={t:active,at:now2};toUpsert2.push(parseInt(idx));});
+            setPixels(next);
+            if(isOnline)dbUpsertPixels(new Set(toUpsert2),active,currentSeasonNum);
+            const newGold=warChest-20;setWarChest(newGold);localStorage.setItem("pow_war_chest",String(newGold));
+            spawnParticles("#FFD700",vx+VW/2,vy+VH/2,20,true);triggerFlash("#FFD700",true);
+            pushToast(`💰 GOLD RAID! Stole ${targets.length}px! (${newGold}💰 left)`,"#FFD700",5000);
+          }} style={{padding:"6px 14px",background:"rgba(255,215,0,.12)",border:"1px solid rgba(255,215,0,.4)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700",fontWeight:900}}>
+            ⚔️ GOLD RAID (20💰) — Steal 20 enemy pixels
+          </button>
+          <button onClick={()=>{
+            if(warChest<10){pushToast("Need 10💰 gold!","#FFD700",2000);return;}
+            const newGold=warChest-10;setWarChest(newGold);localStorage.setItem("pow_war_chest",String(newGold));
+            syncFreePixels(freePixels+5);
+            pushToast("💰 Converted 10 gold → 5 free pixels!","#FFD700",4000);
+          }} style={{padding:"6px 14px",background:"rgba(200,255,0,.08)",border:"1px solid rgba(200,255,0,.25)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#C8FF00",fontWeight:900}}>
+            🔄 CONVERT (10💰) → 5 free pixels
+          </button>
+          <button onClick={()=>setShowWarChest(false)} style={{padding:"6px 10px",background:"transparent",border:"1px solid rgba(255,255,255,.1)",borderRadius:6,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)"}}>✕</button>
         </div>
       </div>}
 
