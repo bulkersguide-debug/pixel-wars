@@ -75,6 +75,13 @@ const DISCORD_CHANNEL="1504550948541042819";
 const DISCORD_WIDGET=`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`;
 const DISCORD_INVITE="https://discord.gg/4Da2avYyPF";
 const DISCORD_WEBHOOK="https://discord.com/api/webhooks/1505216663786623178/zgC0xopUlfOex7rIIcRos4SxMQrTvtj8-Gjl4cvoqyEukuOP3a-xl9ekt7iIPIj_dBAb";
+
+// Browser fingerprint for guest abuse prevention
+const getFingerprint=()=>{
+  const s=[navigator.language,screen.width,screen.height,screen.colorDepth,new Date().getTimezoneOffset(),navigator.hardwareConcurrency||0,navigator.platform||""].join("|");
+  let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}
+  return Math.abs(h).toString(36);
+};
 const _webhookLastSent={};
 const postToDiscord=async(embed)=>{
   const key=embed.title||"default";
@@ -208,6 +215,10 @@ export default function App(){
   const [profile,setProfile]=useState(null);
   const [showAuthModal,setShowAuthModal]=useState(false);
   const [authReason,setAuthReason]=useState("claim");
+  const [guestPixelsUsed,setGuestPixelsUsed]=useState(0);
+  const [guestSessionId]=useState(()=>{let id=localStorage.getItem("pow_guest_id");if(!id){id=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem("pow_guest_id",id);}return id;});
+  const [showGuestSavePrompt,setShowGuestSavePrompt]=useState(false);
+  const GUEST_MAX=3;
   const [totalPlayers,setTotalPlayers]=useState(0);
   const [sponsoredBanners,setSponsoredBanners]=useState([]);
   const [showSponsor,setShowSponsor]=useState(false);
@@ -284,10 +295,19 @@ export default function App(){
     return()=>{if(channelRef.current)supabase?.removeChannel(channelRef.current);if(presenceRef.current)supabase?.removeChannel(presenceRef.current);};
   },[]);
 
+  const [onlineByFandom,setOnlineByFandom]=useState({});
+
   function setupPresence(){
     if(!supabase)return;
     const ch=supabase.channel("online-users",{config:{presence:{key:Math.random().toString(36).slice(2)}}});
-    ch.on("presence",{event:"sync"},()=>{const st=ch.presenceState();setOnlineCount(Object.keys(st).length||1);}).subscribe(async(status)=>{if(status==="SUBSCRIBED")await ch.track({t:Date.now()});});
+    ch.on("presence",{event:"sync"},()=>{
+      const st=ch.presenceState();
+      setOnlineCount(Object.keys(st).length||1);
+      // Count per fandom
+      const byFandom={};
+      Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
+      setOnlineByFandom(byFandom);
+    }).subscribe(async(status)=>{if(status==="SUBSCRIBED")await ch.track({t:Date.now(),fandom:null});});
     presenceRef.current=ch;
   }
 
@@ -331,6 +351,13 @@ export default function App(){
 
   // Load chat when fandom changes
   useEffect(()=>{if(active&&isOnline){dbLoadMessages(active,currentSeasonNum).then(msgs=>setChatMessages(msgs));}else setChatMessages([]);},[active,currentSeasonNum]);
+
+  // Update presence when fandom changes
+  useEffect(()=>{
+    if(presenceRef.current&&active){
+      presenceRef.current.track({t:Date.now(),fandom:active}).catch(()=>{});
+    }
+  },[active]);
 
   const seasonDaysLeft=useMemo(()=>{const end=new Date(new Date(season.startDate).getTime()+SEASON_DAYS*86400000);return Math.max(0,Math.ceil((end-Date.now())/86400000));},[season]);
   useEffect(()=>{if(seasonDaysLeft===0&&!showSeasonEnd&&!loading)setShowSeasonEnd(true);},[seasonDaysLeft,loading]);
@@ -715,7 +742,25 @@ export default function App(){
   const calcCost=(pendingSet)=>{if(!pendingSet.size)return 0;let total=0;const groups={};pendingSet.forEach(idx=>{const[sx,sy]=sectorOf(idx);const k=sectorKey(sx,sy);if(!groups[k])groups[k]=[];groups[k].push(idx);});Object.entries(groups).forEach(([k,idxs])=>{const[sx,sy]=k.split(",").map(Number);const fill=sectorFills[k]||0;let price=sectorBasePrice(sx,sy)*fillMultiplier(fill);if(mode==="RAID")price*=2;if(event?.label==="CHAOS HOUR"&&mode==="RAID")price*=0.5;if(event?.label==="SECTOR SALE")price*=0.5;total+=idxs.length*price;});return Math.round(total*100)/100;};
   const requestClaim=()=>{
     if(!active||pending.size===0)return;
-    if(!user){setAuthReason("claim");setShowAuthModal(true);return;}
+    if(!user){
+      // Guest claiming — allow up to GUEST_MAX pixels
+      if(mode==="RAID"){setAuthReason("raid");setShowAuthModal(true);return;}
+      const remaining=GUEST_MAX-guestPixelsUsed;
+      if(remaining<=0){setAuthReason("claim");setShowAuthModal(true);return;}
+      const allowed=Math.min(pending.size,remaining);
+      const allowedSet=new Set(Array.from(pending).slice(0,allowed));
+      const t=TM[active];
+      // Store guest pixels in Supabase with fingerprint
+      const fp=getFingerprint();
+      supabase.from("guest_claims").upsert({fingerprint:fp,session_id:guestSessionId,pixels_used:(guestPixelsUsed+allowed),fandom_id:active,expires_at:new Date(Date.now()+86400000).toISOString()},{onConflict:"session_id"}).then(()=>{});
+      // Place pixels visually
+      const next={...pixels};allowedSet.forEach(idx=>{next[idx]={t:active,at:Date.now()};});
+      setPixels(next);setGuestPixelsUsed(g=>g+allowed);setPending(new Set());
+      if(isOnline)dbUpsertPixels(allowedSet,active,currentSeasonNum);
+      // Show save prompt after placing
+      setTimeout(()=>setShowGuestSavePrompt(true),1500);
+      return;
+    }
     const t=TM[active];const isRaid=mode==="RAID";const cost=calcCost(pending);
     const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;
     const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;
@@ -1297,8 +1342,12 @@ export default function App(){
       {/* GUEST BANNER */}
       {!user&&!loading&&<div style={{background:"rgba(88,101,242,.1)",borderBottom:"1px solid rgba(88,101,242,.3)",padding:"5px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:14}}>👀</span>
-          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#7289DA"}}>Viewing as guest — sign in to claim territory and get <strong style={{color:"#FFD700"}}>25 FREE pixels</strong></span>
+          <span style={{fontSize:14}}>{guestPixelsUsed>=GUEST_MAX?"🔒":"👀"}</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#7289DA"}}>
+            {guestPixelsUsed>=GUEST_MAX
+              ? <>Guest limit reached — <strong style={{color:"#FFD700"}}>Login to claim unlimited pixels + 25 FREE</strong></>
+              : <><strong style={{color:"#C8FF00"}}>{GUEST_MAX-guestPixelsUsed} free pixel{GUEST_MAX-guestPixelsUsed!==1?"s":""} left</strong> — Login with Discord for 25 more + save your territory</>}
+          </span>
         </div>
         <button onClick={()=>setShowAuthModal(true)} style={{padding:"4px 14px",background:"linear-gradient(90deg,#5865F2,#7289DA)",border:"none",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#fff",letterSpacing:1}}>LOGIN WITH DISCORD →</button>
       </div>}
@@ -1394,6 +1443,25 @@ export default function App(){
 
       {pixelHistory&&<PixelHistoryModal pixel={pixelHistory.pixel} history={pixelHistory.history} TM={TM} onClose={()=>setPixelHistory(null)} onJumpTo={()=>{setVx(Math.max(0,pixelHistory.gx-VW/2));setVy(Math.max(0,pixelHistory.gy-VH/2));setPixelHistory(null);}}/>}
       {showAuthModal&&<AuthModal onClose={()=>setShowAuthModal(false)} reason={authReason}/>}
+
+      {/* GUEST SAVE PROMPT */}
+      {showGuestSavePrompt&&!user&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(8px)"}} onClick={()=>setShowGuestSavePrompt(false)}>
+        <div style={{background:"rgba(9,9,26,.98)",border:"1px solid rgba(88,101,242,.5)",borderRadius:18,padding:"32px 28px",width:380,maxWidth:"94vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",textAlign:"center",boxShadow:"0 0 60px rgba(88,101,242,.2)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontSize:48,marginBottom:12}}>⚠️</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:15,fontWeight:900,color:"#FFD700",letterSpacing:2,marginBottom:8}}>YOUR PIXELS WILL DISAPPEAR!</div>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.5)",marginBottom:20,lineHeight:1.7}}>
+            You placed <strong style={{color:"#C8FF00"}}>{guestPixelsUsed} pixel{guestPixelsUsed!==1?"s":""}</strong> as a guest.<br/>
+            They expire in <strong style={{color:"#FF4400"}}>24 hours</strong> unless you save them.<br/><br/>
+            Login with Discord to <strong style={{color:"#00FF88"}}>keep them forever</strong> + get 25 more free pixels.
+          </div>
+          <button onClick={()=>{setShowGuestSavePrompt(false);setShowAuthModal(true);}} style={{width:"100%",padding:"14px",background:"linear-gradient(90deg,#5865F2,#7289DA)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:12,color:"#fff",letterSpacing:2,marginBottom:8}}>
+            💾 SAVE MY PIXELS — LOGIN WITH DISCORD
+          </button>
+          <button onClick={()=>setShowGuestSavePrompt(false)} style={{width:"100%",padding:"10px",background:"transparent",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)"}}>
+            I'll lose them (dismiss)
+          </button>
+        </div>
+      </div>}
       {showSponsor&&<SponsorModal onClose={()=>setShowSponsor(false)} userEmail={user?.email}/>}
       <CookieBanner/>
 
@@ -1501,13 +1569,14 @@ export default function App(){
                     );})}
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:5}}>
-                    {vis.map(t=>{const isA=active===t.id;const px=Object.values(pixels).filter(p=>p?.t===t.id).length;const rank=getRank(px);const allied=active&&isAllied(t.id);return(
+                    {vis.map(t=>{const isA=active===t.id;const px=Object.values(pixels).filter(p=>p?.t===t.id).length;const rank=getRank(px);const allied=active&&isAllied(t.id);const online=onlineByFandom[t.id]||0;return(
                       <div key={t.id} onClick={()=>setActive(isA?null:t.id)} style={{padding:"8px 10px",borderRadius:6,cursor:"pointer",border:`1px solid ${isA?t.color:allied?"rgba(0,255,170,.25)":rgba(t.color,.2)}`,background:isA?rgba(t.color,.1):"#0c0c1a",display:"flex",alignItems:"center",gap:7}}>
                         <div style={{width:10,height:10,borderRadius:2,background:t.color,flexShrink:0,boxShadow:isA?`0 0 6px ${t.color}`:undefined}}/>
-                        <div style={{minWidth:0}}>
+                        <div style={{minWidth:0,flex:1}}>
                           <div style={{fontWeight:700,fontSize:11,color:isA?t.color:"#c0c8e8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}{allied?" 🤝":""}</div>
                           {px>0&&<div style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:rank.color}}>{rank.icon} {px}px</div>}
                         </div>
+                        {online>0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00FF88",whiteSpace:"nowrap",flexShrink:0}}>🟢{online}</div>}
                       </div>
                     );})}
                   </div>
@@ -1720,7 +1789,7 @@ export default function App(){
                 {subArrFull.map(s=>{const on=selSub===s,acc=selCat!=="All"?CAT_ACCENT[selCat]:"#5566AA";return(<button key={s} className="chip" onClick={()=>setSelSub(s)} style={{padding:"2px 6px",borderRadius:20,border:`1px solid ${on?acc:acc+"22"}`,background:on?rgba(acc,.12):"transparent",color:on?acc:acc+"55",fontSize:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",whiteSpace:"nowrap",transition:"all .1s"}}>{s}</button>);})}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(118px,1fr))",gap:3}}>
-                {vis.map(t=>{const isA=active===t.id,acc=CAT_ACCENT[t.cat]||"#00F5FF";const px=Object.values(pixels).filter(p=>p?.t===t.id).length;const rank=getRank(px);const allied=active&&isAllied(t.id);const atWar=active&&wars.some(w=>(w.attacker===active&&w.defender===t.id)||(w.defender===active&&w.attacker===t.id));const trend=territoryTrend[t.id]||0;return(
+                {vis.map(t=>{const isA=active===t.id,acc=CAT_ACCENT[t.cat]||"#00F5FF";const px=Object.values(pixels).filter(p=>p?.t===t.id).length;const rank=getRank(px);const allied=active&&isAllied(t.id);const atWar=active&&wars.some(w=>(w.attacker===active&&w.defender===t.id)||(w.defender===active&&w.attacker===t.id));const trend=territoryTrend[t.id]||0;const online=onlineByFandom[t.id]||0;return(
                   <div key={t.id} className="tbtn" onClick={()=>setActive(isA?null:t.id)} style={{padding:"5px 7px",borderRadius:5,cursor:"pointer",border:`1px solid ${isA?t.color:allied?"rgba(0,255,170,.3)":atWar?"rgba(255,68,0,.3)":acc+"18"}`,background:isA?rgba(t.color,.1):allied?rgba("#00FFAA",.04):atWar?rgba("#FF4400",.04):"#0c0c1a",transition:"all .1s",position:"relative",overflow:"hidden"}}>
                     {isA&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:2,background:t.color}}/>}
                     <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:1}}>
@@ -1728,6 +1797,7 @@ export default function App(){
                       <span style={{fontWeight:700,fontSize:9,color:isA?t.color:"#c0c8e8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.name}</span>
                       {allied&&<span style={{fontSize:8}}>🤝</span>}
                       {atWar&&<span style={{fontSize:8,animation:"pulse .7s infinite"}}>⚔️</span>}
+                      {online>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00FF88",marginLeft:"auto"}}>🟢{online}</span>}
                     </div>
                     <div style={{fontSize:7,color:acc+"55",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"'Share Tech Mono',monospace"}}>{t.sub}</div>
                     {px>0&&<div style={{display:"flex",alignItems:"center",gap:3,marginTop:1}}>
