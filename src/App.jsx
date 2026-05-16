@@ -218,6 +218,14 @@ export default function App(){
   const [rechargePixels,setRechargePixels]=useState(()=>{try{return parseInt(localStorage.getItem("pow_recharge")||"0");}catch{return 0;}});
   const [loyaltyDays,setLoyaltyDays]=useState(()=>{try{return JSON.parse(localStorage.getItem("pow_loyalty")||'{"fandom":"","days":0,"last":""}');}catch{return{fandom:"",days:0,last:""};}});
   const [showLevelUp,setShowLevelUp]=useState(null); // level number when leveled up
+  // ── MONETIZATION STATE ───────────────────────────────────────────────────────
+  const [hasSeasonPass,setHasSeasonPass]=useState(()=>{try{const d=JSON.parse(localStorage.getItem("pow_season_pass")||"null");return d&&d.season===1?d:null;}catch{return null;}});
+  const [showPaywall,setShowPaywall]=useState(false);
+  const [paywallTab,setPaywallTab]=useState("bundles"); // bundles | pass | starter
+  const [watchingAd,setWatchingAd]=useState(false);
+  const [adCooldown,setAdCooldown]=useState(()=>{try{return parseInt(localStorage.getItem("pow_ad_cooldown")||"0");}catch{return 0;}});
+  const [showStarterPack,setShowStarterPack]=useState(false);
+  const starterPackAvailable=useMemo(()=>{try{const j=localStorage.getItem("pow_joined_at");return j&&Date.now()-parseInt(j)<3*86400000&&!localStorage.getItem("pow_starter_used");}catch{return false;}},[]);
   const [flashColor,setFlashColor]=useState(null);
   const [shakeCanvas,setShakeCanvas]=useState(false);
   const [myPixels,setMyPixels]=useState(0);
@@ -346,7 +354,8 @@ export default function App(){
         if(myPx===0)return px;
         const base=Math.max(1,Math.floor(myPx/50));
         const themeBonus=(weeklyTheme.cat===active?.split("|")[0]||weeklyTheme.cat==="ALL")?2:1;
-        const income=base*themeBonus;
+        const passBonus=hasSeasonPass?1.5:1; // 50% War Chest bonus with Season Pass
+        const income=Math.floor(base*themeBonus*passBonus);
         setWarChest(g=>{
           const next=g+income;
           localStorage.setItem("pow_war_chest",String(next));
@@ -550,10 +559,17 @@ export default function App(){
 
   useEffect(()=>{
     const lk=document.createElement("link");lk.href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap";lk.rel="stylesheet";document.head.appendChild(lk);
+    // Track join date for starter pack
+    if(!localStorage.getItem("pow_joined_at"))localStorage.setItem("pow_joined_at",String(Date.now()));
     const p=new URLSearchParams(window.location.search).get("fandom");
     if(p){const f=ALL.find(t=>slugify(t.name)===p);if(f)setTimeout(()=>setActive(f.id),600);}
     const today=todayStr();const saved=JSON.parse(localStorage.getItem("pow_streak")||'{"days":0,"last":"","total":0}');
     if(saved.last!==today){const nd=saved.last===yesterdayStr()?saved.days+1:1;setDailyInfo({days:nd,reward:streakReward(nd)});setTimeout(()=>setShowDaily(true),1400);}
+    // Show starter pack to new players after 30s
+    const joined=localStorage.getItem("pow_joined_at");
+    if(joined&&Date.now()-parseInt(joined)<3*86400000&&!localStorage.getItem("pow_starter_used")){
+      setTimeout(()=>setShowStarterPack(true),30000);
+    }
     // Init live battle
     try{
       const lb=JSON.parse(localStorage.getItem("pow_live_battle")||"null");
@@ -1220,7 +1236,12 @@ export default function App(){
     const t=TM[active];const isRaid=mode==="RAID";const cost=calcCost(pending);
     const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;
     const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;
-    // Check how many pending pixels are adjacent to own territory
+    // If player has no free pixels, show paywall instead of confirm
+    if(!isRaid&&freePixels<=0&&rechargePixels<=0){
+      setShowPaywall(true);setPaywallTab("bundles");
+      setPending(new Set());
+      return;
+    }
     const adjCount=!isRaid?Array.from(pending).filter(idx=>{const gx=idx%GW,gy=Math.floor(idx/GW);return pixels[(gy-1)*GW+gx]?.t===active||pixels[(gy+1)*GW+gx]?.t===active||pixels[gy*GW+(gx-1)]?.t===active||pixels[gy*GW+(gx+1)]?.t===active;}).length:0;
     setConfirmPayload({count:pending.size,cost,freeUsed,isRaid,bonus,teamName:t.name,teamColor:t.color,modeLabel:isRaid?"⚔️ RAID":"🏴 CLAIM",adjCount});
     setShowConfirm(true);
@@ -1364,7 +1385,7 @@ export default function App(){
       }
     }
     // Earn XP — 1 per pixel claimed/raided
-    const xpEarned=toClaim.size+bonus;
+    const xpEarned=(toClaim.size+bonus)*(hasSeasonPass?2:1); // Double XP with Season Pass
     setXp(prevXp=>{
       const newXp=prevXp+xpEarned;
       localStorage.setItem("pow_xp",String(newXp));
@@ -2018,6 +2039,133 @@ export default function App(){
         </div>
       </div>}
 
+      {/* ── PAYWALL / SHOP MODAL ────────────────────────────────────────────── */}
+      {showPaywall&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(16px)"}} onClick={()=>setShowPaywall(false)}>
+        <div style={{background:"rgba(9,9,26,.99)",border:"1px solid rgba(200,255,0,.3)",borderRadius:20,padding:"24px",width:520,maxWidth:"96vw",maxHeight:"90vh",overflow:"auto",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",boxShadow:"0 0 80px rgba(200,255,0,.1)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#C8FF00",letterSpacing:2}}>💰 GET MORE PIXELS</div>
+            <button onClick={()=>setShowPaywall(false)} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:18}}>✕</button>
+          </div>
+
+          {/* Tabs */}
+          <div style={{display:"flex",gap:4,marginBottom:16,background:"rgba(255,255,255,.04)",borderRadius:8,padding:4}}>
+            {[["bundles","📦 Pixel Bundles"],["pass","🏆 Season Pass"],["free","🎬 Watch Ad"]].map(([id,label])=>(
+              <button key={id} onClick={()=>setPaywallTab(id)} style={{flex:1,padding:"7px",background:paywallTab===id?"rgba(200,255,0,.15)":"transparent",border:`1px solid ${paywallTab===id?"rgba(200,255,0,.4)":"transparent"}`,borderRadius:6,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:paywallTab===id?"#C8FF00":"rgba(255,255,255,.4)",fontWeight:900}}>{label}</button>
+            ))}
+          </div>
+
+          {/* PIXEL BUNDLES TAB */}
+          {paywallTab==="bundles"&&<div>
+            {starterPackAvailable&&<div style={{background:"linear-gradient(90deg,rgba(255,68,0,.15),rgba(255,215,0,.08))",border:"2px solid rgba(255,68,0,.5)",borderRadius:12,padding:"14px 16px",marginBottom:12,position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:6,right:10,fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FF4400",fontWeight:900,background:"rgba(255,68,0,.2)",borderRadius:3,padding:"2px 6px"}}>⏰ 3-DAY OFFER</div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700",marginBottom:4}}>🎁 STARTER PACK</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.6)",marginBottom:10}}>100 pixels + 1 Power-Up + Season Pass · Best value for new players</div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div><span style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#C8FF00"}}>€2.99</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",marginLeft:6,textDecoration:"line-through"}}>€14.97</span></div>
+                <button onClick={()=>{pushToast("💳 Stripe coming soon! This will open checkout.","#C8FF00",3000);}} style={{padding:"10px 20px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#040408",fontWeight:900}}>BUY NOW →</button>
+              </div>
+            </div>}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {[
+                {pixels:50,price:"€1.99",bonus:0,color:"#00F5FF",label:"SMALL",icon:"💧"},
+                {pixels:200,price:"€4.99",bonus:20,color:"#C8FF00",label:"MEDIUM",icon:"⚡",popular:true},
+                {pixels:500,price:"€9.99",bonus:75,color:"#FFD700",label:"LARGE",icon:"🔥"},
+                {pixels:1500,price:"€24.99",bonus:300,color:"#FF2D78",label:"MEGA",icon:"👑",whale:true},
+              ].map(b=>(
+                <div key={b.pixels} style={{background:b.popular?"rgba(200,255,0,.08)":b.whale?"rgba(255,45,120,.08)":"rgba(255,255,255,.03)",border:`1px solid ${b.popular?"rgba(200,255,0,.4)":b.whale?"rgba(255,45,120,.4)":"rgba(255,255,255,.08)"}`,borderRadius:10,padding:"14px 12px",position:"relative",textAlign:"center"}}>
+                  {b.popular&&<div style={{position:"absolute",top:-8,left:"50%",transform:"translateX(-50%)",background:"#C8FF00",color:"#040408",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,padding:"2px 8px",borderRadius:4}}>BEST VALUE</div>}
+                  {b.whale&&<div style={{position:"absolute",top:-8,left:"50%",transform:"translateX(-50%)",background:"#FF2D78",color:"#fff",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,padding:"2px 8px",borderRadius:4}}>WHALE PACK</div>}
+                  <div style={{fontSize:24,marginBottom:4}}>{b.icon}</div>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:b.color,fontWeight:900,marginBottom:4}}>{b.label}</div>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:20,fontWeight:900,color:"#fff"}}>{b.pixels}<span style={{fontSize:11,color:"rgba(255,255,255,.4)"}}> px</span></div>
+                  {b.bonus>0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700",marginBottom:4}}>+{b.bonus} bonus px</div>}
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:b.color,margin:"8px 0"}}>{b.price}</div>
+                  <button onClick={()=>pushToast("💳 Stripe coming soon! Payment will open here.","#C8FF00",3000)} style={{width:"100%",padding:"8px",background:`rgba(${b.color==="#C8FF00"?"200,255,0":"0,245,255"},.15)`,border:`1px solid ${b.color}44`,borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:b.color,fontWeight:900}}>BUY →</button>
+                </div>
+              ))}
+            </div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.2)",textAlign:"center",marginTop:10}}>Pixels are free pixels added to your account. Secure payment via Stripe.</div>
+          </div>}
+
+          {/* SEASON PASS TAB */}
+          {paywallTab==="pass"&&<div>
+            <div style={{background:"linear-gradient(135deg,rgba(255,215,0,.1),rgba(200,255,0,.05))",border:"2px solid rgba(255,215,0,.4)",borderRadius:14,padding:"20px",marginBottom:12,textAlign:"center"}}>
+              <div style={{fontSize:40,marginBottom:8}}>🏆</div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#FFD700",letterSpacing:2,marginBottom:4}}>SEASON {currentSeasonNum} PASS</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.4)",marginBottom:16}}>Never expires · One-time purchase · No subscription</div>
+              {hasSeasonPass
+                ?<div style={{background:"rgba(0,255,136,.1)",border:"1px solid rgba(0,255,136,.3)",borderRadius:8,padding:"12px",fontFamily:"'Orbitron',monospace",fontSize:12,color:"#00FF88"}}>✅ YOU HAVE THE SEASON PASS!</div>
+                :<>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16,textAlign:"left"}}>
+                    {[["⚡","2× XP on all pixels"],["💰","50% more War Chest gold"],["🎁","+50 free pixels now"],["🌟","Exclusive Season badge"],["🔥","SEASON WARRIOR power-up"],["🎨","Gold fandom border glow"]].map(([icon,desc])=>(
+                      <div key={desc} style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <span style={{fontSize:14}}>{icon}</span>
+                        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.6)"}}>{desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <div><span style={{fontFamily:"'Orbitron',monospace",fontSize:24,fontWeight:900,color:"#FFD700"}}>€4.99</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginLeft:8}}>one season</span></div>
+                    <button onClick={()=>pushToast("💳 Stripe coming soon! Season Pass checkout will open here.","#FFD700",3000)} style={{padding:"12px 24px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:11,color:"#040408",fontWeight:900}}>GET PASS →</button>
+                  </div>
+                </>
+              }
+            </div>
+          </div>}
+
+          {/* REWARDED AD TAB */}
+          {paywallTab==="free"&&<div style={{textAlign:"center",padding:"20px 0"}}>
+            <div style={{fontSize:48,marginBottom:12}}>🎬</div>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#00F5FF",marginBottom:8}}>WATCH & EARN</div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.5)",marginBottom:20}}>Watch a short ad → get 5 free pixels instantly.<br/>No payment needed. Available every 30 minutes.</div>
+            {adCooldown>Date.now()
+              ?<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.3)",padding:"14px",border:"1px solid rgba(255,255,255,.1)",borderRadius:8}}>⏰ Next ad available in {Math.ceil((adCooldown-Date.now())/60000)} minutes</div>
+              :<button onClick={()=>{
+                if(watchingAd)return;
+                setWatchingAd(true);
+                // Simulate ad watching (replace with real ad SDK)
+                pushToast("🎬 Ad starting... (demo mode)","#00F5FF",2000);
+                setTimeout(()=>{
+                  setWatchingAd(false);
+                  const cooldown=Date.now()+30*60000;
+                  setAdCooldown(cooldown);
+                  localStorage.setItem("pow_ad_cooldown",String(cooldown));
+                  syncFreePixels(freePixels+5);
+                  pushToast("✅ +5 free pixels earned! Thanks for watching.","#00FF88",4000);
+                  setShowPaywall(false);
+                },3000);
+              }} style={{padding:"16px 32px",background:"linear-gradient(90deg,#00F5FF,#0088FF)",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:12,color:"#fff",fontWeight:900,animation:"pulse 2s infinite"}}>
+                {watchingAd?"⏳ WATCHING...":"▶ WATCH AD → GET 5 PIXELS"}
+              </button>
+            }
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.15)",marginTop:16}}>30-minute cooldown between ads. Max 10 free pixels/day via ads.</div>
+          </div>}
+        </div>
+      </div>}
+
+      {/* ── STARTER PACK MODAL ──────────────────────────────────────────────── */}
+      {showStarterPack&&!localStorage.getItem("pow_starter_used")&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(12px)"}} onClick={()=>setShowStarterPack(false)}>
+        <div style={{background:"rgba(9,9,26,.99)",border:"2px solid rgba(255,68,0,.5)",borderRadius:20,padding:"28px",width:420,maxWidth:"96vw",animation:"pop .5s cubic-bezier(.34,1.56,.64,1)",boxShadow:"0 0 80px rgba(255,68,0,.2)",textAlign:"center"}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:"rgba(255,68,0,.15)",border:"1px solid rgba(255,68,0,.4)",borderRadius:8,padding:"4px 12px",display:"inline-block",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400",marginBottom:12}}>⏰ NEW PLAYER OFFER · 3 DAYS ONLY</div>
+          <div style={{fontSize:40,marginBottom:8}}>🎁</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#FFD700",letterSpacing:2,marginBottom:8}}>STARTER PACK</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:20,textAlign:"left"}}>
+            {[["🗺️","100 free pixels","Start claiming territory immediately"],["⚡","1 Power-Up","CLUSTER BOMB ready to use"],["🏆","Season Pass","All season benefits unlocked"]].map(([icon,title,desc])=>(
+              <div key={title} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 10px",background:"rgba(255,255,255,.04)",borderRadius:8}}>
+                <span style={{fontSize:20}}>{icon}</span>
+                <div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:"#FFD700",fontWeight:900}}>{title}</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.4)"}}>{desc}</div></div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <div><span style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:"#C8FF00"}}>€2.99</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.3)",marginLeft:8,textDecoration:"line-through"}}>€14.97</span></div>
+            <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400"}}>80% OFF · Today only</span>
+          </div>
+          <button onClick={()=>{pushToast("💳 Stripe coming soon! Checkout will open here.","#C8FF00",3000);}} style={{width:"100%",padding:"14px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:12,color:"#040408",fontWeight:900,marginBottom:8}}>🎁 CLAIM STARTER PACK →</button>
+          <button onClick={()=>setShowStarterPack(false)} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.2)"}}>No thanks, I'll miss out</button>
+        </div>
+      </div>}
+
       {/* LEVEL UP CELEBRATION */}
       {showLevelUp&&<div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:1001,pointerEvents:"none",textAlign:"center",animation:"pop .5s cubic-bezier(.34,1.56,.64,1)"}}>
         <div style={{background:"rgba(9,9,26,.97)",border:"2px solid rgba(255,215,0,.6)",borderRadius:20,padding:"28px 40px",boxShadow:"0 0 80px rgba(255,215,0,.3)"}}>
@@ -2229,6 +2377,8 @@ export default function App(){
           <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
           <a href="/rivalries" style={{marginTop:3,display:"inline-block",background:"rgba(255,68,0,.06)",border:"1px solid rgba(255,68,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",letterSpacing:1,textDecoration:"none"}}>⚔️ RIVALRIES</a>
           <button onClick={()=>setShowStandings(true)} style={{marginTop:3,background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FFD700",letterSpacing:1,fontWeight:900}}>🏆 STANDINGS</button>
+          <button onClick={()=>{setShowPaywall(true);setPaywallTab("bundles");}} style={{marginTop:3,background:"linear-gradient(90deg,rgba(200,255,0,.15),rgba(200,255,0,.05))",border:"1px solid rgba(200,255,0,.4)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900,animation:"pulse 3s infinite"}}>💰 GET PIXELS</button>
+          {hasSeasonPass&&<div style={{marginTop:3,background:"rgba(255,215,0,.1)",border:"1px solid rgba(255,215,0,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FFD700",letterSpacing:1,fontWeight:900}}>🏆 PASS</div>}
           <button onClick={()=>{if(!requireAuth("fandom"))return;navigate("/request-fandom");}} style={{marginTop:3,background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.5)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST FANDOM</button>
 
           {/* RIVAL WIDGET */}
@@ -2692,7 +2842,14 @@ export default function App(){
             {/* GAME — fandom selector */}
             {mobileTab==="GAME"&&<div style={{padding:"6px"}}>
               {mode==="SHOP"?(
-                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:6}}>
+                <div>
+                  {/* Monetization quick actions */}
+                  <div style={{display:"flex",gap:6,marginBottom:8}}>
+                    <button onClick={()=>{setShowPaywall(true);setPaywallTab("bundles");}} style={{flex:1,padding:"8px",background:"linear-gradient(90deg,rgba(200,255,0,.15),rgba(200,255,0,.05))",border:"1px solid rgba(200,255,0,.4)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#C8FF00",fontWeight:900}}>💰 BUY PIXELS</button>
+                    <button onClick={()=>{setShowPaywall(true);setPaywallTab("free");}} style={{flex:1,padding:"8px",background:"rgba(0,245,255,.08)",border:"1px solid rgba(0,245,255,.25)",borderRadius:6,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00F5FF"}}>🎬 WATCH AD +5px</button>
+                    {!hasSeasonPass&&<button onClick={()=>{setShowPaywall(true);setPaywallTab("pass");}} style={{flex:1,padding:"8px",background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700",fontWeight:900}}>🏆 PASS</button>}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:6}}>
                   {POWERUPS.map(pu=>(
                     <div key={pu.id} onClick={()=>{if(!requireAuth("powerup"))return;usePowerup(pu);}} style={{background:rgba(pu.color,.07),border:`1px solid ${rgba(pu.color,.3)}`,borderRadius:8,padding:"10px",cursor:"pointer"}}>
                       <div style={{fontSize:22,marginBottom:3}}>{pu.icon}</div>
@@ -2701,6 +2858,7 @@ export default function App(){
                       <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>€{pu.price}</div>
                     </div>
                   ))}
+                  </div>
                 </div>
               ):(
                 <>
