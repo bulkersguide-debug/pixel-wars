@@ -207,6 +207,10 @@ export default function App(){
   const [liveBattleStreak,setLiveBattleStreak]=useState(()=>{try{return JSON.parse(localStorage.getItem("pow_lb_streak")||'{"days":0,"last":""}');}catch{return{days:0,last:""};} });
   const [liveBattlePixels,setLiveBattlePixels]=useState({});
   const [liveBattleEndsAt,setLiveBattleEndsAt]=useState(null);
+  const [floatingTexts,setFloatingTexts]=useState([]);
+  const [sectorZoom,setSectorZoom]=useState(null);
+  const [claimsLastMin,setClaimsLastMin]=useState(0);
+  const claimsLogRef=useRef([]);
   const [missionProgress,setMissionProgress]=useState(()=>{
     try{const wk=getWeekNum();const saved=JSON.parse(localStorage.getItem("pow_missions")||"{}");return saved.week===wk?saved.data:{};}catch{return{};}
   });
@@ -366,8 +370,20 @@ export default function App(){
         remoteAnimRef.current.push({idx:payload.new.idx,color:teamColor,type:"claim",ts:Date.now()});
         const mx=Math.floor((payload.new.idx%GW)/MMS),my=Math.floor(Math.floor(payload.new.idx/GW)/MMS);
         mmFlashRef.current.push({mx,my,color:teamColor,ts:Date.now()});
-        if(remoteAnimRef.current.length>50)remoteAnimRef.current=remoteAnimRef.current.slice(-50);
-        if(mmFlashRef.current.length>20)mmFlashRef.current=mmFlashRef.current.slice(-20);
+        // Track claims per minute
+        claimsLogRef.current.push(Date.now());
+        claimsLogRef.current=claimsLogRef.current.filter(t=>Date.now()-t<60000);
+        setClaimsLastMin(claimsLogRef.current.length);
+        // Floating war text on grid
+        const teamName=TM[payload.new.team_id]?.name||"?";
+        const gx2=payload.new.idx%GW,gy2=Math.floor(payload.new.idx/GW);
+        const screenX=((gx2-vxRef.current)/VW)*100;
+        const screenY=((gy2-vyRef.current)/VH)*100;
+        if(screenX>0&&screenX<100&&screenY>0&&screenY<100){
+          const ftId=Date.now()+Math.random();
+          setFloatingTexts(f=>[...f,{id:ftId,text:`🏴 ${teamName}`,color:teamColor,x:screenX,y:screenY}].slice(-8));
+          setTimeout(()=>setFloatingTexts(f=>f.filter(x=>x.id!==ftId)),2000);
+        }
         // Enemy nearby detection — alert if enemy claims within 60px of your territory
         setActive(myActive=>{
           if(myActive&&payload.new.team_id!==myActive){
@@ -401,10 +417,19 @@ export default function App(){
         setPixels(prev=>({...prev,[payload.new.idx]:dbRowToPixel(payload.new)}));trackHeatmap(payload.new.idx);
         // Queue remote raid animation (red flash)
         if(payload.old?.team_id!==payload.new?.team_id){
-          const raidColor=TM[payload.new.team_id]?.color||"#FF4400";
           remoteAnimRef.current.push({idx:payload.new.idx,color:"#FF4400",type:"raid",ts:Date.now()});
-          const mx=Math.floor((payload.new.idx%GW)/MMS),my=Math.floor(Math.floor(payload.new.idx/GW)/MMS);
-          mmFlashRef.current.push({mx,my,color:"#FF4400",ts:Date.now()});
+          const mx2=Math.floor((payload.new.idx%GW)/MMS),my2=Math.floor(Math.floor(payload.new.idx/GW)/MMS);
+          mmFlashRef.current.push({mx:mx2,my:my2,color:"#FF4400",ts:Date.now()});
+          // Floating raid text
+          const raider=TM[payload.new.team_id]?.name||"?";
+          const victim=TM[payload.old?.team_id]?.name||"?";
+          const gxR=payload.new.idx%GW,gyR=Math.floor(payload.new.idx/GW);
+          const sxR=((gxR-vxRef.current)/VW)*100,syR=((gyR-vyRef.current)/VH)*100;
+          if(sxR>0&&sxR<100&&syR>0&&syR<100){
+            const ftId=Date.now()+Math.random();
+            setFloatingTexts(f=>[...f,{id:ftId,text:`⚔️ ${raider} RAIDED ${victim}`,color:"#FF4400",x:sxR,y:syR}].slice(-8));
+            setTimeout(()=>setFloatingTexts(f=>f.filter(x=>x.id!==ftId)),2500);
+          }
         }
       })
       .on("postgres_changes",{event:"DELETE",schema:"public",table:"pixels",filter:`season_num=eq.${sNum}`},(payload)=>{setPixels(prev=>{const next={...prev};delete next[payload.old.idx];return next;});})
@@ -747,6 +772,25 @@ export default function App(){
       else if(px){
         if(isMyPixel&&at){ctx.fillStyle=rgba(at.color,.2);ctx.fillRect(dx*CELL-1,dy*CELL-1,CELL+1,CELL+1);}
         ctx.fillStyle=`#${cv(TM[px.t]?.color||"#888")}`;ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);
+        // Border glow on territory edges
+        if(isMyPixel&&at){
+          const gxA=vx+dx,gyA=vy+dy;
+          const hasN=pixels[(gyA-1)*GW+gxA]?.t===active;
+          const hasS=pixels[(gyA+1)*GW+gxA]?.t===active;
+          const hasW=pixels[gyA*GW+(gxA-1)]?.t===active;
+          const hasE=pixels[gyA*GW+(gxA+1)]?.t===active;
+          if(!hasN||!hasS||!hasW||!hasE){
+            const pulse=0.5+0.3*Math.sin(frame*0.12);
+            ctx.shadowColor=at.color;ctx.shadowBlur=5;
+            ctx.strokeStyle=at.color+(Math.round(pulse*200).toString(16).padStart(2,"0"));
+            ctx.lineWidth=1.5;
+            if(!hasN){ctx.beginPath();ctx.moveTo(dx*CELL,dy*CELL);ctx.lineTo(dx*CELL+CELL,dy*CELL);ctx.stroke();}
+            if(!hasS){ctx.beginPath();ctx.moveTo(dx*CELL,dy*CELL+CELL-1);ctx.lineTo(dx*CELL+CELL,dy*CELL+CELL-1);ctx.stroke();}
+            if(!hasW){ctx.beginPath();ctx.moveTo(dx*CELL,dy*CELL);ctx.lineTo(dx*CELL,dy*CELL+CELL);ctx.stroke();}
+            if(!hasE){ctx.beginPath();ctx.moveTo(dx*CELL+CELL-1,dy*CELL);ctx.lineTo(dx*CELL+CELL-1,dy*CELL+CELL);ctx.stroke();}
+            ctx.shadowBlur=0;
+          }
+        }
         if(age>DECAY_EXPIRE*86400000){ctx.fillStyle="rgba(255,0,0,.15)";ctx.fillRect(dx*CELL,dy*CELL,CELL-1,CELL-1);}
         if(isShielded){
           const phase=Math.sin((frame+dx*3+dy*3)*0.25)*0.5+0.5;
@@ -909,7 +953,18 @@ export default function App(){
   // ── MOUSE ──────────────────────────────────────────────────────────────────
   const mouseToGrid=(e)=>{const rc=cvs.current.getBoundingClientRect(),cx=(e.clientX-rc.left)*CW/rc.width,cy=(e.clientY-rc.top)*CH/rc.height,gx=vx+Math.floor(cx/CELL),gy=vy+Math.floor(cy/CELL);if(gx<0||gx>=GW||gy<0||gy>=GH)return null;return{gx,gy,idx:gy*GW+gx};};
   const pan=(dx,dy)=>{setVx(x=>Math.max(0,Math.min(GW-VW,x+dx)));setVy(y=>Math.max(0,Math.min(GH-VH,y+dy)));};
-  const onMmClick=(e)=>{const rc=mmCvs.current.getBoundingClientRect(),mx=Math.floor((e.clientX-rc.left)*MM/rc.width),my=Math.floor((e.clientY-rc.top)*MM/rc.height);setVx(Math.max(0,Math.min(GW-VW,mx*MMS-Math.floor(VW/2))));setVy(Math.max(0,Math.min(GH-VH,my*MMS-Math.floor(VH/2))));};
+  const onMmClick=(e)=>{
+    const rc=mmCvs.current.getBoundingClientRect();
+    const mx=Math.floor((e.clientX-rc.left)*MM/rc.width);
+    const my=Math.floor((e.clientY-rc.top)*MM/rc.height);
+    setVx(Math.max(0,Math.min(GW-VW,mx*MMS-Math.floor(VW/2))));
+    setVy(Math.max(0,Math.min(GH-VH,my*MMS-Math.floor(VH/2))));
+    // Show sector zoom modal
+    const sx=Math.floor(mx/MMS/SECTOR*NS);
+    const sy=Math.floor(my/MMS/SECTOR*NS);
+    setSectorZoom({sx:Math.max(0,Math.min(NS-1,sx)),sy:Math.max(0,Math.min(NS-1,sy))});
+    setTimeout(()=>setSectorZoom(null),8000);
+  };
   const rs=(x1,y1,x2,y2)=>{const s=new Set(),now=Date.now();for(let gy=Math.min(y1,y2);gy<=Math.max(y1,y2);gy++)for(let gx=Math.min(x1,x2);gx<=Math.max(x1,x2);gx++){const idx=gy*GW+gx;const sx=Math.floor(gx/SECTOR),sy=Math.floor(gy/SECTOR);if(!unlockedSet.has(sectorKey(sx,sy)))continue;const isShielded=shields[idx]&&shields[idx]>now;if(mode==="RAID"&&pixels[idx]&&isAllied(pixels[idx].t))continue;if(mode==="BUILD"?!pixels[idx]:(pixels[idx]&&pixels[idx].t!==active&&!isShielded))s.add(idx);}return s;};
   const onMD=(e)=>{
     if(!active||mode==="SHOP")return;
@@ -1654,6 +1709,68 @@ export default function App(){
         </div>
       </div>}
 
+      {/* SECTOR ZOOM MODAL */}
+      {sectorZoom&&(()=>{
+        const{sx,sy}=sectorZoom;
+        const k=sectorKey(sx,sy);
+        const isUnlocked=unlockedSet.has(k);
+        const sData=sectorLeaderboard.find(s=>s.sx===sx&&s.sy===sy);
+        const fill=sectorFills[k]||0;
+        const fillPct=Math.round(fill*100);
+        const price=sectorBasePrice(sx,sy)*fillMultiplier(fill);
+        // Count by fandom in this sector
+        const counts={};
+        for(let py=sy*SECTOR;py<(sy+1)*SECTOR;py++)
+          for(let px2=sx*SECTOR;px2<(sx+1)*SECTOR;px2++){
+            const p=pixels[py*GW+px2];
+            if(p?.t)counts[p.t]=(counts[p.t]||0)+1;
+          }
+        const topFandoms=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        const leader=topFandoms[0];
+        const leaderTeam=leader?TM[leader[0]]:null;
+        return(
+        <div style={{position:"fixed",bottom:80,right:16,zIndex:990,animation:"slideDown .3s ease"}} onClick={()=>setSectorZoom(null)}>
+          <div style={{background:"rgba(6,6,18,.97)",border:`1px solid ${leaderTeam?rgba(leaderTeam.color,.4):"rgba(0,245,255,.3)"}`,borderRadius:14,padding:"14px 16px",width:220,boxShadow:`0 8px 32px rgba(0,0,0,.5),0 0 20px ${leaderTeam?rgba(leaderTeam.color,.1):"rgba(0,245,255,.05)"}`}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#00F5FF"}}>SECTOR {sx+1}-{sy+1}</div>
+              <button onClick={()=>setSectorZoom(null)} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:14}}>✕</button>
+            </div>
+            {/* Fill bar */}
+            <div style={{marginBottom:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.4)"}}>FILL</span>
+                <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:fillPct>70?"#FF4400":fillPct>40?"#FFD700":"#00FF88",fontWeight:900}}>{fillPct}%</span>
+              </div>
+              <div style={{height:4,background:"rgba(255,255,255,.08)",borderRadius:2,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${fillPct}%`,background:fillPct>70?"linear-gradient(90deg,#FF4400,#FF0000)":fillPct>40?"linear-gradient(90deg,#FFD700,#FF8800)":"linear-gradient(90deg,#00FF88,#00F5FF)",borderRadius:2,transition:"width .5s"}}/>
+              </div>
+            </div>
+            {/* Leader */}
+            {leaderTeam&&<div style={{background:rgba(leaderTeam.color,.08),border:`1px solid ${rgba(leaderTeam.color,.25)}`,borderRadius:7,padding:"6px 8px",marginBottom:8}}>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)",marginBottom:2}}>DOMINATING</div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:leaderTeam.color}}>{leaderTeam.name}</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.4)"}}>{leader[1]}px · {Math.round(leader[1]/(SECTOR*SECTOR)*100)}% of sector</div>
+            </div>}
+            {/* Top fandoms */}
+            {topFandoms.length>1&&<div style={{marginBottom:10}}>
+              {topFandoms.slice(1,4).map(([tid,cnt])=>(
+                <div key={tid} style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                  <div style={{width:6,height:6,borderRadius:1,background:TM[tid]?.color||"#888",flexShrink:0}}/>
+                  <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.4)",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{TM[tid]?.name||tid}</span>
+                  <span style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:"rgba(255,255,255,.3)"}}>{cnt}px</span>
+                </div>
+              ))}
+            </div>}
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>{setVx(Math.max(0,Math.min(GW-VW,sx*SECTOR-20)));setVy(Math.max(0,Math.min(GH-VH,sy*SECTOR-20)));setSectorZoom(null);}} style={{flex:1,padding:"7px",background:"rgba(0,245,255,.1)",border:"1px solid rgba(0,245,255,.3)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00F5FF",fontWeight:900}}>→ ENTER</button>
+              {!isUnlocked&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",padding:"7px",border:"1px solid rgba(255,68,0,.3)",borderRadius:6}}>🔒 LOCKED</div>}
+              {isUnlocked&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",padding:"7px",border:"1px solid rgba(200,255,0,.2)",borderRadius:6}}>€{price.toFixed(1)}/px</div>}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
       {/* DECAY ALERT MODAL */}
       {showDecayAlert&&active&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:997,backdropFilter:"blur(8px)"}} onClick={()=>setShowDecayAlert(false)}>
         <div style={{background:"rgba(9,9,26,.98)",border:"1px solid rgba(255,200,0,.5)",borderRadius:18,padding:"32px 28px",width:380,maxWidth:"94vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",textAlign:"center",boxShadow:"0 0 60px rgba(255,200,0,.15)"}} onClick={e=>e.stopPropagation()}>
@@ -1975,10 +2092,43 @@ export default function App(){
                 onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onDragStart={e=>e.preventDefault()}
                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}/>
               <div style={{position:"absolute",top:4,left:4,background:rgba(modeColor,.15),border:`1px solid ${rgba(modeColor,.5)}`,borderRadius:4,padding:"2px 6px",fontFamily:"'Orbitron',monospace",fontSize:7,color:modeColor,pointerEvents:"none",letterSpacing:1}}>{mode==="BUILD"?"🏗":"mode"==="RAID"?"⚔️":"💥"} {mode}</div>
+              {/* Live claims counter */}
+              {claimsLastMin>0&&<div style={{position:"absolute",top:4,left:"50%",transform:"translateX(-50%)",background:"rgba(255,68,0,.15)",border:"1px solid rgba(255,68,0,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",pointerEvents:"none",animation:"pulse 1s infinite"}}>🔥 {claimsLastMin} px/min</div>}
+              {/* Floating war texts */}
+              {floatingTexts.map(ft=>(
+                <div key={ft.id} style={{position:"absolute",left:`${ft.x}%`,top:`${ft.y}%`,transform:"translate(-50%,-50%)",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:ft.color,textShadow:`0 0 8px ${ft.color}`,pointerEvents:"none",animation:"floatUp .5s ease forwards",whiteSpace:"nowrap",zIndex:10}}>
+                  {ft.text}
+                </div>
+              ))}
+              <style>{`@keyframes floatUp{0%{opacity:1;transform:translate(-50%,-50%)}100%{opacity:0;transform:translate(-50%,-200%)}}`}</style>
               <div style={{position:"absolute",top:4,right:4,background:"rgba(4,4,12,.85)",borderRadius:4,border:"1px solid rgba(0,245,255,.2)",overflow:"hidden",cursor:"crosshair"}} onClick={onMmClick}>
                 <canvas ref={mmCvs} width={MM} height={MM} style={{display:"block",width:60,height:60}}/>
               </div>
-              {!active&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(4,4,8,.85))",padding:"10px 8px 4px",pointerEvents:"none",textAlign:"center"}}>
+              {/* Top 3 race bar */}
+              {board.length>0&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(4,4,8,.9))",padding:"8px 8px 4px",pointerEvents:"none"}}>
+                <div style={{display:"flex",gap:3,alignItems:"flex-end"}}>
+                  {board.slice(0,3).map((t,i)=>{
+                    const maxPx=board[0].count||1;
+                    const pct=Math.max(8,(t.count/maxPx)*100);
+                    const isMe=t.id===active;
+                    const myPx=active?Object.values(pixels).filter(p=>p?.t===active).length:0;
+                    const diff=t.count-myPx;
+                    return(
+                      <div key={t.id} style={{flex:1,display:"flex",flexDirection:"column",gap:2}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:t.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"70%"}}>{["🥇","🥈","🥉"][i]} {t.name}</span>
+                          <span style={{fontFamily:"'Orbitron',monospace",fontSize:6,color:isMe?"#C8FF00":t.color,fontWeight:900}}>{t.count}</span>
+                        </div>
+                        <div style={{height:3,background:"rgba(255,255,255,.1)",borderRadius:2,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${pct}%`,background:t.color,borderRadius:2,transition:"width .5s",boxShadow:`0 0 4px ${t.color}`}}/>
+                        </div>
+                        {isMe&&diff>0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:5,color:"rgba(255,255,255,.3)",textAlign:"right"}}>-{diff} from #{i+1}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>}
+              {!active&&board.length===0&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(4,4,8,.85))",padding:"10px 8px 4px",pointerEvents:"none",textAlign:"center"}}>
                 <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:2,color:"rgba(0,245,255,.5)"}}>⚔ SELECT A FANDOM BELOW</div>
               </div>}
             </div>
