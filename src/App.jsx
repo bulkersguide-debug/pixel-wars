@@ -68,6 +68,7 @@ const POWERUPS=[
   {id:"nuke",icon:"☢️",name:"NUKE",desc:"Wipe 20×20 unshielded zone",price:50,color:"#FF0000",rarity:"LEGENDARY"},
   {id:"renew",icon:"♻️",name:"RENEWAL SHIELD",desc:"Renew 50 decaying pixels",price:5,color:"#00FFAA",rarity:"UNCOMMON"},
   {id:"double",icon:"✨",name:"DOUBLE OR NOTHING",desc:"Gamble — 2× or 0×",price:5,color:"#BB88FF",rarity:"UNCOMMON"},
+  {id:"surge",icon:"⚡",name:"SURGE",desc:"Drag connected pixels — lose them if disconnected!",price:6,color:"#FF2D78",rarity:"RARE"},
 ];
 const RARITY_COLOR={COMMON:"#aaa",UNCOMMON:"#00CC44",RARE:"#0088FF",EPIC:"#AA00FF",LEGENDARY:"#FFD700"};
 const DISCORD_ID="1504550947295072328";
@@ -166,6 +167,10 @@ export default function App(){
   const [chatInput,setChatInput]=useState("");
   const [alliances,setAlliances]=useState([]);
   const [wars,setWars]=useState([]);
+  const [surgeMode,setSurgeMode]=useState(false);
+  const [surgePixels,setSurgePixels]=useState(new Set());
+  const [peaceVote,setPeaceVote]=useState(null); // {proposer, endsAt, votes}
+  const [showPeaceVote,setShowPeaceVote]=useState(false);
   const [raidAlert,setRaidAlert]=useState(null);
   const [miniSeason,setMiniSeason]=useState(null);
   const [showWarModal,setShowWarModal]=useState(false);
@@ -980,6 +985,33 @@ export default function App(){
         ctx.fillText(label,cx2,cy2+4);
       });
     }
+    // ── SURGE MODE OVERLAY ────────────────────────────────────────────────────
+    if(surgeMode&&pending.size>0&&active){
+      // Show which pending pixels are connected vs disconnected
+      const myExisting=new Set(Object.entries(pixels).filter(([,v])=>v?.t===active).map(([k])=>parseInt(k)));
+      const allCandidates=new Set([...myExisting,...pending]);
+      const visited=new Set();const queue=[...myExisting];
+      while(queue.length){const idx=queue.pop();if(visited.has(idx))continue;visited.add(idx);const gx2=idx%GW,gy2=Math.floor(idx/GW);[[0,-1],[0,1],[-1,0],[1,0]].forEach(([ddx,ddy])=>{const nidx=(gy2+ddy)*GW+(gx2+ddx);if(allCandidates.has(nidx)&&!visited.has(nidx))queue.push(nidx);});}
+      pending.forEach(idx=>{
+        const gx2=idx%GW,gy2=Math.floor(idx/GW);
+        const sx2=(gx2-vx)*CELL,sy2=(gy2-vy)*CELL;
+        if(sx2<0||sx2>CW||sy2<0||sy2>CH)return;
+        if(visited.has(idx)){
+          // Connected — green glow
+          ctx.fillStyle="rgba(0,255,136,.5)";ctx.fillRect(sx2,sy2,CELL-1,CELL-1);
+          ctx.shadowColor="#00FF88";ctx.shadowBlur=4;
+        }else{
+          // Disconnected — red flash warning
+          ctx.fillStyle="rgba(255,68,0,.6)";ctx.fillRect(sx2,sy2,CELL-1,CELL-1);
+          ctx.shadowColor="#FF4400";ctx.shadowBlur=4;
+        }
+        ctx.shadowBlur=0;
+      });
+      // Surge mode border flash on canvas
+      const surgePulse=0.5+0.5*Math.sin(Date.now()*0.01);
+      ctx.strokeStyle=`rgba(255,45,120,${surgePulse})`;ctx.lineWidth=4;
+      ctx.strokeRect(2,2,CW-4,CH-4);
+    }
     // ── REMOTE ANIMATIONS (other players claiming/raiding) ────────────────────
     const now2=Date.now();
     remoteAnimRef.current=remoteAnimRef.current.filter(a=>now2-a.ts<1200);
@@ -987,22 +1019,20 @@ export default function App(){
       const gx2=a.idx%GW,gy2=Math.floor(a.idx/GW);
       const sx2=(gx2-vx)*CELL,sy2=(gy2-vy)*CELL;
       if(sx2<-CELL*4||sx2>CW+CELL*4||sy2<-CELL*4||sy2>CH+CELL*4)return;
-      const age=(now2-a.ts)/1200; // 0→1
+      const age=(now2-a.ts)/1200;
       const r=CELL*2+age*CELL*8;
       const alpha=Math.max(0,(1-age)*0.8);
-      // Expanding ring
       ctx.beginPath();
       ctx.arc(sx2+CELL/2,sy2+CELL/2,r,0,Math.PI*2);
       ctx.strokeStyle=a.color+(Math.round(alpha*255).toString(16).padStart(2,"0"));
       ctx.lineWidth=2*(1-age)+0.5;
       ctx.stroke();
-      // Inner glow on fresh claims
       if(age<0.3){
         ctx.fillStyle=a.color+(Math.round((0.3-age)*255).toString(16).padStart(2,"0"));
         ctx.fillRect(sx2,sy2,CELL,CELL);
       }
     });
-  },[pixels,shields,pending,active,mode,vx,vy,unlockedSet,sectorFills,showPriceMap,showHeatmap,heatmapTick,miniSeason,animTick]);
+  },[pixels,shields,pending,active,mode,vx,vy,unlockedSet,sectorFills,showPriceMap,showHeatmap,heatmapTick,miniSeason,animTick,surgeMode,fortifiedSectors]);
 
   // ── MINIMAP ────────────────────────────────────────────────────────────────
   useEffect(()=>{
@@ -1122,14 +1152,43 @@ export default function App(){
   };
   const onMU=()=>{
     setDrag(false);
+    if(surgeMode&&pending.size>0){
+      // Surge: only keep pixels connected to existing territory (BFS flood fill)
+      const myExisting=new Set(Object.entries(pixels).filter(([,v])=>v?.t===active).map(([k])=>parseInt(k)));
+      const allCandidates=new Set([...myExisting,...pending]);
+      // BFS from existing pixels through pending to find connected set
+      const visited=new Set();
+      const queue=[...myExisting];
+      while(queue.length){
+        const idx=queue.pop();if(visited.has(idx))continue;visited.add(idx);
+        const gx=idx%GW,gy=Math.floor(idx/GW);
+        [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dx,dy])=>{
+          const nidx=(gy+dy)*GW+(gx+dx);
+          if(allCandidates.has(nidx)&&!visited.has(nidx))queue.push(nidx);
+        });
+      }
+      // Only keep pending pixels that are connected
+      const connected=new Set([...pending].filter(idx=>visited.has(idx)));
+      const disconnected=pending.size-connected.size;
+      if(connected.size>0){
+        setPending(connected);
+        if(disconnected>0)pushToast(`⚡ SURGE! ${connected.size}px connected kept, ${disconnected}px disconnected lost!`,"#FF2D78",4000);
+        else pushToast(`⚡ SURGE! All ${connected.size}px connected — PERFECT!`,"#FF2D78",3000);
+        requestClaim();
+      }else{
+        pushToast("⚡ SURGE FAILED — no pixels connected to your territory!","#FF4400",3000);
+        setPending(new Set());
+      }
+      setSurgeMode(false);setSurgePixels(new Set());
+      return;
+    }
     if(pending.size>0){requestClaim();return;}
     // Single click with no drag — show pixel history
     if(orig&&Date.now()-orig.time<200){
       const g=mouseToGrid({clientX:orig.x*CELL,clientY:orig.y*CELL});
-      const idx=orig.y*GW+orig.x;// use stored grid coords
+      const idx=orig.y*GW+orig.x;
       const px=pixels[idx];
       if(px){
-        // Fetch history from DB
         if(isOnline&&supabase){
           supabase.from("pixel_history").select("*").eq("idx",idx).eq("season_num",currentSeasonNum).order("created_at",{ascending:false}).limit(8)
             .then(({data})=>setPixelHistory({pixel:px,history:data||[],gx:orig.x,gy:orig.y}));
@@ -1255,6 +1314,15 @@ export default function App(){
     else if(pu.id==="nuke"){const ex=randInt(0,GW-21),ey=randInt(0,GH-21);let d=0;for(let dy=0;dy<20;dy++)for(let dx=0;dx<20;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)&&!isAllied(next[idx].t)){toDelete.push(idx);delete next[idx];delete newShields[idx];d++;}}spawnShockwave("#FF0000",vx+VW/2,vy+VH/2);spawnShockwave("#FF4400",vx+VW/2,vy+VH/2);spawnParticles("#FF0000",vx+VW/2,vy+VH/2,30,true);triggerFlash("#FF0000",true);pushToast(`☢️ NUKE! Obliterated ${d} pixels!`,"#FF0000",6000);}
     else if(pu.id==="renew"){let r=0;const myPx=Object.entries(next).filter(([,v])=>v?.t===active).sort((a,b)=>a[1].at-b[1].at).slice(0,50);myPx.forEach(([k])=>{if(next[k]){next[k]={...next[k],at:now};toUpsert.push(parseInt(k));r++;}});pushToast(`♻️ RENEWED ${r} pixels!`,"#00FFAA",5000);triggerFlash("#00FFAA");}
     else if(pu.id==="double"){const win=Math.random()>.5;pushToast(win?"✨ WIN! Bonus territory!":"✨ LOST 💀","#BB88FF",5000);triggerFlash("#BB88FF",win);}
+    else if(pu.id==="surge"){
+      // Surge mode — player drags pixels, they only stick if connected to own territory
+      setSurgeMode(true);setSurgePixels(new Set());
+      pushToast("⚡ SURGE ACTIVE! Drag pixels connected to your territory — release to claim. Disconnected pixels vanish!","#FF2D78",5000);
+      triggerFlash("#FF2D78");
+      // Auto-cancel after 15 seconds
+      setTimeout(()=>{setSurgeMode(false);setSurgePixels(new Set());},15000);
+      return; // don't execute normal powerup flow
+    }
     else if(pu.id==="goldraid"){
       // War Chest gold raid — spend 20 gold to steal 20 random enemy pixels
       if(warChest<20){pushToast("Need 20💰 gold! Earn more by holding territory.","#FFD700",3000);return;}
@@ -2262,6 +2330,27 @@ export default function App(){
         </div>
       </div>}
 
+      {/* PEACE VOTE BANNER */}
+      {peaceVote&&<div style={{background:"rgba(0,245,255,.06)",borderBottom:"1px solid rgba(0,245,255,.3)",padding:"5px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap",animation:"slideDown .3s ease"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:14,animation:"pulse .8s infinite"}}>🕊️</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#00F5FF"}}>
+            <strong style={{color:TM[peaceVote.proposer]?.color||"#00F5FF"}}>{TM[peaceVote.proposer]?.name||"?"}</strong> proposes a 1-hour ceasefire!
+          </span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)"}}>
+            Expires in {Math.max(0,Math.floor((peaceVote.endsAt-Date.now())/60000))}m
+          </span>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <button onClick={()=>{
+            setPeaceVote(v=>({...v,votes:(v.votes||0)+1}));
+            pushToast("🕊️ You voted FOR peace!","#00F5FF",3000);
+            postToDiscord({title:"🕊️ PEACE VOTE — Community Decides!",description:`**${TM[peaceVote.proposer]?.name}** has proposed a 1-hour ceasefire!\n\nVote in the game or react to this message to show your support.\n\n✅ = FOR PEACE\n⚔️ = CONTINUE WAR`,color:0x00F5FF,url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War Peace System"},timestamp:new Date().toISOString()});
+          }} style={{padding:"3px 10px",background:"rgba(0,245,255,.15)",border:"1px solid rgba(0,245,255,.4)",borderRadius:4,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00F5FF",fontWeight:900}}>✅ VOTE PEACE ({peaceVote.votes||0})</button>
+          <button onClick={()=>setPeaceVote(null)} style={{padding:"3px 10px",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.3)",borderRadius:4,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",fontWeight:900}}>⚔️ REJECT</button>
+        </div>
+      </div>}
+
       {/* PENDING ALLIANCE ALERT */}
       {pendingAlliances.length>0&&<div style={{background:"rgba(0,255,170,.06)",borderBottom:"1px solid rgba(0,255,170,.25)",padding:"5px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
         <span style={{fontSize:14}}>🤝</span>
@@ -2341,7 +2430,11 @@ export default function App(){
                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}/>
               <div style={{position:"absolute",top:4,left:4,background:rgba(modeColor,.15),border:`1px solid ${rgba(modeColor,.5)}`,borderRadius:4,padding:"2px 6px",fontFamily:"'Orbitron',monospace",fontSize:7,color:modeColor,pointerEvents:"none",letterSpacing:1}}>{mode==="BUILD"?"🏗":"mode"==="RAID"?"⚔️":"💥"} {mode}</div>
               {/* Live claims counter */}
-              {claimsLastMin>0&&<div style={{position:"absolute",top:4,left:"50%",transform:"translateX(-50%)",background:"rgba(255,68,0,.15)",border:"1px solid rgba(255,68,0,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",pointerEvents:"none",animation:"pulse 1s infinite"}}>🔥 {claimsLastMin} px/min</div>}
+              {claimsLastMin>0&&!surgeMode&&<div style={{position:"absolute",top:4,left:"50%",transform:"translateX(-50%)",background:"rgba(255,68,0,.15)",border:"1px solid rgba(255,68,0,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",pointerEvents:"none",animation:"pulse 1s infinite"}}>🔥 {claimsLastMin} px/min</div>}
+              {/* Surge mode HUD */}
+              {surgeMode&&<div style={{position:"absolute",top:4,left:"50%",transform:"translateX(-50%)",background:"rgba(255,45,120,.2)",border:"2px solid rgba(255,45,120,.8)",borderRadius:6,padding:"4px 12px",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF2D78",pointerEvents:"none",animation:"pulse .5s infinite",fontWeight:900,whiteSpace:"nowrap"}}>
+                ⚡ SURGE ACTIVE — Drag connected pixels! 🟢=keep 🔴=lose
+              </div>}
               {/* Floating war texts */}
               {floatingTexts.map(ft=>(
                 <div key={ft.id} style={{position:"absolute",left:`${ft.x}%`,top:`${ft.y}%`,transform:"translate(-50%,-50%)",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:ft.color,textShadow:`0 0 8px ${ft.color}`,pointerEvents:"none",animation:"floatUp .5s ease forwards",whiteSpace:"nowrap",zIndex:10}}>
@@ -2544,6 +2637,14 @@ export default function App(){
               {active&&<div style={{display:"flex",gap:6,marginTop:8}}>
                 <button onClick={()=>{if(!requireAuth("war"))return;setShowWarModal(true);}} style={{flex:1,padding:"10px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.3)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FF4400"}}>⚔️ DECLARE WAR</button>
                 <button onClick={()=>{if(!requireAuth("alliance"))return;setShowAllianceModal(true);}} style={{flex:1,padding:"10px",background:"rgba(0,255,170,.06)",border:"1px solid rgba(0,255,170,.25)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#00FFAA"}}>🤝 ALLY</button>
+                {/* Peace vote — only top 3 fandoms can propose */}
+                {board.slice(0,3).some(t=>t.id===active)&&!peaceVote&&<button onClick={()=>{
+                  if(!requireAuth("peace"))return;
+                  const vote={proposer:active,endsAt:Date.now()+3600000,votes:0};
+                  setPeaceVote(vote);
+                  pushToast("🕊️ Peace vote proposed! Other fandoms can accept or reject.","#00F5FF",5000);
+                  postToDiscord({title:"🕊️ PEACE VOTE PROPOSED",description:`**${TM[active]?.name}** has proposed a 1-hour ceasefire!\n\nAll fandoms can vote in the game. React with ✅ to support peace or ⚔️ to continue war.`,color:0x00F5FF,url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War Peace System"},timestamp:new Date().toISOString()});
+                }} style={{flex:1,padding:"10px",background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.25)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00F5FF"}}>🕊️ PEACE</button>}
               </div>}
               {myActiveAlliances.length>0&&<>
                 <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:2,color:"#00FFAA",marginTop:10,marginBottom:5}}>🤝 ACTIVE ALLIANCES</div>
