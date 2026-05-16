@@ -423,7 +423,7 @@ export default function AdminPage(){
             {/* Admin create banner */}
             <div style={{marginBottom:14,padding:"12px",background:"rgba(255,215,0,.04)",border:"1px solid rgba(255,215,0,.15)",borderRadius:8}}>
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700",letterSpacing:1,marginBottom:8}}>CREATE YOUR OWN BANNER</div>
-              <AdminBannerForm onCreated={(b)=>{setBanners(r=>[b,...r]);addLog(`✅ Banner created: "${b.message.slice(0,30)}"`, "#FFD700");}} addLog={addLog}/>
+              <CreateBannerForm onCreated={(b)=>{setBanners(r=>[b,...r]);addLog(`✅ Banner created: "${b.message.slice(0,30)}"`, "#FFD700");}} addLog={addLog}/>
             </div>
 
             {loadingBanners&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>Loading...</div>}
