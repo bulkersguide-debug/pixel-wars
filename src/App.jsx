@@ -371,8 +371,18 @@ export default function App(){
         // New 24h battle
         const endsAt=Date.now()+86400000;
         setLiveBattleEndsAt(endsAt);
-        setLiveBattlePixels({});
-        localStorage.setItem("pow_live_battle",JSON.stringify({pixels:{},endsAt}));
+        // Seed with some starter pixels from popular fandoms
+        const seedFandoms=["🎮 Gaming|Battle Royale|Fortnite","🎌 Anime|Shonen|Naruto","🎵 Music|K-Pop|BTS","🎮 Gaming|RPG|Pokémon","🎌 Anime|Shonen|One Piece","🎵 Music|Pop|Taylor Swift","🎮 Gaming|Shooter|Valorant","🎌 Anime|Shonen|Dragon Ball Z"];
+        const seed={};
+        seedFandoms.forEach((fid,fi)=>{
+          for(let i=0;i<50;i++){
+            const x=Math.floor(fi*25+Math.random()*20);
+            const y=Math.floor(Math.random()*200);
+            seed[y*200+x]=fid;
+          }
+        });
+        setLiveBattlePixels(seed);
+        localStorage.setItem("pow_live_battle",JSON.stringify({pixels:seed,endsAt}));
       }
     }catch{}
   },[]);
@@ -1300,22 +1310,29 @@ export default function App(){
               ))}
             </div>;
           })()}
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>{
-              if(!active){pushToast("Select a fandom first!","#FF4400",3000);return;}
-              if(!requireAuth("livebattle"))return;
-              // Claim a random spot in the 200x200 arena
-              const taken=new Set(Object.keys(liveBattlePixels).map(Number));
-              let idx;do{idx=Math.floor(Math.random()*40000);}while(taken.has(idx)&&taken.size<40000);
-              if(taken.size>=40000){pushToast("Arena is full! Wait for reset.","#FF4400",3000);return;}
-              const next={...liveBattlePixels,[idx]:active};
-              setLiveBattlePixels(next);
-              localStorage.setItem("pow_live_battle",JSON.stringify({pixels:next,endsAt:liveBattleEndsAt}));
-              pushToast(`⚡ Claimed spot in Live Battle for ${TM[active]?.name}!`,"#FF4400",3000);
-            }} style={{flex:1,padding:"12px",background:"linear-gradient(90deg,#FF4400,#FF2D00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#fff",letterSpacing:1,fontWeight:900}}>
-              ⚡ CLAIM SPOT (FREE)
-            </button>
-            <button onClick={()=>setShowLiveBattle(false)} style={{padding:"12px 16px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)"}}>CLOSE</button>
+          <div style={{display:"flex",gap:8,flexDirection:"column"}}>
+            {!active&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FFD700",textAlign:"center",padding:"8px",background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.2)",borderRadius:6}}>⚠️ Select a fandom from the left panel first</div>}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{
+                if(!active){pushToast("Select a fandom first!","#FF4400",3000);return;}
+                // Claim up to 10 random spots per click
+                const taken=new Set(Object.keys(liveBattlePixels).map(Number));
+                if(taken.size>=40000){pushToast("Arena is full! Wait for reset.","#FF4400",3000);return;}
+                const next={...liveBattlePixels};
+                let added=0;
+                for(let i=0;i<10&&taken.size+added<40000;i++){
+                  let idx;let tries=0;
+                  do{idx=Math.floor(Math.random()*40000);tries++;}while((taken.has(idx)||next[idx])&&tries<100);
+                  next[idx]=active;added++;
+                }
+                setLiveBattlePixels(next);
+                localStorage.setItem("pow_live_battle",JSON.stringify({pixels:next,endsAt:liveBattleEndsAt}));
+                pushToast(`⚡ +${added}px for ${TM[active]?.name} in Live Battle!`,"#FF4400",2000);
+              }} style={{flex:1,padding:"12px",background:active?`linear-gradient(90deg,${TM[active]?.color||"#FF4400"},#FF2D00)`:"rgba(255,68,0,.3)",border:"none",borderRadius:8,cursor:active?"pointer":"not-allowed",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#fff",letterSpacing:1,fontWeight:900}}>
+                ⚡ CLAIM 10 SPOTS {active?`FOR ${TM[active]?.name?.toUpperCase().slice(0,12)||""}`:""} (FREE)
+              </button>
+              <button onClick={()=>setShowLiveBattle(false)} style={{padding:"12px 16px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)"}}>CLOSE</button>
+            </div>
           </div>
         </div>
       </div>}
