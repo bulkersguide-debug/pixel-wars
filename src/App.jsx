@@ -6,43 +6,12 @@ import MissionsModal, { MISSIONS } from "./MissionsModal";
 import OnboardingModal from "./OnboardingModal";
 import PixelHistoryModal from "./PixelHistoryModal";
 import CookieBanner from "./CookieBanner";
-import { startMusic, stopMusic } from "./MusicPlayer";
+
 import AuthModal from "./AuthModal";
 import SponsorModal from "./SponsorModal";
 
 
 // ── SOUND SYSTEM ──────────────────────────────────────────────────────────────
-let _audioCtx=null;
-const getACtx=()=>{if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();return _audioCtx;};
-const playSound=(type,enabled)=>{
-  if(!enabled)return;
-  try{
-    const ctx=getACtx();if(ctx.state==="suspended")ctx.resume();
-    const now=ctx.currentTime;
-    if(type==="claim"){
-      const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);
-      o.frequency.setValueAtTime(660,now);o.frequency.exponentialRampToValueAtTime(880,now+.08);
-      g.gain.setValueAtTime(.18,now);g.gain.exponentialRampToValueAtTime(.001,now+.12);
-      o.start(now);o.stop(now+.12);
-    }else if(type==="raid"){
-      const buf=ctx.createBuffer(1,ctx.sampleRate*.25,ctx.sampleRate);
-      const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/d.length*8);
-      const src=ctx.createBufferSource(),g=ctx.createGain(),f=ctx.createBiquadFilter();
-      f.type="lowpass";f.frequency.value=180;src.buffer=buf;src.connect(f);f.connect(g);g.connect(ctx.destination);
-      g.gain.setValueAtTime(.4,now);g.gain.exponentialRampToValueAtTime(.001,now+.25);src.start();src.stop(now+.25);
-    }else if(type==="combo"){
-      const o=ctx.createOscillator(),g=ctx.createGain();o.type="sawtooth";o.connect(g);g.connect(ctx.destination);
-      o.frequency.setValueAtTime(220,now);o.frequency.exponentialRampToValueAtTime(1100,now+.35);
-      g.gain.setValueAtTime(.15,now);g.gain.exponentialRampToValueAtTime(.001,now+.4);
-      o.start(now);o.stop(now+.4);
-    }else if(type==="shield"){
-      const o=ctx.createOscillator(),g=ctx.createGain();o.type="sine";o.connect(g);g.connect(ctx.destination);
-      o.frequency.setValueAtTime(1200,now);o.frequency.exponentialRampToValueAtTime(600,now+.15);
-      g.gain.setValueAtTime(.1,now);g.gain.exponentialRampToValueAtTime(.001,now+.2);
-      o.start(now);o.stop(now+.2);
-    }
-  }catch{}
-};
 
 // ── GRID ──────────────────────────────────────────────────────────────────────
 const GW=2000,GH=2000,CELL=5,VW=180,VH=117,CW=VW*CELL,CH=VH*CELL,MM=200,MMS=GW/MM;
@@ -231,8 +200,7 @@ export default function App(){
   const [mobileTab,setMobileTab]=useState("GAME");
   const [showOnboarding,setShowOnboarding]=useState(()=>!localStorage.getItem("pow_onboarded"));
   const [countdownStr,setCountdownStr]=useState("");
-  const [soundEnabled,setSoundEnabled]=useState(()=>localStorage.getItem("pow_sound")!=="0");
-  const [musicEnabled,setMusicEnabled]=useState(()=>localStorage.getItem("pow_music")==="1");
+
   const [pixelHistory,setPixelHistory]=useState(null);
   const lastClaimRef=useRef(0);
   const prevBoardRef=useRef([]);
@@ -814,11 +782,11 @@ export default function App(){
     const sample=claimArr.filter((_,i)=>i%Math.max(1,Math.floor(claimArr.length/6))===0).slice(0,6);
     sample.forEach(idx=>spawnParticles(t.color,idx%GW,Math.floor(idx/GW),isRaid?14:9,isRaid));
     if(claimArr.length>0){const mid=claimArr[Math.floor(claimArr.length/2)];spawnShockwave(t.color,mid%GW,Math.floor(mid/GW));}
-    if(isRaid){triggerFlash("#FF0000",true);playSound("raid",soundEnabled);pushToast(`⚔️ RAID! ${toClaim.size}px conquered!`,"#FF4400",4000);
+    if(isRaid){triggerFlash("#FF0000",true);pushToast(`⚔️ RAID! ${toClaim.size}px conquered!`,"#FF4400",4000);
       if(toClaim.size>=20){const raider=TM[active];postToDiscord({title:`⚔️ MASSIVE RAID!`,description:`**${raider?.name||active}** just raided **${toClaim.size} pixels** in one strike!\n\nThis is war. Join the battle now.`,color:0xFF4400,fields:[{name:"Raider",value:raider?.name||active,inline:true},{name:"Pixels Stolen",value:`${toClaim.size}px`,inline:true}],url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()});}
-    }else{triggerFlash(t.color);playSound("claim",soundEnabled);spawnConfetti(t.color,Math.min(30,toClaim.size+10));}
+    }else{triggerFlash(t.color);spawnConfetti(t.color,Math.min(30,toClaim.size+10));}
     if(freeUsed>0)pushToast(`🎁 ${freeUsed} free pixels used!`,"#FFD700",3000);
-    if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);playSound("combo",soundEnabled);spawnConfetti(t.color,40);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
+    if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);spawnConfetti(t.color,40);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
     else pushToast(`🏴 ${toClaim.size}px for ${t.name}! €${(cost-freeUsed).toFixed(2)}`,"#00F5FF",3000);
     setFeed(f=>[{id:Date.now(),icon:isRaid?"⚔️":"🏴",team:t.name,msg:`${isRaid?"RAIDED":"claimed"} ${toClaim.size}px (€${cost.toFixed(2)})`,color:t.color,ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isMe:true},...f].slice(0,40));
   };
@@ -938,14 +906,6 @@ export default function App(){
     }).sort((a,b)=>b.total-a.total);
   },[pixels]);
 
-  // Sync sound pref
-  useEffect(()=>{localStorage.setItem("pow_sound",soundEnabled?"1":"0");},[soundEnabled]);
-
-  // Music toggle
-  useEffect(()=>{
-    localStorage.setItem("pow_music",musicEnabled?"1":"0");
-    if(musicEnabled)startMusic();else stopMusic();
-  },[musicEnabled]);
 
   // Confetti on claim
   const spawnConfetti=useCallback((color,count=22)=>{
@@ -1384,8 +1344,6 @@ export default function App(){
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button onClick={()=>setShowHeatmap(s=>!s)} style={{background:showHeatmap?"rgba(255,100,0,.2)":"rgba(255,100,0,.05)",border:`1px solid ${showHeatmap?"rgba(255,100,0,.6)":"rgba(255,100,0,.2)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF6422",letterSpacing:1,transition:"all .15s"}}>{showHeatmap?"HIDE":"🔥 HEATMAP"}</button>
           <button onClick={()=>setShowPriceMap(s=>!s)} style={{background:showPriceMap?"rgba(0,245,255,.15)":"rgba(0,245,255,.05)",border:`1px solid ${showPriceMap?"rgba(0,245,255,.5)":"rgba(0,245,255,.15)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00F5FF",transition:"all .15s"}}>{showPriceMap?"HIDE":"💰 PRICES"}</button>
-          <button onClick={()=>setSoundEnabled(s=>!s)} style={{background:soundEnabled?"rgba(200,255,0,.1)":"rgba(255,255,255,.04)",border:`1px solid ${soundEnabled?"rgba(200,255,0,.4)":"rgba(255,255,255,.1)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:soundEnabled?"#C8FF00":"#3a3a5a",transition:"all .15s"}}>{soundEnabled?"🔊 SFX":"🔇 SFX"}</button>
-          <button onClick={()=>setMusicEnabled(s=>!s)} style={{background:musicEnabled?"rgba(147,71,255,.15)":"rgba(255,255,255,.04)",border:`1px solid ${musicEnabled?"rgba(147,71,255,.5)":"rgba(255,255,255,.1)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:musicEnabled?"#9747FF":"#3a3a5a",transition:"all .15s"}}>{musicEnabled?"🎵 MUSIC":"🎵 MUSIC"}</button>
         </div>
       </div>
 
