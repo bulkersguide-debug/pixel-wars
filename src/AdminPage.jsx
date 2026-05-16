@@ -53,7 +53,7 @@ function CreateBannerForm({addLog,onCreated}){
 
   return(
     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-      <input value={msg} onChange={e=>setMsg(e.target.value)} placeholder="Your banner message..." maxLength={120}
+      <input value={msg} onChange={e=>setMsg(e.target.value)} placeholder="Your banner message..." maxLength={500}
         style={{flex:2,minWidth:160,background:"#0c0c1c",border:"1px solid rgba(255,215,0,.3)",borderRadius:5,padding:"7px 10px",color:"#e0e8ff",fontSize:11,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
       <select value={hours} onChange={e=>setHours(e.target.value)} style={{background:"#0c0c1c",border:"1px solid rgba(255,215,0,.3)",borderRadius:5,padding:"7px 8px",color:"#FFD700",fontSize:10,fontFamily:"'Share Tech Mono',monospace",outline:"none"}}>
         <option value="1">1 hour</option>
