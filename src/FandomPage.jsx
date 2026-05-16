@@ -135,6 +135,106 @@ export default function FandomPage(){
   },[fandom?.id]);
 
   const shareUrl=window.location.href;
+  const shareCardRef=useRef(null);
+  const [generatingCard,setGeneratingCard]=useState(false);
+
+  const generateShareCard=async()=>{
+    setGeneratingCard(true);
+    const canvas=document.createElement("canvas");
+    canvas.width=1200;canvas.height=630;
+    const ctx=canvas.getContext("2d");
+    const c=fandom.color;
+    const hexToRgb=h=>{const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return{r,g,b};};
+    const rgb=hexToRgb(c);
+
+    // Background
+    const bg=ctx.createLinearGradient(0,0,1200,630);
+    bg.addColorStop(0,"#04040c");
+    bg.addColorStop(0.5,`rgba(${rgb.r},${rgb.g},${rgb.b},0.08)`);
+    bg.addColorStop(1,"#04040c");
+    ctx.fillStyle=bg;ctx.fillRect(0,0,1200,630);
+
+    // Grid pattern
+    ctx.strokeStyle="rgba(255,255,255,0.03)";ctx.lineWidth=1;
+    for(let x=0;x<1200;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,630);ctx.stroke();}
+    for(let y=0;y<630;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(1200,y);ctx.stroke();}
+
+    // Glow circle behind fandom name
+    const grd=ctx.createRadialGradient(600,280,0,600,280,300);
+    grd.addColorStop(0,`rgba(${rgb.r},${rgb.g},${rgb.b},0.15)`);
+    grd.addColorStop(1,"transparent");
+    ctx.fillStyle=grd;ctx.fillRect(0,0,1200,630);
+
+    // Top label
+    ctx.fillStyle="rgba(255,255,255,0.3)";
+    ctx.font="bold 22px monospace";
+    ctx.textAlign="center";
+    ctx.fillText("⚔ PIXELS OF WAR",600,60);
+
+    // Fandom name
+    ctx.shadowColor=c;ctx.shadowBlur=40;
+    ctx.fillStyle=c;
+    const nameSize=pixelCount>0?Math.min(120,Math.max(60,1800/fandom.name.length)):80;
+    ctx.font=`900 ${nameSize}px 'Arial Black', sans-serif`;
+    ctx.fillText(fandom.name,600,220);
+    ctx.shadowBlur=0;
+
+    // Divider line
+    ctx.strokeStyle=c;ctx.lineWidth=2;ctx.globalAlpha=0.4;
+    ctx.beginPath();ctx.moveTo(300,250);ctx.lineTo(900,250);ctx.stroke();
+    ctx.globalAlpha=1;
+
+    // Stats row
+    const stats=[
+      {label:"PIXELS OWNED",value:pixelCount.toLocaleString(),color:"#C8FF00"},
+      {label:"TERRITORY",value:pct+"%",color:"#00F5FF"},
+      {label:"RANK",value:rank.icon+" "+rank.name,color:rank.color},
+      {label:"LEADERBOARD",value:"#"+lbPos,color:"#FFD700"},
+    ];
+    stats.forEach((s,i)=>{
+      const x=150+i*225;
+      ctx.fillStyle=s.color;
+      ctx.shadowColor=s.color;ctx.shadowBlur=10;
+      ctx.font="bold 36px monospace";
+      ctx.textAlign="center";
+      ctx.fillText(s.value,x,330);
+      ctx.shadowBlur=0;
+      ctx.fillStyle="rgba(255,255,255,0.35)";
+      ctx.font="12px monospace";
+      ctx.fillText(s.label,x,355);
+    });
+
+    // Call to action
+    ctx.fillStyle="rgba(255,255,255,0.15)";
+    ctx.beginPath();
+    ctx.roundRect(350,400,500,70,12);
+    ctx.fill();
+    ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.globalAlpha=0.5;
+    ctx.stroke();ctx.globalAlpha=1;
+    ctx.fillStyle="#ffffff";
+    ctx.font="bold 22px monospace";
+    ctx.textAlign="center";
+    ctx.fillText("JOIN THE WAR → pixelsofwar.com",600,441);
+
+    // Bottom tag
+    ctx.fillStyle="rgba(255,255,255,0.2)";
+    ctx.font="13px monospace";
+    ctx.fillText(`#PixelsOfWar  #${fandom.name.replace(/\s/g,"")}  ${fandom.cat}`,600,560);
+
+    // Category pill
+    ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},0.2)`;
+    ctx.beginPath();ctx.roundRect(480,580,240,30,15);ctx.fill();
+    ctx.fillStyle=c;ctx.font="bold 13px monospace";
+    ctx.fillText(fandom.sub+" · "+fandom.cat.replace(/[^\w\s]/g,"").trim(),600,600);
+
+    // Download
+    const link=document.createElement("a");
+    link.download=`pixels-of-war-${slug}.png`;
+    link.href=canvas.toDataURL("image/png");
+    link.click();
+    setGeneratingCard(false);
+  };
+
   const handleShare=()=>{
     navigator.clipboard.writeText(shareUrl).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500);});
   };
@@ -197,8 +297,8 @@ export default function FandomPage(){
             <button onClick={handleJoin} style={{padding:"13px 32px",background:`linear-gradient(90deg,${fandom.color},${catAccent})`,color:"#040408",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontWeight:900,fontSize:14,letterSpacing:2,boxShadow:`0 0 24px ${rgba(fandom.color,.3)}`}}>
               ⚔ JOIN THE BATTLE
             </button>
-            <button onClick={handleShare} style={{padding:"13px 24px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.15)",color:"#e0e8ff",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:12,letterSpacing:1}}>
-              {copied?"✅ COPIED!":"📤 SHARE PAGE"}
+            <button onClick={generateShareCard} disabled={generatingCard} style={{padding:"13px 24px",background:rgba(fandom.color,.12),border:`1px solid ${rgba(fandom.color,.4)}`,color:fandom.color,borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:12,letterSpacing:1,fontWeight:900}}>
+              {generatingCard?"⏳ GENERATING...":"🖼️ SHARE CARD"}
             </button>
           </div>
         </div>
