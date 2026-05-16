@@ -1712,7 +1712,18 @@ export default function App(){
         const shareInvite=()=>{
           const fandomName=TM[active]?.name||"my fandom";
           const msg=`⚡ I'm fighting for ${fandomName} in the Live Battle on Pixels of War!\n\nJoin for free — no payment needed. Claim spots, raid enemies, win bonus pixels.\n\n👉 https://www.pixelsofwar.com`;
-          navigator.clipboard.writeText(msg).then(()=>pushToast("📋 Invite copied! Share it anywhere.","#00FF88",3000));
+          // Try native share first (mobile), then clipboard, then fallback
+          if(navigator.share){
+            navigator.share({title:"Pixels of War — Live Battle",text:msg,url:"https://www.pixelsofwar.com"}).catch(()=>{});
+          }else if(navigator.clipboard?.writeText){
+            navigator.clipboard.writeText(msg).then(()=>pushToast("📋 Invite copied! Share it anywhere.","#00FF88",3000)).catch(()=>{
+              // Clipboard failed — show text to copy manually
+              prompt("Copy this invite message:",msg);
+            });
+          }else{
+            // Last resort — prompt dialog
+            prompt("Copy this invite message:",msg);
+          }
         };
 
         const raidSpot=()=>{
