@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "./supabase";
 
 // ── Shared data ───────────────────────────────────────────────────────────────
 const hashColor=(n)=>{let h=0;for(let i=0;i<n.length;i++)h=(Math.imul(31,h)+n.charCodeAt(i))|0;const hue=Math.abs(h)%360,sat=65+(Math.abs(h>>8)%25),lit=50+(Math.abs(h>>16)%15),s=sat/100,l=lit/100,a=s*Math.min(l,1-l),f=x=>{const k=(x+hue/30)%12,c=l-a*Math.max(Math.min(k-3,9-k,1),-1);return Math.round(255*c).toString(16).padStart(2,"0")};return`#${f(0)}${f(8)}${f(4)}`;};
@@ -51,15 +52,22 @@ export default function FandomPage(){
   const navigate=useNavigate();
   const mmRef=useRef(null);
   const [copied,setCopied]=useState(false);
-  const [pixels,setPixels]=useState({});
+  const [pixelCount,setPixelCount]=useState(0);
+  const [totalPixels,setTotalPixels]=useState(0);
+  const [loading,setLoading]=useState(true);
   const [activity,setActivity]=useState([]);
 
   const fandom=SLUG_MAP[slug];
 
-  // Load pixels from localStorage
+  // Load real pixel counts from Supabase
   useEffect(()=>{
-    try{const s=localStorage.getItem("pw2k");if(s)setPixels(JSON.parse(s));}catch{}
-  },[]);
+    if(!fandom)return;
+    setLoading(true);
+    supabase.from("pixels").select("*",{count:"exact",head:true}).eq("team_id",fandom.id)
+      .then(({count})=>{setPixelCount(count||0);setLoading(false);});
+    supabase.from("pixels").select("*",{count:"exact",head:true})
+      .then(({count})=>setTotalPixels(count||0));
+  },[fandom?.id]);
 
   // Generate simulated activity feed for this fandom
   useEffect(()=>{
@@ -74,36 +82,29 @@ export default function FandomPage(){
     setActivity(items);
   },[fandom]);
 
-  // Draw territory minimap
+  // Draw territory minimap using real pixel positions
   useEffect(()=>{
     const mm=mmRef.current;if(!mm||!fandom)return;
     const ctx=mm.getContext("2d");
     const W=400,H=400,MMS=GW/W;
     ctx.fillStyle="#07071a";ctx.fillRect(0,0,W,H);
-
-    // Draw all pixels — fandom's in full color, others dark
-    Object.entries(pixels).forEach(([idxStr,teamId])=>{
-      const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);
-      const mx=Math.floor(gx/MMS),my=Math.floor(gy/MMS);
-      const isMine=teamId===fandom.id;
-      ctx.fillStyle=isMine?fandom.color:"rgba(255,255,255,.08)";
-      ctx.fillRect(mx,my,isMine?2:1,isMine?2:1);
-    });
-
     // Grid lines
     ctx.strokeStyle="rgba(255,255,255,.04)";ctx.lineWidth=1;
     for(let i=0;i<=20;i++){const p=i*20;ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,H);ctx.stroke();ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(W,p);ctx.stroke();}
-
-    // Glow effect on fandom pixels — redraw with glow
-    ctx.shadowColor=fandom.color;ctx.shadowBlur=4;
-    Object.entries(pixels).forEach(([idxStr,teamId])=>{
-      if(teamId!==fandom.id)return;
-      const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);
-      ctx.fillStyle=fandom.color;
-      ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),2,2);
-    });
-    ctx.shadowBlur=0;
-  },[pixels,fandom]);
+    if(pixelCount===0)return;
+    // Fetch pixel positions for this fandom
+    supabase.from("pixels").select("idx").eq("team_id",fandom.id).limit(5000)
+      .then(({data})=>{
+        if(!data)return;
+        ctx.shadowColor=fandom.color;ctx.shadowBlur=3;
+        ctx.fillStyle=fandom.color;
+        data.forEach(({idx})=>{
+          const gx=idx%GW,gy=Math.floor(idx/GW);
+          ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),2,2);
+        });
+        ctx.shadowBlur=0;
+      });
+  },[pixelCount,fandom]);
 
   if(!fandom){
     return(
@@ -118,16 +119,20 @@ export default function FandomPage(){
     );
   }
 
-  const pixelCount=Object.values(pixels).filter(v=>v===fandom.id).length;
   const rank=getRank(pixelCount);
-  const pct=((pixelCount/TOTAL)*100).toFixed(4);
+  const pct=totalPixels>0?((pixelCount/totalPixels)*100).toFixed(4):"0.0000";
   const catAccent=CAT_ACCENT[fandom.cat]||"#00F5FF";
 
   // Leaderboard position
-  const counts={};
-  Object.values(pixels).forEach(id=>{counts[id]=(counts[id]||0)+1;});
-  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-  const lbPos=sorted.findIndex(([id])=>id===fandom.id)+1||"—";
+  const [lbPos,setLbPos]=useState("—");
+  useEffect(()=>{
+    if(!fandom)return;
+    supabase.rpc("get_fandom_rankings").then(({data})=>{
+      if(!data)return;
+      const pos=data.findIndex(r=>r.team_id===fandom.id)+1;
+      setLbPos(pos||"—");
+    }).catch(()=>setLbPos("—"));
+  },[fandom?.id]);
 
   const shareUrl=window.location.href;
   const handleShare=()=>{
@@ -176,7 +181,7 @@ export default function FandomPage(){
             {[
               [rank.icon+" "+rank.name,"RANK",rank.color],
               ["#"+lbPos,"LEADERBOARD",catAccent],
-              [pixelCount.toLocaleString(),"PIXELS OWNED","#C8FF00"],
+              [loading?"…":pixelCount.toLocaleString(),"PIXELS OWNED","#C8FF00"],
               ["€"+pixelCount,"TERRITORY VALUE","#00F5FF"],
               [pct+"%","OF TOTAL GRID","rgba(255,255,255,.6)"],
             ].map(([v,l,c])=>(

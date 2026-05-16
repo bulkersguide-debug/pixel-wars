@@ -105,6 +105,17 @@ const DISCORD_ID="1504550947295072328";
 const DISCORD_CHANNEL="1504550948541042819";
 const DISCORD_WIDGET=`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`;
 const DISCORD_INVITE="https://discord.gg/4Da2avYyPF";
+const DISCORD_WEBHOOK="https://discord.com/api/webhooks/1505216663786623178/zgC0xopUlfOex7rIIcRos4SxMQrTvtj8-Gjl4cvoqyEukuOP3a-xl9ekt7iIPIj_dBAb";
+
+const postToDiscord=async(embed)=>{
+  try{
+    await fetch(DISCORD_WEBHOOK,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({embeds:[embed]})
+    });
+  }catch(e){console.warn("Discord webhook failed:",e);}
+};
 const EVENTS=[
   {icon:"⚡",label:"CHAOS HOUR",desc:"RAIDS 50% OFF!",duration:600,color:"#FF4400"},
   {icon:"💎",label:"MEGA BONUS",desc:"Buy 10px → get 5 FREE!",duration:300,color:"#FFD700"},
@@ -377,8 +388,13 @@ export default function App(){
 
   const proposeAlliance=async(targetId)=>{if(!active||!isOnline)return;if(isAllied(targetId)){pushToast("Already allied!","#00FFAA",3000);return;}await dbProposeAlliance(active,targetId,currentSeasonNum);pushToast(`🤝 Alliance proposed to ${TM[targetId]?.name}!`,"#00FFAA",4000);setShowAllianceModal(false);};
   const acceptAlliance=async(allianceId)=>{await dbUpdateAlliance(allianceId,"active");setAlliances(prev=>prev.map(a=>a.id===allianceId?{...a,status:"active"}:a));pushToast("🤝 Alliance ACCEPTED!","#00FFAA",4000);};
-  const betrayAlliance=async(allianceId,partnerName)=>{if(!confirm(`BETRAY ${partnerName}?`))return;await dbUpdateAlliance(allianceId,"betrayed");setAlliances(prev=>prev.map(a=>a.id===allianceId?{...a,status:"betrayed"}:a));pushToast(`💀 BETRAYAL! Alliance with ${partnerName} broken!`,"#FF4400",6000);setFeed(f=>[{id:Date.now(),icon:"💀",team:TM[active]?.name||"?",msg:`BETRAYED ${partnerName}!`,color:"#FF4400",ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isBetrayal:true},...f].slice(0,40));};
-  const declareWar=async(targetId)=>{if(!active||!isOnline)return;if(isAllied(targetId)){pushToast("Break the alliance first!","#FF4400",3000);return;}const already=wars.some(w=>w.attacker===active&&w.defender===targetId);if(already){pushToast("Already at war!","#FF4400",3000);return;}await dbDeclareWar(active,targetId,currentSeasonNum);pushToast(`⚔️ WAR DECLARED on ${TM[targetId]?.name}!`,"#FF4400",6000);setShowWarModal(false);};
+  const betrayAlliance=async(allianceId,partnerName)=>{if(!confirm(`BETRAY ${partnerName}?`))return;await dbUpdateAlliance(allianceId,"betrayed");setAlliances(prev=>prev.map(a=>a.id===allianceId?{...a,status:"betrayed"}:a));pushToast(`💀 BETRAYAL! Alliance with ${partnerName} broken!`,"#FF4400",6000);setFeed(f=>[{id:Date.now(),icon:"💀",team:TM[active]?.name||"?",msg:`BETRAYED ${partnerName}!`,color:"#FF4400",ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isBetrayal:true},...f].slice(0,40));
+    postToDiscord({title:`💀 ALLIANCE BETRAYED`,description:`**${TM[active]?.name||active}** has **betrayed** their alliance with **${partnerName}**!\n\nThe backstab heard across the grid. Trust no one.`,color:0xFF0000,fields:[{name:"Traitor",value:TM[active]?.name||active,inline:true},{name:"Betrayed",value:partnerName,inline:true}],footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()});
+  };
+  const declareWar=async(targetId)=>{if(!active||!isOnline)return;if(isAllied(targetId)){pushToast("Break the alliance first!","#FF4400",3000);return;}const already=wars.some(w=>w.attacker===active&&w.defender===targetId);if(already){pushToast("Already at war!","#FF4400",3000);return;}await dbDeclareWar(active,targetId,currentSeasonNum);pushToast(`⚔️ WAR DECLARED on ${TM[targetId]?.name}!`,"#FF4400",6000);setShowWarModal(false);
+    const att=TM[active],def=TM[targetId];
+    postToDiscord({title:`⚔️ WAR DECLARED`,description:`**${att?.name||active}** has declared war on **${def?.name||targetId}**!\n\nThe battle for territory begins now. Rally your fandom!`,color:0xFF4400,fields:[{name:"Attacker",value:att?.name||active,inline:true},{name:"Defender",value:def?.name||targetId,inline:true}],footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()});
+  };
   const sanitizeChat=(text)=>{
     return text.replace(/<[^>]*>/g,"").replace(/https?:\/\/[^\s]{0,200}/g,"[link]").trim().slice(0,200);
   };
@@ -412,6 +428,7 @@ export default function App(){
     setSeason(ns);setPixels({});setShields({});setMyPixels(0);setUnlockedSectors(INIT_SECTORS);setAlliances([]);setWars([]);
     if(isOnline)setupRealtime(ns.num);
     pushToast(`🎉 SEASON ${ns.num} STARTED!`,"#FFD700",6000);setShowSeasonEnd(false);
+    postToDiscord({title:`🏆 SEASON ${ns.num} HAS BEGUN!`,description:`A new season of **Pixels of War** has started!\n\nThe grid is reset. Territory is up for grabs. Which fandom will dominate this season?`,color:0xFFD700,fields:[{name:"Season",value:`#${ns.num}`,inline:true},{name:"Duration",value:"~90 days",inline:true}],url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()});
   };
 
   useEffect(()=>{const add=()=>{const t1=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];let t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];while(t2===t1)t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];const acts=["claimed","raided","shielded","renewed"];const action=acts[randInt(0,acts.length-1)];const px=randInt(1,60);const icon={"claimed":"🏴","raided":"⚔️","shielded":"🛡️","renewed":"♻️"}[action];setFeed(f=>[{id:Date.now()+Math.random(),icon,team:t1,msg:action==="claimed"?`claimed ${px}px`:action==="raided"?`RAIDED ${t2}`:action==="renewed"?`renewed ${px}px`:`shielded territory`,color:tc(t1),ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"})},...f].slice(0,40));};add();const iv=setInterval(add,randInt(2500,5500));return()=>clearInterval(iv);},[]);
@@ -775,7 +792,9 @@ export default function App(){
     const sample=claimArr.filter((_,i)=>i%Math.max(1,Math.floor(claimArr.length/6))===0).slice(0,6);
     sample.forEach(idx=>spawnParticles(t.color,idx%GW,Math.floor(idx/GW),isRaid?14:9,isRaid));
     if(claimArr.length>0){const mid=claimArr[Math.floor(claimArr.length/2)];spawnShockwave(t.color,mid%GW,Math.floor(mid/GW));}
-    if(isRaid){triggerFlash("#FF0000",true);playSound("raid",soundEnabled);pushToast(`⚔️ RAID! ${toClaim.size}px conquered!`,"#FF4400",4000);}
+    if(isRaid){triggerFlash("#FF0000",true);playSound("raid",soundEnabled);pushToast(`⚔️ RAID! ${toClaim.size}px conquered!`,"#FF4400",4000);
+      if(toClaim.size>=20){const raider=TM[active];const victim=TM[Object.values(pixels).find(p=>toClaim.has(Object.keys(pixels).find(k=>pixels[k]===p)))?.t]||{};postToDiscord({title:`⚔️ MASSIVE RAID!`,description:`**${raider?.name||active}** just raided **${toClaim.size} pixels** in one strike!\n\nThis is war. Join the battle now.`,color:0xFF4400,fields:[{name:"Raider",value:raider?.name||active,inline:true},{name:"Pixels Stolen",value:`${toClaim.size}px`,inline:true}],url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()});}}
+    }
     else{triggerFlash(t.color);playSound("claim",soundEnabled);spawnConfetti(t.color,Math.min(30,toClaim.size+10));}
     if(freeUsed>0)pushToast(`🎁 ${freeUsed} free pixels used!`,"#FFD700",3000);
     if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);playSound("combo",soundEnabled);spawnConfetti(t.color,40);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
