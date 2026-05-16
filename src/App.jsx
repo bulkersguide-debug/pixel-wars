@@ -204,6 +204,7 @@ export default function App(){
   const [showLiveBattle,setShowLiveBattle]=useState(false);
   const [showLiveBattleBanner,setShowLiveBattleBanner]=useState(()=>!localStorage.getItem("pow_seen_live_battle"));
   const [enemyNearby,setEnemyNearby]=useState(null);
+  const [liveBattleStreak,setLiveBattleStreak]=useState(()=>{try{return JSON.parse(localStorage.getItem("pow_lb_streak")||'{"days":0,"last":""}');}catch{return{days:0,last:""};} });
   const [liveBattlePixels,setLiveBattlePixels]=useState({});
   const [liveBattleEndsAt,setLiveBattleEndsAt]=useState(null);
   const [missionProgress,setMissionProgress]=useState(()=>{
@@ -313,7 +314,17 @@ export default function App(){
         let sNum=1;
         if(dbSeason){const sObj={num:dbSeason.num,startDate:dbSeason.start_date,theme:dbSeason.theme_index,winners:dbSeason.winners||[]};setSeason(sObj);sNum=dbSeason.num;}
         const dbSectors=await dbLoadSectors(sNum);if(dbSectors&&dbSectors.length)setUnlockedSectors(dbSectors);
-        const px=await dbLoadPixels(sNum);if(px)setPixels(px);
+        const px=await dbLoadPixels(sNum);if(px){setPixels(px);
+          // Pan viewport to the most active area so grid doesn't look empty
+          if(!localStorage.getItem("pow_viewport_set")&&Object.keys(px).length>0){
+            const idxs=Object.keys(px).map(Number);
+            const midIdx=idxs[Math.floor(idxs.length/2)];
+            const mx=midIdx%GW,my=Math.floor(midIdx/GW);
+            setVx(Math.max(0,Math.min(GW-VW,mx-Math.floor(VW/2))));
+            setVy(Math.max(0,Math.min(GH-VH,my-Math.floor(VH/2))));
+            localStorage.setItem("pow_viewport_set","1");
+          }
+        }
         const[als,ws,ms]=await Promise.all([dbLoadAlliances(sNum),dbLoadWars(sNum),dbLoadMiniSeason(sNum)]);
         setAlliances(als);setWars(ws);setMiniSeason(ms);
         setupRealtime(sNum);setupPresence();
@@ -1433,6 +1444,28 @@ export default function App(){
           setLiveBattlePixels(next);
           localStorage.setItem("pow_live_battle",JSON.stringify({pixels:next,endsAt:liveBattleEndsAt}));
           pushToast(`⚡ +${added} spots for ${TM[active]?.name}! (${myCount+added}/10 used)`,"#FF4400",2500);
+          // Track daily streak
+          const today=todayStr();
+          if(liveBattleStreak.last!==today){
+            const yesterday=yesterdayStr();
+            const newDays=liveBattleStreak.last===yesterday?liveBattleStreak.days+1:1;
+            const newStreak={days:newDays,last:today};
+            setLiveBattleStreak(newStreak);
+            localStorage.setItem("pow_lb_streak",JSON.stringify(newStreak));
+            if(newDays>1)pushToast(`🔥 Live Battle streak: ${newDays} days! Keep it up!`,"#FF4400",3000);
+            // Bonus pixels at streak milestones
+            if([3,7,14,30].includes(newDays)){
+              const bonus=newDays>=30?20:newDays>=14?10:newDays>=7?5:3;
+              syncFreePixels(freePixels+bonus);
+              pushToast(`🏆 ${newDays}-day Live Battle streak! +${bonus} free pixels!`,"#FFD700",5000);
+            }
+          }
+        };
+
+        const shareInvite=()=>{
+          const fandomName=TM[active]?.name||"my fandom";
+          const msg=`⚡ I'm fighting for ${fandomName} in the Live Battle on Pixels of War!\n\nJoin for free — no payment needed. Claim spots, raid enemies, win bonus pixels.\n\n👉 https://www.pixelsofwar.com`;
+          navigator.clipboard.writeText(msg).then(()=>pushToast("📋 Invite copied! Share it anywhere.","#00FF88",3000));
         };
 
         const raidSpot=()=>{
@@ -1547,6 +1580,11 @@ export default function App(){
             {/* Action buttons */}
             {!isExpired&&<div style={{display:"flex",gap:8,flexDirection:"column"}}>
               {!active&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FFD700",textAlign:"center",padding:"7px",background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.15)",borderRadius:6}}>⚠️ Select a fandom from the panel first</div>}
+              {/* Streak display */}
+              {liveBattleStreak.days>0&&<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"5px 10px",background:"rgba(255,68,0,.06)",border:"1px solid rgba(255,68,0,.2)",borderRadius:6}}>
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF6644"}}>🔥 Live Battle streak: <strong style={{color:"#FF4400"}}>{liveBattleStreak.days} day{liveBattleStreak.days!==1?"s":""}</strong></span>
+                <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)"}}>Next milestone: {liveBattleStreak.days<3?3:liveBattleStreak.days<7?7:liveBattleStreak.days<14?14:30}d</span>
+              </div>}
               <div style={{display:"flex",gap:8}}>
                 <button onClick={claimSpots} disabled={!active||myCount>=10} style={{flex:2,padding:"11px",background:!active||myCount>=10?"rgba(255,255,255,.05)":`linear-gradient(90deg,${TM[active]?.color||"#FF4400"},#FF2D00)`,border:`1px solid ${!active||myCount>=10?"rgba(255,255,255,.1)":`${TM[active]?.color||"#FF4400"}88`}`,borderRadius:8,cursor:!active||myCount>=10?"default":"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:!active||myCount>=10?"rgba(255,255,255,.3)":"#fff",letterSpacing:1,fontWeight:900}}>
                   {!active?"SELECT FANDOM FIRST":myCount>=10?`✅ FULL — RAID INSTEAD`:`⚡ CLAIM ${10-myCount} SPOTS (FREE)`}
@@ -1556,8 +1594,11 @@ export default function App(){
                 </button>
                 <button onClick={()=>setShowLiveBattle(false)} style={{padding:"11px 14px",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.08)",borderRadius:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.25)"}}>✕</button>
               </div>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)",textAlign:"center"}}>
-                🏆 Top fandom at reset wins +5 free pixels · ⚔️ Raid requires Discord login
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)"}}>
+                  🏆 Top fandom wins +5px · ⚔️ Raid needs Discord login · 🔥 Daily streak = bonus pixels
+                </div>
+                <button onClick={shareInvite} style={{padding:"4px 10px",background:"rgba(0,255,136,.08)",border:"1px solid rgba(0,255,136,.25)",borderRadius:5,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00FF88",whiteSpace:"nowrap",flexShrink:0}}>📤 INVITE</button>
               </div>
             </div>}
 
@@ -1650,6 +1691,19 @@ export default function App(){
         </div>
         <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(0,245,255,.5)",letterSpacing:3,animation:"pulse 1.2s infinite"}}>{isOnline?"CONNECTING TO WAR SERVERS…":"LOADING…"}</div>
         <style>{`@keyframes loadingBar{0%{width:0%;margin-left:0}50%{width:100%;margin-left:0}100%{width:0%;margin-left:100%}}`}</style>
+        {/* Hall of Fame on loading screen */}
+        {season.winners&&season.winners.length>0&&<div style={{position:"relative",marginTop:28,textAlign:"center",maxWidth:340,padding:"0 16px"}}>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"rgba(255,215,0,.4)",letterSpacing:3,marginBottom:10}}>🏆 HALL OF FAME</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center"}}>
+            {[...season.winners].reverse().slice(0,5).map((w,i)=>(
+              <div key={i} style={{background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.15)",borderRadius:6,padding:"4px 10px",textAlign:"center"}}>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,215,0,.4)",marginBottom:2}}>S{w.season}</div>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#FFD700"}}>{w.team}</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"rgba(255,255,255,.25)"}}>{w.pixels?.toLocaleString()}px</div>
+              </div>
+            ))}
+          </div>
+        </div>}
       </div>}
 
       {/* ── HEADER ── */}
