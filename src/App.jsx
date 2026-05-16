@@ -202,6 +202,8 @@ export default function App(){
   const [showWeeklyReport,setShowWeeklyReport]=useState(false);
   const [weeklyStats,setWeeklyStats]=useState(null);
   const [showLiveBattle,setShowLiveBattle]=useState(false);
+  const [showLiveBattleBanner,setShowLiveBattleBanner]=useState(()=>!localStorage.getItem("pow_seen_live_battle"));
+  const [enemyNearby,setEnemyNearby]=useState(null);
   const [liveBattlePixels,setLiveBattlePixels]=useState({});
   const [liveBattleEndsAt,setLiveBattleEndsAt]=useState(null);
   const [missionProgress,setMissionProgress]=useState(()=>{
@@ -349,15 +351,29 @@ export default function App(){
       .on("postgres_changes",{event:"INSERT",schema:"public",table:"pixels",filter:`season_num=eq.${sNum}`},(payload)=>{
         setPixels(prev=>({...prev,[payload.new.idx]:dbRowToPixel(payload.new)}));
         trackHeatmap(payload.new.idx);
-        // Queue remote claim animation
         const teamColor=TM[payload.new.team_id]?.color||"#00F5FF";
         remoteAnimRef.current.push({idx:payload.new.idx,color:teamColor,type:"claim",ts:Date.now()});
-        // Minimap flash
         const mx=Math.floor((payload.new.idx%GW)/MMS),my=Math.floor(Math.floor(payload.new.idx/GW)/MMS);
         mmFlashRef.current.push({mx,my,color:teamColor,ts:Date.now()});
-        // Keep queues small
         if(remoteAnimRef.current.length>50)remoteAnimRef.current=remoteAnimRef.current.slice(-50);
         if(mmFlashRef.current.length>20)mmFlashRef.current=mmFlashRef.current.slice(-20);
+        // Enemy nearby detection — alert if enemy claims within 60px of your territory
+        setActive(myActive=>{
+          if(myActive&&payload.new.team_id!==myActive){
+            setPixels(myPixelsNow=>{
+              const myIdxs=Object.entries(myPixelsNow).filter(([,v])=>v?.t===myActive).map(([k])=>parseInt(k));
+              const claimGx=payload.new.idx%GW,claimGy=Math.floor(payload.new.idx/GW);
+              const isNear=myIdxs.some(idx=>{const gx=idx%GW,gy=Math.floor(idx/GW);return Math.abs(gx-claimGx)<60&&Math.abs(gy-claimGy)<60;});
+              if(isNear){
+                const attacker=TM[payload.new.team_id];
+                setEnemyNearby({name:attacker?.name||"Enemy",color:attacker?.color||"#FF4400",mx,my});
+                setTimeout(()=>setEnemyNearby(null),5000);
+              }
+              return myPixelsNow;
+            });
+          }
+          return myActive;
+        });
       })
       .on("postgres_changes",{event:"UPDATE",schema:"public",table:"pixels",filter:`season_num=eq.${sNum}`},(payload)=>{
         setActive(myActive=>{
@@ -1071,7 +1087,13 @@ export default function App(){
   // ── DERIVED ────────────────────────────────────────────────────────────────
   const subArrFull=useMemo(()=>{const subs=selCat==="All"?[...new Set(CAT.map(e=>e.sub))]:CAT.filter(e=>e.cat===selCat).map(e=>e.sub);return["All",...subs];},[selCat]);
   useEffect(()=>setSelSub("All"),[selCat]);
-  const vis=useMemo(()=>{if(q.trim().length>1){const lq=q.toLowerCase();return ALL.filter(t=>t.name.toLowerCase().includes(lq));}return ALL.filter(t=>{if(selCat!=="All"&&t.cat!==selCat)return false;if(selSub!=="All"&&t.sub!==selSub)return false;return true;});},[selCat,selSub,q]);
+  const vis=useMemo(()=>{
+    let list;
+    if(q.trim().length>1){const lq=q.toLowerCase();list=ALL.filter(t=>t.name.toLowerCase().includes(lq));}
+    else{list=ALL.filter(t=>{if(selCat!=="All"&&t.cat!==selCat)return false;if(selSub!=="All"&&t.sub!==selSub)return false;return true;});}
+    // Sort by pixel count descending so popular fandoms appear first
+    return list.sort((a,b)=>{const pa=Object.values(pixels).filter(p=>p?.t===a.id).length;const pb=Object.values(pixels).filter(p=>p?.t===b.id).length;return pb-pa;});
+  },[selCat,selSub,q,pixels]);
   const board=useMemo(()=>{const cnt={};Object.values(pixels).forEach(p=>{if(p?.t)cnt[p.t]=(cnt[p.t]||0)+1;});return Object.entries(cnt).map(([id,count])=>({...(TM[id]||{}),id,count,trend:territoryTrend[id]||0})).filter(t=>t.name).sort((a,b)=>b.count-a.count).slice(0,20);},[pixels,territoryTrend]);
   const totalSold=Object.keys(pixels).length;
   const at=active?TM[active]:null;
@@ -1760,12 +1782,42 @@ export default function App(){
         <style>{`@keyframes sponsorTicker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}`}</style>
       </div>}
 
+      {/* LIVE BATTLE FIRST-VISIT BANNER */}
+      {showLiveBattleBanner&&!loading&&<div style={{background:"linear-gradient(90deg,rgba(255,68,0,.15),rgba(255,68,0,.05),transparent)",borderBottom:"1px solid rgba(255,68,0,.3)",padding:"5px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,animation:"slideDown .3s ease"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{animation:"pulse .8s infinite",fontSize:14}}>⚡</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.7)"}}>
+            <strong style={{color:"#FF4400"}}>FREE LIVE BATTLE</strong> is happening now — 200×200 arena, no payment needed. Claim spots for your fandom!
+          </span>
+        </div>
+        <div style={{display:"flex",gap:6,flexShrink:0}}>
+          <button onClick={()=>{setShowLiveBattle(true);setShowLiveBattleBanner(false);localStorage.setItem("pow_seen_live_battle","1");}} style={{padding:"4px 12px",background:"linear-gradient(90deg,#FF4400,#FF2D00)",border:"none",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#fff",fontWeight:900,letterSpacing:1}}>JOIN NOW →</button>
+          <button onClick={()=>{setShowLiveBattleBanner(false);localStorage.setItem("pow_seen_live_battle","1");}} style={{padding:"4px 8px",background:"transparent",border:"none",cursor:"pointer",color:"rgba(255,255,255,.3)",fontSize:14}}>✕</button>
+        </div>
+      </div>}
+
+      {/* ENEMY NEARBY ALERT */}
+      {enemyNearby&&<div style={{background:"linear-gradient(90deg,rgba(255,68,0,.2),rgba(255,68,0,.05),transparent)",borderBottom:"1px solid rgba(255,68,0,.4)",padding:"4px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,animation:"slideDown .2s ease"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{animation:"pulse .5s infinite",fontSize:13}}>⚠️</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FF4400"}}>
+            <strong style={{color:enemyNearby.color}}>{enemyNearby.name}</strong> is claiming territory near you!
+          </span>
+        </div>
+        <button onClick={()=>{setEnemyNearby(null);setMode("RAID");}} style={{padding:"3px 10px",background:"rgba(255,68,0,.2)",border:"1px solid rgba(255,68,0,.5)",borderRadius:4,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",fontWeight:900}}>⚔️ RAID BACK</button>
+      </div>}
+
       {/* SEASON BANNER */}
-      <div style={{background:"linear-gradient(90deg,rgba(255,215,0,.06),rgba(200,255,0,.03),transparent)",borderBottom:"1px solid rgba(255,215,0,.12)",padding:"4px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
+      <div style={{background:seasonDaysLeft<=7?"linear-gradient(90deg,rgba(255,68,0,.12),rgba(255,215,0,.06),transparent)":"linear-gradient(90deg,rgba(255,215,0,.06),rgba(200,255,0,.03),transparent)",borderBottom:`1px solid ${seasonDaysLeft<=7?"rgba(255,68,0,.25)":"rgba(255,215,0,.12)"}`,padding:"4px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           <span>{currentTheme.icon}</span>
           <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#FFD700"}}>SEASON {season.num}</span>
-          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:seasonDaysLeft<=2?"#FF4400":seasonDaysLeft<=7?"#FFD700":"rgba(255,255,255,.3)",animation:seasonDaysLeft<=2?"pulse 1s infinite":undefined}}>· {countdownStr}</span>
+          {/* Prominent countdown */}
+          <div style={{display:"flex",alignItems:"center",gap:4,background:seasonDaysLeft<=2?"rgba(255,68,0,.15)":seasonDaysLeft<=7?"rgba(255,150,0,.1)":"rgba(255,255,255,.04)",border:`1px solid ${seasonDaysLeft<=2?"rgba(255,68,0,.5)":seasonDaysLeft<=7?"rgba(255,150,0,.3)":"rgba(255,255,255,.08)"}`,borderRadius:5,padding:"2px 8px",animation:seasonDaysLeft<=2?"pulse .8s infinite":undefined}}>
+            <span style={{fontFamily:"'Orbitron',monospace",fontSize:seasonDaysLeft<=7?10:9,fontWeight:900,color:seasonDaysLeft<=2?"#FF4400":seasonDaysLeft<=7?"#FFD700":"rgba(255,255,255,.4)"}}>
+              {seasonDaysLeft<=2?"🔥 ":seasonDaysLeft<=7?"⏰ ":""}{countdownStr}
+            </span>
+          </div>
           {decayStats.warn>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700",background:"rgba(255,200,0,.1)",border:"1px solid rgba(255,200,0,.25)",borderRadius:4,padding:"1px 6px"}}>⚠️ {decayStats.warn}px fading</span>}
           {decayStats.expired>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.25)",borderRadius:4,padding:"1px 6px"}}>❌ {decayStats.expired}px expired</span>}
         </div>
