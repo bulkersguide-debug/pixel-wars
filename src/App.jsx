@@ -118,6 +118,13 @@ const SIM_TEAMS=["BTS","Naruto","Fortnite","BLACKPINK","Taylor Swift","Valorant"
 const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const RANKS=[{name:"BRONZE",min:0,max:49,icon:"🥉",color:"#CD7F32"},{name:"SILVER",min:50,max:199,icon:"🥈",color:"#C0C0C0"},{name:"GOLD",min:200,max:499,icon:"🥇",color:"#FFD700"},{name:"PLATINUM",min:500,max:999,icon:"💎",color:"#00EAFF"},{name:"DIAMOND",min:1000,max:2499,icon:"💠",color:"#BB88FF"},{name:"LEGEND",min:2500,max:Infinity,icon:"👑",color:"#FF2D78"}];
 const getRank=(px)=>RANKS.find(r=>px>=r.min&&px<=r.max)||RANKS[0];
+// XP Level system — level = floor(sqrt(xp/50)) + 1, capped at 50
+const getLevel=(xp)=>Math.min(50,Math.floor(Math.sqrt(xp/50))+1);
+const xpForLevel=(lv)=>Math.pow(lv-1,2)*50;
+const LEVEL_BADGES=["","🌱","🌿","🌳","⚔️","🛡️","💥","🔥","⚡","💎","👑","🌟","🌙","☀️","🏆","💫","🎯","🎮","🎌","🎵","🚀","🌊","🌈","🦁","🦊","🐉","🌺","🎭","🎪","🎨","🏰","⚜️","🔮","🌠","🎇","🎆","🏅","🎖️","🥇","💠","🔱","⚡","🌋","🌌","🎯","💎","👑","🌟","✨","🏆"];
+const MAX_RECHARGE=10; // max stockpiled recharge pixels
+const RECHARGE_MAX_LEVEL=20; // at level 20, recharge cap increases
+const getMaxRecharge=(lv)=>Math.min(MAX_RECHARGE+Math.floor(lv/5),25);
 
 // ── SUPABASE HELPERS ──────────────────────────────────────────────────────────
 const dbRowToPixel=(row)=>({t:row.team_id,at:row.claimed_at});
@@ -198,6 +205,11 @@ export default function App(){
   const [fortifiedSectors,setFortifiedSectors]=useState(()=>{try{return JSON.parse(localStorage.getItem("pow_fort_sectors")||"[]");}catch{return [];}});
   const [showWarChest,setShowWarChest]=useState(false);
   const weeklyTheme=useMemo(()=>WEEKLY_THEMES[getWeekNum()%WEEKLY_THEMES.length],[]);
+  const [xp,setXp]=useState(()=>{try{return parseInt(localStorage.getItem("pow_xp")||"0");}catch{return 0;}});
+  const [playerLevel,setPlayerLevel]=useState(()=>{try{return parseInt(localStorage.getItem("pow_level")||"1");}catch{return 1;}});
+  const [rechargePixels,setRechargePixels]=useState(()=>{try{return parseInt(localStorage.getItem("pow_recharge")||"0");}catch{return 0;}});
+  const [loyaltyDays,setLoyaltyDays]=useState(()=>{try{return JSON.parse(localStorage.getItem("pow_loyalty")||'{"fandom":"","days":0,"last":""}');}catch{return{fandom:"",days:0,last:""};}});
+  const [showLevelUp,setShowLevelUp]=useState(null); // level number when leveled up
   const [flashColor,setFlashColor]=useState(null);
   const [shakeCanvas,setShakeCanvas]=useState(false);
   const [myPixels,setMyPixels]=useState(0);
@@ -324,7 +336,6 @@ export default function App(){
       setPixels(px=>{
         const myPx=Object.values(px).filter(p=>p?.t===active).length;
         if(myPx===0)return px;
-        // 1 gold per 50 pixels per 5 minutes, bonus if weekly theme matches
         const base=Math.max(1,Math.floor(myPx/50));
         const themeBonus=(weeklyTheme.cat===active?.split("|")[0]||weeklyTheme.cat==="ALL")?2:1;
         const income=base*themeBonus;
@@ -336,9 +347,39 @@ export default function App(){
         });
         return px;
       });
-    },300000); // every 5 minutes
+    },300000);
     return()=>clearInterval(iv);
   },[active,weeklyTheme]);
+
+  // Free pixel recharge — 1 pixel per hour, up to max based on level
+  useEffect(()=>{
+    const iv=setInterval(()=>{
+      if(!user)return; // only for logged-in players
+      setRechargePixels(r=>{
+        const maxR=getMaxRecharge(playerLevel);
+        if(r>=maxR)return r;
+        const next=Math.min(maxR,r+1);
+        localStorage.setItem("pow_recharge",String(next));
+        pushToast(`⏰ +1 free pixel recharged! (${next}/${maxR} ready)`,"#00FF88",3000);
+        return next;
+      });
+    },3600000); // every hour
+    return()=>clearInterval(iv);
+  },[user,playerLevel]);
+
+  // Loyalty tracking — consecutive days with same fandom
+  useEffect(()=>{
+    if(!active||!user)return;
+    const today=todayStr();
+    if(loyaltyDays.last===today)return;
+    const yesterday=yesterdayStr();
+    const isSameFandom=loyaltyDays.fandom===active;
+    const newDays=isSameFandom&&loyaltyDays.last===yesterday?loyaltyDays.days+1:1;
+    const newLoyalty={fandom:active,days:newDays,last:today};
+    setLoyaltyDays(newLoyalty);
+    localStorage.setItem("pow_loyalty",JSON.stringify(newLoyalty));
+    if(newDays>=7&&isSameFandom)pushToast(`🎖️ ${newDays}-day loyalty to ${TM[active]?.name}! You get a build cost discount.`,"#FFD700",5000);
+  },[active,user]);
 
   // Init fortified sectors — 4 random unlocked sectors per season
   useEffect(()=>{
@@ -1110,6 +1151,11 @@ export default function App(){
         if(mode==="RAID")price*=weeklyTheme.raidDiscount;
         else price*=weeklyTheme.claimBonus;
       }
+      // Loyalty discount — 7+ days same fandom = 5% off build
+      if(mode==="BUILD"&&loyaltyDays.fandom===active&&loyaltyDays.days>=7)price*=0.95;
+      // Level discount — higher level = small discount
+      if(playerLevel>=10)price*=0.97;
+      if(playerLevel>=20)price*=0.95;
       idxs.forEach(idx=>{
         if(mode==="BUILD"&&active){
           const gx=idx%GW,gy=Math.floor(idx/GW);
@@ -1280,6 +1326,35 @@ export default function App(){
     setPixels(next);setMyPixels(p=>p+pending.size+bonus);setShields(newShields);
     try{localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
     if(freeUsed>0)syncFreePixels(freePixels-freeUsed);
+    // Use recharge pixels if available
+    if(!isRaid&&rechargePixels>0){
+      const useRecharge=Math.min(rechargePixels,Math.ceil(cost-freeUsed));
+      if(useRecharge>0){
+        setRechargePixels(r=>{const next2=Math.max(0,r-useRecharge);localStorage.setItem("pow_recharge",String(next2));return next2;});
+        pushToast(`⏰ Used ${useRecharge} recharged pixel${useRecharge>1?"s":""}!`,"#00FF88",2000);
+      }
+    }
+    // Earn XP — 1 per pixel claimed/raided
+    const xpEarned=toClaim.size+bonus;
+    setXp(prevXp=>{
+      const newXp=prevXp+xpEarned;
+      localStorage.setItem("pow_xp",String(newXp));
+      const prevLevel=getLevel(prevXp);
+      const newLevel=getLevel(newXp);
+      if(newLevel>prevLevel){
+        setPlayerLevel(newLevel);
+        localStorage.setItem("pow_level",String(newLevel));
+        setShowLevelUp(newLevel);
+        setTimeout(()=>setShowLevelUp(null),4000);
+        // Level up rewards
+        const rechargeBonus=500;
+        setWarChest(g=>{const next2=g+rechargeBonus;localStorage.setItem("pow_war_chest",String(next2));return next2;});
+        pushToast(`🎉 LEVEL UP! You're now Level ${newLevel} ${LEVEL_BADGES[newLevel]||"⭐"} +500💰 gold!`,"#FFD700",6000);
+      }
+      return newXp;
+    });
+    // 1 gold per pixel earned in War Chest
+    setWarChest(g=>{const next2=g+xpEarned;localStorage.setItem("pow_war_chest",String(next2));return next2;});
     const toClaim=new Set(pending);setPending(new Set());
     if(isOnline)await dbUpsertPixels(toClaim,active,currentSeasonNum);else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
     toClaim.forEach(idx=>trackHeatmap(idx));
@@ -1558,6 +1633,8 @@ export default function App(){
           <div style={{background:rgba(confirmPayload.teamColor,.08),border:`1px solid ${rgba(confirmPayload.teamColor,.2)}`,borderRadius:10,padding:"16px",marginBottom:16}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Pixels</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:confirmPayload.teamColor}}>{confirmPayload.count}px</span></div>
             {confirmPayload.adjCount>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Territory bonus (-10%)</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#00FF88"}}>🗺️ {confirmPayload.adjCount}px adj.</span></div>}
+            {loyaltyDays.fandom===active&&loyaltyDays.days>=7&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Loyalty discount (-5%)</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700"}}>🎖️ {loyaltyDays.days}d fan</span></div>}
+            {playerLevel>=10&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Level {playerLevel} bonus</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700"}}>{LEVEL_BADGES[playerLevel]||"⭐"} -{playerLevel>=20?"5":"3"}%</span></div>}
             {confirmPayload.freeUsed>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Free pixels</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700"}}>-{confirmPayload.freeUsed} 🎁</span></div>}
             {confirmPayload.bonus>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Combo bonus</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700"}}>+{confirmPayload.bonus} 🔥</span></div>}
             <div style={{borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:8,display:"flex",justifyContent:"space-between"}}><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"rgba(255,255,255,.4)"}}>Total cost</span><span style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#C8FF00"}}>€{(confirmPayload.cost-confirmPayload.freeUsed).toFixed(2)}</span></div>
@@ -1912,6 +1989,16 @@ export default function App(){
         </div>
       </div>}
 
+      {/* LEVEL UP CELEBRATION */}
+      {showLevelUp&&<div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:1001,pointerEvents:"none",textAlign:"center",animation:"pop .5s cubic-bezier(.34,1.56,.64,1)"}}>
+        <div style={{background:"rgba(9,9,26,.97)",border:"2px solid rgba(255,215,0,.6)",borderRadius:20,padding:"28px 40px",boxShadow:"0 0 80px rgba(255,215,0,.3)"}}>
+          <div style={{fontSize:48,marginBottom:8}}>{LEVEL_BADGES[showLevelUp]||"⭐"}</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"rgba(255,255,255,.5)",letterSpacing:3,marginBottom:4}}>LEVEL UP!</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:32,fontWeight:900,color:"#FFD700",letterSpacing:4}}>LVL {showLevelUp}</div>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.4)",marginTop:8}}>+500💰 gold · Pixel cap increased · Keep conquering!</div>
+        </div>
+      </div>}
+
       {/* SECTOR ZOOM MODAL */}
       {sectorZoom&&(()=>{
         const{sx,sy}=sectorZoom;
@@ -2155,7 +2242,7 @@ export default function App(){
         </div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
           {freePixels>0&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:7,padding:"4px 9px",cursor:"pointer"}} onClick={gatedOpenDaily}>
-            <span style={{fontSize:13}}>🎁</span><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#FFD700"}}>{freePixels}px FREE</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{alreadyClaimedToday?"CLAIMED":"TAP"}</div></div>
+            <span style={{fontSize:13}}>🎁</span><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#FFD700"}}>{freePixels+(rechargePixels||0)}px FREE</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{rechargePixels>0?`+${rechargePixels}⏰`:alreadyClaimedToday?"CLAIMED":"TAP"}</div></div>
           </div>}
           <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,45,120,.07)",border:"1px solid rgba(255,45,120,.25)",borderRadius:7,padding:"4px 9px",cursor:"pointer"}} onClick={gatedOpenDaily}>
             <span style={{fontSize:13}}>🔥</span><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#FF2D78"}}>{streakData.days}d</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{alreadyClaimedToday?"✅":"STREAK"}</div></div>
@@ -2163,6 +2250,17 @@ export default function App(){
           <div style={{display:"flex",alignItems:"center",gap:5,background:rgba(myRank.color,.07),border:`1px solid ${rgba(myRank.color,.25)}`,borderRadius:7,padding:"4px 9px"}}>
             <span style={{fontSize:13}}>{myRank.icon}</span><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:myRank.color}}>{myRank.name}</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{myPixels}px</div></div>
           </div>
+          {/* XP Level badge */}
+          {user&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,215,0,.07)",border:"1px solid rgba(255,215,0,.25)",borderRadius:7,padding:"4px 9px",cursor:"pointer",position:"relative"}} title={`XP: ${xp} | Next level: ${xpForLevel(playerLevel+1)} XP`}>
+            <span style={{fontSize:12}}>{LEVEL_BADGES[playerLevel]||"⭐"}</span>
+            <div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#FFD700"}}>LVL {playerLevel}</div>
+              <div style={{width:40,height:3,background:"rgba(255,255,255,.1)",borderRadius:2,marginTop:2,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${Math.min(100,((xp-xpForLevel(playerLevel))/(xpForLevel(playerLevel+1)-xpForLevel(playerLevel)))*100)}%`,background:"linear-gradient(90deg,#FFD700,#FF8800)",borderRadius:2}}/>
+              </div>
+            </div>
+            {rechargePixels>0&&<div style={{position:"absolute",top:-4,right:-4,background:"#00FF88",color:"#040408",borderRadius:"50%",width:14,height:14,fontSize:7,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontFamily:"'Orbitron',monospace"}}>+{rechargePixels}</div>}
+          </div>}
           {/* User auth — only show when logged in */}
           {user&&(
             <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 8px",background:"rgba(88,101,242,.1)",border:"1px solid rgba(88,101,242,.3)",borderRadius:6,cursor:"pointer"}} onClick={()=>supabase?.auth.signOut()}>
@@ -2270,6 +2368,17 @@ export default function App(){
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button onClick={()=>setShowHeatmap(s=>!s)} style={{background:showHeatmap?"rgba(255,100,0,.2)":"rgba(255,100,0,.05)",border:`1px solid ${showHeatmap?"rgba(255,100,0,.6)":"rgba(255,100,0,.2)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF6422",letterSpacing:1,transition:"all .15s"}}>{showHeatmap?"HIDE":"🔥 HEATMAP"}</button>
           <button onClick={()=>setShowLiveBattle(true)} style={{background:"rgba(255,68,0,.15)",border:"1px solid rgba(255,68,0,.5)",borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400",letterSpacing:1,animation:"pulse 2s infinite"}}>⚡ LIVE BATTLE</button>
+          <button onClick={()=>{
+            // Random Sector — pan to a random active sector
+            const activeSectors=sectorLeaderboard.filter(s=>s.total>10);
+            if(activeSectors.length===0){pushToast("No active sectors yet!","#FF4400",2000);return;}
+            const pick=activeSectors[Math.floor(Math.random()*Math.min(activeSectors.length,20))];
+            setVx(Math.max(0,Math.min(GW-VW,pick.sx*SECTOR-20)));
+            setVy(Math.max(0,Math.min(GH-VH,pick.sy*SECTOR-20)));
+            setSectorZoom({sx:pick.sx,sy:pick.sy});
+            setTimeout(()=>setSectorZoom(null),6000);
+            pushToast(`🎲 Jumped to ${pick.leader?.name||"active"} sector!`,"#C8FF00",2500);
+          }} style={{background:"rgba(200,255,0,.08)",border:"1px solid rgba(200,255,0,.25)",borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#C8FF00",letterSpacing:1}}>🎲 RANDOM</button>
           <button onClick={()=>setShowPriceMap(s=>!s)} style={{background:showPriceMap?"rgba(0,245,255,.15)":"rgba(0,245,255,.05)",border:`1px solid ${showPriceMap?"rgba(0,245,255,.5)":"rgba(0,245,255,.15)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#00F5FF",transition:"all .15s"}}>{showPriceMap?"HIDE":"💰 PRICES"}</button>
         </div>
       </div>
