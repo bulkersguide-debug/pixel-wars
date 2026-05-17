@@ -260,8 +260,6 @@ export default function App(){
   const [clanInput,setClanInput]=useState("");
   const [showWorldWar,setShowWorldWar]=useState(false);
   const [wwLastRaid,setWwLastRaid]=useState(()=>{try{return parseInt(localStorage.getItem("pow_ww_raid")||"0");}catch{return 0;}});
-  const [purchases,setPurchases]=useState([]);
-  const [purchasesLoading,setPurchasesLoading]=useState(false);
   const [watchingAd,setWatchingAd]=useState(false);
   const [adCooldown,setAdCooldown]=useState(()=>{try{return parseInt(localStorage.getItem("pow_ad_cooldown")||"0");}catch{return 0;}});
   const [showStarterPack,setShowStarterPack]=useState(false);
