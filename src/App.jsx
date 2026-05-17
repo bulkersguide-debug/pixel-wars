@@ -156,7 +156,17 @@ const getMaxRecharge=(lv)=>Math.min(MAX_RECHARGE+Math.floor(lv/5),25);
 // ── SUPABASE HELPERS ──────────────────────────────────────────────────────────
 const dbRowToPixel=(row)=>({t:row.team_id,at:row.claimed_at});
 async function dbLoadPixels(sn){if(!supabase)return null;const{data}=await supabase.from("pixels").select("idx,team_id,claimed_at").eq("season_num",sn);if(!data)return null;const m={};data.forEach(r=>{m[r.idx]=dbRowToPixel(r);});return m;}
-async function dbUpsertPixels(pending,teamId,sn){if(!supabase)return;const now=Date.now();const rows=Array.from(pending).map(idx=>({idx,season_num:sn,team_id:teamId,claimed_at:now}));for(let i=0;i<rows.length;i+=500)await supabase.from("pixels").upsert(rows.slice(i,i+500),{onConflict:"idx,season_num"});}
+async function dbUpsertPixels(pending,teamId,sn){
+  if(!supabase)return;
+  const now=Date.now();
+  const rows=Array.from(pending).map(idx=>({idx,season_num:sn,team_id:teamId,claimed_at:now}));
+  console.log(`[dbUpsertPixels] saving ${rows.length} pixels to season ${sn}`);
+  for(let i=0;i<rows.length;i+=500){
+    const{error}=await supabase.from("pixels").upsert(rows.slice(i,i+500),{onConflict:"idx,season_num"});
+    if(error)console.error("[dbUpsertPixels] ERROR:",error);
+    else console.log(`[dbUpsertPixels] saved batch ${i/500+1} OK`);
+  }
+}
 async function dbDeletePixels(idxArr,sn){if(!supabase||!idxArr.length)return;for(let i=0;i<idxArr.length;i+=500)await supabase.from("pixels").delete().in("idx",idxArr.slice(i,i+500)).eq("season_num",sn);}
 async function dbLoadSeason(){if(!supabase)return null;const{data}=await supabase.from("seasons").select("*").order("num",{ascending:false}).limit(1);return data?.[0]||null;}
 async function dbSaveSeason(s){if(!supabase)return;await supabase.from("seasons").upsert({num:s.num,start_date:s.startDate,theme_index:s.theme,winners:s.winners});}
