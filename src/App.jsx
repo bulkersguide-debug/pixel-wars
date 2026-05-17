@@ -1224,12 +1224,19 @@ export default function App(){
     for(let i=0;i<=NS;i++){const p=i*(MM/NS);ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,MM);ctx.stroke();ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(MM,p);ctx.stroke();}
     Object.entries(pixels).forEach(([idxStr,px])=>{if(!px?.t)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle=TM[px.t]?.color||"#888";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
     const now=Date.now();Object.entries(shields).forEach(([idxStr,exp])=>{if(exp<=now)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle="rgba(0,245,255,0.4)";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
-    ctx.strokeStyle="#00F5FF";ctx.lineWidth=1.5;ctx.strokeRect(Math.floor(vx/MMS),Math.floor(vy/MMS),Math.ceil(effVW/MMS),Math.ceil(effVH/MMS));
-    // Faction dominance corners on minimap
-    factionStandings.slice(0,3).forEach((f,i)=>{
-      ctx.fillStyle=f.color+"22";ctx.fillStyle=f.color;ctx.font="bold 7px monospace";ctx.textAlign="left";
-      ctx.fillText(`${f.icon}${Math.round(f.pixels/(factionStandings.reduce((a,b)=>a+b.pixels,0)||1)*100)}%`,2,MM-2-i*9);
-    });
+    ctx.strokeStyle="#00F5FF";ctx.lineWidth=1.5;ctx.strokeRect(Math.floor(vx/MMS),Math.floor(vy/MMS),Math.ceil(VW/MMS),Math.ceil(VH/MMS));
+    // Faction dominance on minimap — safe check
+    try{
+      const fs=Object.values(FACTIONS).map(f=>{
+        const cnt=Object.values(pixels).filter(p=>p?.t&&getFaction(p.t)?.id===f.id).length;
+        return{...f,pixels:cnt};
+      }).sort((a,b)=>b.pixels-a.pixels);
+      const tot=fs.reduce((a,b)=>a+b.pixels,0)||1;
+      fs.forEach((f,i)=>{
+        ctx.fillStyle=f.color;ctx.font="bold 7px monospace";ctx.textAlign="left";
+        ctx.fillText(`${f.icon}${Math.round(f.pixels/tot*100)}%`,2,MM-2-i*9);
+      });
+    }catch{}
     // Remote activity flashes on minimap
     const now2=Date.now();
     mmFlashRef.current=mmFlashRef.current.filter(f=>now2-f.ts<2000);
@@ -1243,7 +1250,7 @@ export default function App(){
       ctx.strokeStyle=f.color+(Math.round(alpha*255).toString(16).padStart(2,"0"));
       ctx.lineWidth=1;ctx.stroke();
     });
-  },[pixels,shields,unlockedSet,vx,vy,animTick,factionStandings]);
+  },[pixels,shields,unlockedSet,vx,vy,animTick]);
 
   // ── MOUSE ──────────────────────────────────────────────────────────────────
   const mouseToGrid=(e)=>{const rc=cvs.current.getBoundingClientRect(),cx=(e.clientX-rc.left)*CW/rc.width,cy=(e.clientY-rc.top)*CH/rc.height,gx=vx+Math.floor(cx/effCell),gy=vy+Math.floor(cy/effCell);if(gx<0||gx>=GW||gy<0||gy>=GH)return null;return{gx,gy,idx:gy*GW+gx};};
@@ -2335,7 +2342,7 @@ export default function App(){
           if(isOnline)dbUpsertPixels(new Set(toUpsert),active,currentSeasonNum);
           const newGold=warChest-30;setWarChest(newGold);localStorage.setItem("pow_war_chest",String(newGold));
           setWwLastRaid(Date.now());localStorage.setItem("pow_ww_raid",String(Date.now()));
-          spawnParticles(myFaction.color,vxRef?.current||vx+90,vyRef?.current||vy+58,25,true);
+          spawnParticles(myFaction.color,vx+Math.floor(effVW/2),vy+Math.floor(effVH/2),25,true);
           triggerFlash(myFaction.color,true);
           pushToast(`⚔️ FACTION RAID! ${myFaction.name} stole ${targets.length}px from enemy factions! (${newGold}💰 left)`,"#FF4400",5000);
           postToDiscord({title:`⚔️ FACTION RAID — ${myFaction.name}!`,description:`**${TM[active]?.name}** launched a Faction Raid for the **${myFaction.name}** (${myFaction.icon})!\n\nStole **${targets.length} pixels** from enemy factions.\n\n**Current Standings:**\n${factionStandings.map((f,i)=>`${["🥇","🥈","🥉"][i]} ${f.icon} ${f.name}: ${f.pixels.toLocaleString()}px (${Math.round(f.pixels/totalPx*100)}%)`).join("\n")}`,color:parseInt(myFaction.color.slice(1),16),url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War World War"},timestamp:new Date().toISOString()});
