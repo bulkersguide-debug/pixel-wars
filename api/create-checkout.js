@@ -56,6 +56,9 @@ export default async function handler(req, res) {
     params.append("cancel_url", `${origin}?payment=cancelled`);
     params.append("payment_intent_data[statement_descriptor]", "PIXELSOFWAR");
     params.append("locale", "auto");
+    // Collect email for receipt
+    params.append("billing_address_collection", "auto");
+    params.append("customer_creation", "always");
 
     const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",
