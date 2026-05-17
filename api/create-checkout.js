@@ -1,17 +1,15 @@
 // api/create-checkout.js
-import Stripe from "stripe";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Uses Stripe REST API directly via fetch — no npm package needed
 
 const PRODUCTS = {
-  trial:       { name: "Trial Pack",    pixels: 15,    bonus: 0,    price: 99,   description: "15 pixels for Pixels of War" },
-  small:       { name: "Small Bundle",  pixels: 100,   bonus: 0,    price: 199,  description: "100 pixels for Pixels of War" },
-  medium:      { name: "Medium Bundle", pixels: 250,   bonus: 25,   price: 499,  description: "250 pixels + 25 bonus for Pixels of War" },
-  large:       { name: "Large Bundle",  pixels: 600,   bonus: 60,   price: 999,  description: "600 pixels + 60 bonus for Pixels of War" },
-  mega:        { name: "Mega Bundle",   pixels: 2000,  bonus: 400,  price: 2499, description: "2,000 pixels + 400 bonus for Pixels of War" },
-  whale:       { name: "Whale Pack",    pixels: 5000,  bonus: 1000, price: 4999, description: "5,000 pixels + 1,000 bonus + Crown Badge" },
-  season_pass: { name: "Season Pass",   pixels: 50,    bonus: 0,    price: 499,  description: "Season Pass: 2x XP, +50% gold, +50 pixels, exclusive badge" },
-  starter:     { name: "Starter Pack",  pixels: 100,   bonus: 0,    price: 299,  description: "100 pixels + Cluster Bomb + Season Pass (3-day offer)" },
+  trial:       { name: "Trial Pack",    pixels: 15,    bonus: 0,    price: 99   },
+  small:       { name: "Small Bundle",  pixels: 100,   bonus: 0,    price: 199  },
+  medium:      { name: "Medium Bundle", pixels: 250,   bonus: 25,   price: 499  },
+  large:       { name: "Large Bundle",  pixels: 600,   bonus: 60,   price: 999  },
+  mega:        { name: "Mega Bundle",   pixels: 2000,  bonus: 400,  price: 2499 },
+  whale:       { name: "Whale Pack",    pixels: 5000,  bonus: 1000, price: 4999 },
+  season_pass: { name: "Season Pass",   pixels: 50,    bonus: 0,    price: 499  },
+  starter:     { name: "Starter Pack",  pixels: 100,   bonus: 0,    price: 299  },
 };
 
 export default async function handler(req, res) {
@@ -31,42 +29,54 @@ export default async function handler(req, res) {
   const product = PRODUCTS[productId];
   const totalPixels = product.pixels + product.bonus;
   const origin = "https://www.pixelsofwar.com";
+  const key = process.env.STRIPE_SECRET_KEY;
+
+  if (!key) {
+    return res.status(500).json({ error: "Stripe key not configured" });
+  }
 
   try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "payment",
-      line_items: [{
-        price_data: {
-          currency: "eur",
-          product_data: {
-            name: `${product.name} — Pixels of War`,
-            description: product.description,
-          },
-          unit_amount: product.price,
-        },
-        quantity: 1,
-      }],
-      metadata: {
-        productId,
-        userId: userId || "guest",
-        discordUsername: discordUsername || "unknown",
-        fandom: fandom || "none",
-        pixels: String(totalPixels),
-        isSeasonPass: productId === "season_pass" ? "true" : "false",
-        isWhale: productId === "whale" ? "true" : "false",
+    // Build form-encoded body for Stripe API
+    const params = new URLSearchParams();
+    params.append("payment_method_types[]", "card");
+    params.append("mode", "payment");
+    params.append("line_items[0][quantity]", "1");
+    params.append("line_items[0][price_data][currency]", "eur");
+    params.append("line_items[0][price_data][unit_amount]", String(product.price));
+    params.append("line_items[0][price_data][product_data][name]", `${product.name} — Pixels of War`);
+    params.append("line_items[0][price_data][product_data][description]", `${totalPixels} pixels added to your account`);
+    params.append("metadata[productId]", productId);
+    params.append("metadata[userId]", userId || "guest");
+    params.append("metadata[discordUsername]", discordUsername || "unknown");
+    params.append("metadata[fandom]", fandom || "none");
+    params.append("metadata[pixels]", String(totalPixels));
+    params.append("metadata[isSeasonPass]", productId === "season_pass" ? "true" : "false");
+    params.append("metadata[isWhale]", productId === "whale" ? "true" : "false");
+    params.append("success_url", `${origin}?payment=success&session_id={CHECKOUT_SESSION_ID}&product=${productId}`);
+    params.append("cancel_url", `${origin}?payment=cancelled`);
+    params.append("payment_intent_data[statement_descriptor]", "PIXELSOFWAR");
+    params.append("locale", "auto");
+
+    const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${key}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      success_url: `${origin}?payment=success&session_id={CHECKOUT_SESSION_ID}&product=${productId}`,
-      cancel_url: `${origin}?payment=cancelled`,
-      payment_intent_data: {
-        statement_descriptor: "PIXELSOFWAR",
-      },
-      locale: "auto",
+      body: params.toString(),
     });
 
+    const session = await response.json();
+
+    if (!response.ok) {
+      console.error("Stripe API error:", session.error);
+      return res.status(500).json({ error: session.error?.message || "Stripe error" });
+    }
+
     return res.status(200).json({ url: session.url });
+
   } catch (err) {
-    console.error("Stripe error:", err.message);
+    console.error("Server error:", err.message);
     return res.status(500).json({ error: err.message });
   }
 }
