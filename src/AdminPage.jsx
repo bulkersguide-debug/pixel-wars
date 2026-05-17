@@ -140,7 +140,7 @@ export default function AdminPage(){
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({embeds:[{
           title:`${roleEmoji} ROLE ASSIGNED — Pixels of War`,
-          description:`**${roleUser?.username}** has been assigned the **${role.toUpperCase()}** role!${bonus>0?`\n\n🎁 **+${bonus} bonus pixels** granted.`:""}\n\nWelcome to the team! 🎮`,
+          description:`**${roleUser?.username}** has been assigned the **${role.toUpperCase()}** role!${bonus>0?`\n\n🎁 **+${bonus} bonus pixels** granted instantly.`:""}\n\n👉 **${roleUser?.username}** — refresh your game page to see your new badge and pixels!\n\n🎮 https://www.pixelsofwar.com`,
           color:roleColor,
           timestamp:new Date().toISOString(),
           footer:{text:"Pixels of War Staff System"}
@@ -198,7 +198,7 @@ export default function AdminPage(){
     supabase.from("sponsored_banners").select("*").order("created_at",{ascending:false})
       .then(({data})=>{setBanners(data||[]);setLoadingBanners(false);});
     // Listen for new banner submissions and alert via Discord
-    const ch=supabase.channel("admin-banner-alerts")
+    const bannerCh=supabase.channel("admin-banner-alerts")
       .on("postgres_changes",{event:"INSERT",schema:"public",table:"sponsored_banners"},(payload)=>{
         const b=payload.new;
         if(b.status==="pending"){
@@ -214,16 +214,29 @@ export default function AdminPage(){
           });
         }
       }).subscribe();
-    // Load recent signups
-    supabase.from("profiles").select("id,username,email,role,free_pixels,created_at").order("created_at",{ascending:false}).limit(10)
-      .then(({data})=>setRecentUsers(data||[]));
 
-    const ch=supabase.channel("admin-presence").on("presence",{event:"sync"},()=>{
-      const state=ch.presenceState();
-      const users=Object.values(state).flat().map(u=>u.username||"unknown");
-      setOnlineUsers(users);
-    }).subscribe();
-    return()=>supabase.removeChannel(ch);
+    // Load recent signups
+    supabase.from("profiles")
+      .select("id,username,email,role,free_pixels,created_at")
+      .order("created_at",{ascending:false})
+      .limit(10)
+      .then(({data,error})=>{
+        if(!error)setRecentUsers(data||[]);
+        else console.error("Recent signups error:",error);
+      });
+
+    // Track online users via game's presence channel
+    const presenceCh=supabase.channel("online-users")
+      .on("presence",{event:"sync"},()=>{
+        const state=presenceCh.presenceState();
+        const users=Object.values(state).flat().map(u=>u.username||"unknown");
+        setOnlineUsers(users);
+      }).subscribe();
+
+    return()=>{
+      supabase.removeChannel(bannerCh);
+      supabase.removeChannel(presenceCh);
+    };
   },[auth]);
 
   const loadStats=async()=>{

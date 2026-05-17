@@ -992,7 +992,27 @@ export default function App(){
     }
   };
 
-  // Load total player count
+  // Re-sync profile on tab focus — picks up admin role/pixel changes instantly
+  useEffect(()=>{
+    const sync=()=>{
+      if(!user?.id||!supabase||!isOnline)return;
+      supabase.from("profiles").select("free_pixels,role").eq("id",user.id).single()
+        .then(({data})=>{
+          if(!data)return;
+          if(data.free_pixels!=null&&data.free_pixels!==freePixels){
+            setFreePixels(data.free_pixels);
+            localStorage.setItem("pow_free",String(data.free_pixels));
+          }
+          if(data.role&&data.role!==profile?.role){
+            setProfile(p=>({...p,role:data.role}));
+            pushToast(`✨ Your role is now ${data.role.toUpperCase()}! Congrats!`,"#FFD700",6000);
+          }
+        }).catch(()=>{});
+    };
+    window.addEventListener("focus",sync);
+    document.addEventListener("visibilitychange",()=>{if(!document.hidden)sync();});
+    return()=>{window.removeEventListener("focus",sync);};
+  },[user,freePixels,profile]);
   useEffect(()=>{
     if(!supabase||!isOnline)return;
     supabase.rpc("get_player_count").then(({data})=>data&&setTotalPlayers(data));
@@ -3768,6 +3788,58 @@ export default function App(){
                 <div style={{fontSize:6,color:"#2a2a3a",marginTop:1,fontFamily:"'Share Tech Mono',monospace"}}>{f.ts}</div>
               </div>
             ))}
+          </div>}
+
+          {/* WARS TAB */}
+          {tab==="WARS"&&<div style={{flex:1,overflowY:"auto",padding:"5px 5px"}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#2a2a4a",marginBottom:4}}>ACTIVE WARS</div>
+            {wars.length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#2a2a3a",textAlign:"center",paddingTop:16,lineHeight:1.8}}>No active wars.<br/>Peace reigns... for now.</div>}
+            {wars.map((w,i)=>{const att=TM[w.attacker],def=TM[w.defender];return(
+              <div key={i} style={{marginBottom:3,padding:"5px 6px",background:"rgba(255,68,0,.06)",borderRadius:5,border:"1px solid rgba(255,68,0,.2)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:2}}>
+                  <div style={{width:6,height:6,borderRadius:1,background:att?.color||"#888"}}/>
+                  <span style={{fontSize:8,fontWeight:700,color:att?.color||"#888"}}>{att?.name||"?"}</span>
+                  <span style={{fontSize:8,color:"#FF4400"}}>⚔</span>
+                  <div style={{width:6,height:6,borderRadius:1,background:def?.color||"#888"}}/>
+                  <span style={{fontSize:8,fontWeight:700,color:def?.color||"#888"}}>{def?.name||"?"}</span>
+                </div>
+              </div>
+            );})}
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#2a2a4a",marginBottom:4,marginTop:8}}>ALLIANCES</div>
+            {alliances.filter(a=>a.status==="active").length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#2a2a3a",textAlign:"center",lineHeight:1.8}}>No active alliances.</div>}
+            {alliances.filter(a=>a.status==="active").map((a,i)=>{const p=TM[a.proposer],tg=TM[a.target];return(
+              <div key={i} style={{marginBottom:3,padding:"5px 6px",background:"rgba(0,255,170,.04)",borderRadius:5,border:"1px solid rgba(0,255,170,.15)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:4}}>
+                  <div style={{width:6,height:6,borderRadius:1,background:p?.color||"#888"}}/>
+                  <span style={{fontSize:8,fontWeight:700,color:p?.color||"#888"}}>{p?.name||"?"}</span>
+                  <span style={{fontSize:8,color:"#00FFAA"}}>🤝</span>
+                  <div style={{width:6,height:6,borderRadius:1,background:tg?.color||"#888"}}/>
+                  <span style={{fontSize:8,fontWeight:700,color:tg?.color||"#888"}}>{tg?.name||"?"}</span>
+                </div>
+              </div>
+            );})}
+          </div>}
+
+          {/* SECT TAB */}
+          {tab==="SECT"&&<div style={{flex:1,overflowY:"auto",padding:"5px 5px"}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#2a2a4a",marginBottom:4}}>SECTOR MAP</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:2}}>
+              {Array.from({length:20},(_,sy)=>Array.from({length:20},(_,sx)=>{
+                const key=sectorKey(sx,sy);
+                const unlocked=unlockedSet.has(key);
+                const fill=sectorFills[key]||0;
+                const leader=Object.entries(sectorPixelCounts?.[key]||{}).sort((a,b)=>b[1]-a[1])[0];
+                const lColor=leader?TM[leader[0]]?.color||"#888":"#1a1a2a";
+                return unlocked?(
+                  <div key={key} onClick={()=>{setVx(Math.max(0,sx*SECTOR-40));setVy(Math.max(0,sy*SECTOR-30));}} title={`S${sx+1}-${sy+1} ${Math.round(fill*100)}%`} style={{aspectRatio:"1",background:leader?`${lColor}33`:"#09091a",border:`1px solid ${unlocked?"#1a1a30":"#0a0a15"}`,borderRadius:2,cursor:"pointer",position:"relative",overflow:"hidden"}}>
+                    <div style={{position:"absolute",bottom:0,left:0,right:0,height:`${fill*100}%`,background:`${lColor}44`,transition:"height .3s"}}/>
+                  </div>
+                ):(
+                  <div key={key} style={{aspectRatio:"1",background:"#050508",border:"1px solid #0a0a10",borderRadius:2,opacity:.3}}/>
+                );
+              })).flat()}
+            </div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a3a",textAlign:"center",marginTop:6}}>{unlockedSectors.length}/400 sectors unlocked</div>
           </div>}
 
 
