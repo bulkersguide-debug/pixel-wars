@@ -336,6 +336,8 @@ export default function App(){
   const [showSponsor,setShowSponsor]=useState(false);
 
   const currentSeasonNum=season.num;
+  const seasonNumRef=useRef(1);
+  useEffect(()=>{seasonNumRef.current=season.num;},[season.num]);
   const alreadyClaimedToday=streakData.last===todayStr();
 
   const pushToast=useCallback((msg,color,dur=3000)=>{const id=Date.now()+Math.random();setToasts(t=>[...t,{id,msg,color}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),dur);},[]);
@@ -576,7 +578,7 @@ export default function App(){
       if(isOnline){
         const dbSeason=await dbLoadSeason();
         let sNum=1;
-        if(dbSeason){const sObj={num:dbSeason.num,startDate:dbSeason.start_date,theme:dbSeason.theme_index,winners:dbSeason.winners||[]};setSeason(sObj);sNum=dbSeason.num;}
+        if(dbSeason){const sObj={num:dbSeason.num,startDate:dbSeason.start_date,theme:dbSeason.theme_index,winners:dbSeason.winners||[]};setSeason(sObj);sNum=dbSeason.num;seasonNumRef.current=sNum;}
         const dbSectors=await dbLoadSectors(sNum);if(dbSectors&&dbSectors.length)setUnlockedSectors(dbSectors);
         const px=await dbLoadPixels(sNum);if(px){setPixels(px);
           // Pan viewport to the most active area so grid doesn't look empty
@@ -923,6 +925,7 @@ export default function App(){
             try{
               const dbSeason=await dbLoadSeason();
               const sNum=dbSeason?.num||1;
+              seasonNumRef.current=sNum;
               const px=await dbLoadPixels(sNum);
               if(px&&Object.keys(px).length>0)setPixels(px);
             }catch(e){console.error("Pixel reload error:",e);}
@@ -1442,7 +1445,7 @@ export default function App(){
       // Place pixels visually
       const next={...pixels};allowedSet.forEach(idx=>{next[idx]={t:active,at:Date.now()};});
       setPixels(next);setGuestPixelsUsed(g=>g+allowed);setPending(new Set());
-      if(isOnline)dbUpsertPixels(allowedSet,active,currentSeasonNum);
+      if(isOnline)dbUpsertPixels(allowedSet,active,seasonNumRef.current);
       // Show save prompt after placing
       setTimeout(()=>setShowGuestSavePrompt(true),1500);
       return;
@@ -1620,7 +1623,7 @@ export default function App(){
     // 1 gold per pixel earned in War Chest
     setWarChest(g=>{const next2=g+xpEarned;localStorage.setItem("pow_war_chest",String(next2));return next2;});
     const toClaim=new Set(pending);setPending(new Set());
-    if(isOnline)await dbUpsertPixels(toClaim,active,currentSeasonNum);else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
+    if(isOnline)await dbUpsertPixels(toClaim,active,seasonNumRef.current);else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
     toClaim.forEach(idx=>trackHeatmap(idx));
     trackMission(isRaid?"raid":"claim", toClaim.size+bonus);
     if(referralCode&&!localStorage.getItem("pow_ref_used")){
@@ -1675,7 +1678,7 @@ export default function App(){
     }
     setPixels(next);setShields(newShields);try{localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
     trackMission("powerup",1);
-    if(isOnline){if(toDelete.length)await dbDeletePixels(toDelete,currentSeasonNum);if(toUpsert.length)await dbUpsertPixels(new Set(toUpsert),active,currentSeasonNum);}else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
+    if(isOnline){if(toDelete.length)await dbDeletePixels(toDelete,seasonNumRef.current);if(toUpsert.length)await dbUpsertPixels(new Set(toUpsert),active,seasonNumRef.current);}else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
   };
 
   const resetGrid=async()=>{if(isOnline)await dbClearSeason(currentSeasonNum);setPixels({});setShields({});setMyPixels(0);setFreePixels(0);setStreakData({days:0,last:"",total:0});setDailyInfo(null);setPending(new Set());setActive(null);setUnlockedSectors(INIT_SECTORS);setAlliances([]);setWars([]);try{["pw2k","pw2k_v2","pow_shields","pow_free","pow_streak","pow_sectors"].forEach(k=>localStorage.removeItem(k));}catch{}pushToast("🔄 Grid reset!","#00F5FF",3000);setShowReset(false);};
@@ -2563,7 +2566,7 @@ export default function App(){
           const now2=Date.now();const next={...pixels};const toUpsert=[];
           targets.forEach(([idx])=>{next[parseInt(idx)]={t:active,at:now2};toUpsert.push(parseInt(idx));});
           setPixels(next);
-          if(isOnline)dbUpsertPixels(new Set(toUpsert),active,currentSeasonNum);
+          if(isOnline)dbUpsertPixels(new Set(toUpsert),active,seasonNumRef.current);
           const newGold=warChest-30;setWarChest(newGold);localStorage.setItem("pow_war_chest",String(newGold));
           setWwLastRaid(Date.now());localStorage.setItem("pow_ww_raid",String(Date.now()));
           spawnParticles(myFaction.color,vx+Math.floor(effVW/2),vy+Math.floor(effVH/2),25,true);
@@ -3193,7 +3196,7 @@ export default function App(){
             const toUpsert2=[];
             targets.forEach(([idx])=>{next[parseInt(idx)]={t:active,at:now2};toUpsert2.push(parseInt(idx));});
             setPixels(next);
-            if(isOnline)dbUpsertPixels(new Set(toUpsert2),active,currentSeasonNum);
+            if(isOnline)dbUpsertPixels(new Set(toUpsert2),active,seasonNumRef.current);
             const newGold=warChest-20;setWarChest(newGold);localStorage.setItem("pow_war_chest",String(newGold));
             spawnParticles("#FFD700",vx+VW/2,vy+VH/2,20,true);triggerFlash("#FFD700",true);
             pushToast(`💰 GOLD RAID! Stole ${targets.length}px! (${newGold}💰 left)`,"#FFD700",5000);
