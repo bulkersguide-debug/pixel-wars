@@ -711,6 +711,26 @@ export default function App(){
       .on("postgres_changes",{event:"UPDATE",schema:"public",table:"alliances"},(payload)=>{setAlliances(prev=>prev.map(a=>a.id===payload.new.id?payload.new:a));})
       .on("postgres_changes",{event:"INSERT",schema:"public",table:"wars"},(payload)=>{setWars(prev=>[payload.new,...prev]);const att=TM[payload.new.attacker];const def=TM[payload.new.defender];setFeed(f=>[{id:Date.now(),icon:"⚔️",team:att?.name||"?",msg:`declared WAR on ${def?.name||"?"}!`,color:"#FF4400",ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isWar:true},...f].slice(0,40));pushToast(`⚔️ WAR! ${att?.name||"?"} vs ${def?.name||"?"}`,"#FF4400",8000);})
       .on("postgres_changes",{event:"INSERT",schema:"public",table:"mini_seasons"},(payload)=>{setMiniSeason(payload.new);pushToast(`⚡ MINI SEASON: ${payload.new.label}!`,"#FFD700",8000);})
+      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"profiles"},(payload)=>{
+        // Only respond to updates for the current logged-in user
+        setUser(myUser=>{
+          if(!myUser||payload.new.id!==myUser.id)return myUser;
+          // Role changed
+          if(payload.new.role&&payload.new.role!==payload.old?.role){
+            setProfile(p=>({...p,role:payload.new.role}));
+            const roleEmoji={admin:"⚡",moderator:"🛡️",vip:"⭐"}[payload.new.role]||"👤";
+            pushToast(`${roleEmoji} You are now a ${payload.new.role.toUpperCase()}! Welcome to the team!`,"#FFD700",8000);
+          }
+          // Pixels increased (admin grant)
+          if(payload.new.free_pixels!=null&&payload.new.free_pixels>( payload.old?.free_pixels||0)){
+            const gained=payload.new.free_pixels-(payload.old?.free_pixels||0);
+            setFreePixels(payload.new.free_pixels);
+            localStorage.setItem("pow_free",String(payload.new.free_pixels));
+            pushToast(`🎁 +${gained} pixels added to your account by admin!`,"#00FF88",6000);
+          }
+          return myUser;
+        });
+      })
       .subscribe();
     channelRef.current=ch;
   }
