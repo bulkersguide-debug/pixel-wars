@@ -1,13 +1,8 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "functions": {
-    "api/create-checkout.js": {
-      "runtime": "nodejs20.x"
-    },
-    "api/webhook.js": {
-      "runtime": "nodejs20.x"
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
-  }
+  ]
 }
