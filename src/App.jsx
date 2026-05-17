@@ -364,7 +364,7 @@ export default function App(){
   },[user]);
 
   // Record any pixel grant to purchases table for wallet history
-  const recordPixelGrant=useCallback(async(productId,pixels,amountEur=0,label=null)=>{
+  const recordPixelGrant=useCallback(async(productId,pxAmount,amountEur=0,label=null)=>{
     if(!user?.id)return;
     try{
       const sessionId=`free_${productId}_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
@@ -372,7 +372,7 @@ export default function App(){
         user_id:user.id,
         discord_username:user?.user_metadata?.full_name||user?.user_metadata?.name||"player",
         product_id:productId,
-        pixels_granted:pixels,
+        pixels_granted:pxAmount,
         amount_eur:amountEur,
         stripe_session_id:sessionId,
         fandom:active?TM[active]?.name||"none":"none",
