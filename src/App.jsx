@@ -2469,9 +2469,6 @@ export default function App(){
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.2)"}}>No paid purchases yet — your free pixels are listed above.</div>
               <button onClick={()=>setPaywallTab("bundles")} style={{marginTop:12,padding:"10px 20px",background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.3)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#C8FF00",fontWeight:900}}>💰 BUY PIXELS →</button>
             </div>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.2)"}}>Your purchase history will appear here after your first payment.</div>
-              <button onClick={()=>setPaywallTab("bundles")} style={{marginTop:16,padding:"10px 20px",background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.3)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#C8FF00",fontWeight:900}}>💰 BUY PIXELS →</button>
-            </div>
             :<div>
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",marginBottom:12,textAlign:"right"}}>{purchases.length} purchase{purchases.length!==1?"s":""} · click any to view Stripe receipt</div>
               {purchases.map((p,i)=>{
