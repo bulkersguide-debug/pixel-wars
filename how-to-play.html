@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>How to Play — Pixels of War</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#222240;border-radius:2px}
+  body{background:#040408;color:#c0c8e8;font-family:'Rajdhani',sans-serif;line-height:1.6}
+  a{color:#00F5FF;text-decoration:none}a:hover{text-decoration:underline}
+  .header{background:#06060e;border-bottom:1px solid #1a1a30;padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100}
+  .logo{font-family:'Orbitron',monospace;font-size:18px;font-weight:900;letter-spacing:3px;background:linear-gradient(90deg,#00F5FF,#FF4400,#C8FF00);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .back-btn{background:rgba(0,245,255,.08);border:1px solid rgba(0,245,255,.25);border-radius:6px;padding:6px 14px;font-family:'Orbitron',monospace;font-size:9px;color:#00F5FF;letter-spacing:1px;text-decoration:none}
+  .wrap{max-width:800px;margin:0 auto;padding:40px 20px 80px}
+  .hero{text-align:center;padding:48px 20px;border-bottom:1px solid #1a1a30;margin-bottom:48px}
+  .hero-title{font-family:'Orbitron',monospace;font-size:36px;font-weight:900;letter-spacing:4px;background:linear-gradient(90deg,#00F5FF,#C8FF00,#FF4400);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px}
+  .hero-sub{font-family:'Share Tech Mono',monospace;font-size:12px;color:rgba(255,255,255,.35);letter-spacing:3px;margin-bottom:24px}
+  .play-btn{display:inline-block;padding:14px 36px;background:linear-gradient(90deg,#00F5FF,#C8FF00);color:#040408;font-family:'Orbitron',monospace;font-weight:900;font-size:13px;letter-spacing:2px;border-radius:8px;text-decoration:none}
+  .section{margin-bottom:48px}
+  .section-title{font-family:'Orbitron',monospace;font-size:13px;font-weight:900;color:#00F5FF;letter-spacing:3px;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+  .section-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(0,245,255,.3),transparent)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .card{background:#09091a;border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:18px}
+  .card-icon{font-size:28px;margin-bottom:10px}
+  .card-title{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;letter-spacing:1px;margin-bottom:6px}
+  .card-desc{font-size:13px;color:rgba(192,200,232,.65);line-height:1.7}
+  .step{display:flex;gap:16px;margin-bottom:16px;padding:16px;background:#09091a;border-radius:10px;border:1px solid rgba(255,255,255,.06)}
+  .step-num{font-family:'Orbitron',monospace;font-size:24px;font-weight:900;color:rgba(0,245,255,.3);flex-shrink:0;width:40px}
+  .step-title{font-family:'Orbitron',monospace;font-size:11px;font-weight:900;color:#e0e8ff;letter-spacing:1px;margin-bottom:5px}
+  .step-desc{font-size:13px;color:rgba(192,200,232,.65);line-height:1.7}
+  .powerup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .powerup{background:#09091a;border-radius:10px;padding:14px;border:1px solid rgba(255,255,255,.06);display:flex;gap:12px;align-items:flex-start}
+  .powerup-icon{font-size:22px;flex-shrink:0}
+  .powerup-name{font-family:'Orbitron',monospace;font-size:9px;font-weight:900;letter-spacing:1px;margin-bottom:3px}
+  .powerup-desc{font-size:12px;color:rgba(192,200,232,.55);line-height:1.5}
+  .powerup-price{font-family:'Orbitron',monospace;font-size:12px;font-weight:900;color:#C8FF00;margin-top:4px}
+  .tip{background:rgba(0,245,255,.05);border:1px solid rgba(0,245,255,.15);border-radius:8px;padding:12px 16px;margin-bottom:8px;font-size:13px;color:rgba(192,200,232,.7);display:flex;gap:10px;align-items:flex-start}
+  .highlight{background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:16px 20px;margin-bottom:16px}
+  .highlight-title{font-family:'Orbitron',monospace;font-size:10px;font-weight:900;color:#FFD700;letter-spacing:2px;margin-bottom:8px}
+  .rank-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#09091a;border-radius:8px;margin-bottom:6px;border:1px solid rgba(255,255,255,.05)}
+  .badge{display:inline-block;padding:3px 8px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;margin:2px}
+  .faction{border-radius:10px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+  @media(max-width:600px){.hero-title{font-size:24px}.cards{grid-template-columns:1fr}.powerup-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="header">
+  <a href="/" class="back-btn">← PLAY NOW</a>
+  <div class="logo">⚔ PIXELS OF WAR</div>
+</div>
+<div class="wrap">
+  <div class="hero">
+    <div class="hero-title">HOW TO PLAY</div>
+    <div class="hero-sub">FANDOMS · TERRITORY · FACTIONS · GLORY</div>
+    <a href="/" class="play-btn">⚔ ENTER THE WAR</a>
+  </div>
+
+  <!-- BASICS -->
+  <div class="section">
+    <div class="section-title">⚡ THE BASICS</div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">🗺️</div><div class="card-title" style="color:#00F5FF">THE GRID</div><div class="card-desc">A 2000×2000 pixel canvas divided into 400 sectors. Claim pixels for your fandom. Most pixels at season end wins.</div></div>
+      <div class="card"><div class="card-icon">🏴</div><div class="card-title" style="color:#C8FF00">CLAIM</div><div class="card-desc">Select your fandom → BUILD mode → drag across empty pixels. Adjacent pixels cost 10% less — build from your base!</div></div>
+      <div class="card"><div class="card-icon">⚔️</div><div class="card-title" style="color:#FF4400">RAID</div><div class="card-desc">RAID mode lets you steal unshielded enemy pixels. Fortified sectors cost 3×. Requires Discord login.</div></div>
+      <div class="card"><div class="card-icon">🏆</div><div class="card-title" style="color:#FFD700">WIN</div><div class="card-desc">Seasons last ~90 days. The fandom with the most pixels when the timer hits zero becomes Season Champion.</div></div>
+    </div>
+  </div>
+
+  <!-- STEP BY STEP -->
+  <div class="section">
+    <div class="section-title">📋 STEP BY STEP</div>
+    <div class="step"><div class="step-num">01</div><div><div class="step-title">LOGIN WITH DISCORD</div><div class="step-desc">Click "Login with Discord". You get <strong>25 free pixels</strong> instantly. No payment needed to start.</div></div></div>
+    <div class="step"><div class="step-num">02</div><div><div class="step-title">PICK YOUR FANDOM</div><div class="step-desc">Browse 60+ fandoms across Gaming, Anime, Music, TV & Sports. Active fandoms appear first. Your fandom determines your <strong>World War faction</strong>.</div></div></div>
+    <div class="step"><div class="step-num">03</div><div><div class="step-title">CLAIM YOUR FIRST PIXELS</div><div class="step-desc">Drag across empty grid squares in BUILD mode. Free pixels are spent automatically. Adjacent claims cost 10% less!</div></div></div>
+    <div class="step"><div class="step-num">04</div><div><div class="step-title">JOIN THE WORLD WAR</div><div class="step-desc">Click 🌍 WORLD WAR in the season bar. See which faction (Gaming/Anime/Culture) is winning. Use War Chest gold to launch Faction Raids.</div></div></div>
+    <div class="step"><div class="step-num">05</div><div><div class="step-title">EARN MORE PIXELS</div><div class="step-desc">Daily login streaks · Weekly missions · 1px/hour auto-recharge · Watch ads (+5px) · Live Battle wins · Buy bundles</div></div></div>
+    <div class="step"><div class="step-num">06</div><div><div class="step-title">DOMINATE THE SEASON</div><div class="step-desc">Press <strong>T</strong> to see live standings. Create a Clan, join a Canvas Challenge, use the Daily Sector Challenge for 50% off. Season champions enter the Hall of Fame.</div></div></div>
+  </div>
+
+  <!-- WORLD WAR -->
+  <div class="section">
+    <div class="section-title">🌍 WORLD WAR — FACTIONS</div>
+    <div class="highlight">
+      <div class="highlight-title">3 FACTIONS FIGHT FOR GRID DOMINANCE</div>
+      <p style="font-size:13px;color:rgba(192,200,232,.7);margin:0">Your fandom is automatically assigned to a faction based on its category. All fandoms in the same faction fight together. The faction with the most total pixels wins faction dominance.</p>
+    </div>
+    <div class="faction" style="background:rgba(0,245,255,.06);border:1px solid rgba(0,245,255,.2)">
+      <span style="font-size:32px">⚔️</span>
+      <div><div style="font-family:'Orbitron',monospace;font-size:13px;font-weight:900;color:#00F5FF;margin-bottom:4px">GAMING EMPIRE</div><div style="font-size:13px;color:rgba(192,200,232,.6)">All Gaming fandoms — Fortnite, Valorant, Minecraft, Pokémon, and more</div></div>
+    </div>
+    <div class="faction" style="background:rgba(255,45,120,.06);border:1px solid rgba(255,45,120,.2)">
+      <span style="font-size:32px">🎌</span>
+      <div><div style="font-family:'Orbitron',monospace;font-size:13px;font-weight:900;color:#FF2D78;margin-bottom:4px">ANIME ALLIANCE</div><div style="font-size:13px;color:rgba(192,200,232,.6)">All Anime fandoms — Naruto, One Piece, Attack on Titan, and more</div></div>
+    </div>
+    <div class="faction" style="background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.2)">
+      <span style="font-size:32px">🌟</span>
+      <div><div style="font-family:'Orbitron',monospace;font-size:13px;font-weight:900;color:#FFD700;margin-bottom:4px">CULTURE WAVE</div><div style="font-size:13px;color:rgba(192,200,232,.6)">Music, TV & Film, Sports fandoms — BTS, Taylor Swift, and more</div></div>
+    </div>
+    <div style="margin-top:12px">
+      <div class="tip"><span>⚔️</span><span><strong>Faction Raid</strong> — spend 30💰 War Chest gold to instantly steal 30 random enemy-faction pixels. 5-minute cooldown. Result posted to Discord automatically.</span></div>
+      <div class="tip"><span>🗺️</span><span>The minimap shows live faction percentages in the bottom-left corner. Watch the war unfold in real time.</span></div>
+      <div class="tip"><span>🏆</span><span>Your faction badge shows in the header — click it to open the World War standings anytime.</span></div>
+    </div>
+  </div>
+
+  <!-- DAILY CHALLENGE -->
+  <div class="section">
+    <div class="section-title">⚡ DAILY SECTOR CHALLENGE</div>
+    <div class="highlight">
+      <div class="highlight-title">⚡ 50% OFF — ONE SECTOR — 2 HOURS ONLY</div>
+      <p style="font-size:13px;color:rgba(192,200,232,.7);margin:0">Every day, one random sector gets 50% off build costs for 2 hours. A green pulsing border marks it on the grid. A banner at the top shows which sector and the countdown. Click <strong>GO NOW →</strong> to jump there instantly.</p>
+    </div>
+    <div class="tip"><span>💡</span><span>The challenge sector is the same for everyone — all fandoms can see it. Race to claim it before it fills up!</span></div>
+    <div class="tip"><span>⏰</span><span>Resets every day. Come back daily to catch it — it's only active for 2 hours from midnight UTC.</span></div>
+  </div>
+
+  <!-- CANVAS CHALLENGE -->
+  <div class="section">
+    <div class="section-title">🎨 CANVAS CHALLENGE</div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">🎨</div><div class="card-title" style="color:#FF2D78">WEEKLY ART PROMPT</div><div class="card-desc">Every week a new art theme is announced — draw a sunrise, flame, dragon, or other prompt using your fandom's pixels in your sector.</div></div>
+      <div class="card"><div class="card-icon">📸</div><div class="card-title" style="color:#FF2D78">SCREENSHOT & SHARE</div><div class="card-desc">Screenshot your pixel art and post it in the Discord server. The community votes with reactions. Most upvoted wins!</div></div>
+      <div class="card"><div class="card-icon">🏆</div><div class="card-title" style="color:#FFD700">WIN +50 PIXELS</div><div class="card-desc">The weekly Canvas Challenge winner receives +50 free pixels. Winners announced every Sunday in Discord.</div></div>
+    </div>
+    <div class="tip" style="margin-top:12px"><span>🎨</span><span>Find the Canvas Challenge prompt via the <strong>🎨 CANVAS CHALLENGE</strong> button in the weekly theme banner. New prompts every Monday.</span></div>
+  </div>
+
+  <!-- CLANS -->
+  <div class="section">
+    <div class="section-title">⚔️ CLAN SYSTEM</div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">⚔️</div><div class="card-title" style="color:#00F5FF">CREATE A CLAN</div><div class="card-desc">Click <strong>⚔️ CLAN</strong> in the header. Enter a name (e.g. "Anime Alliance") → auto-generates a 4-letter tag like [ANIM]. Free to create. Requires Discord login.</div></div>
+      <div class="card"><div class="card-icon">🏷️</div><div class="card-title" style="color:#00F5FF">CLAN TAG IN HEADER</div><div class="card-desc">Your clan tag shows in the top header next to your rank. Click it anytime to view clan info or invite members.</div></div>
+      <div class="card"><div class="card-icon">📤</div><div class="card-title" style="color:#00F5FF">INVITE MEMBERS</div><div class="card-desc">Click "📤 INVITE TO CLAN" to copy a pre-written Discord invite message. Share it in any server to recruit allies.</div></div>
+      <div class="card"><div class="card-icon">♾️</div><div class="card-title" style="color:#00F5FF">PERMANENT</div><div class="card-desc">Clans persist across seasons — no reset. Build a lasting cross-fandom identity and coordinate strategy on Discord.</div></div>
+    </div>
+  </div>
+
+  <!-- GUEST MODE -->
+  <div class="section">
+    <div class="section-title">👀 GUEST MODE</div>
+    <div class="tip"><span>ℹ️</span><span>Not ready to log in? Guests get <strong>3 free pixels</strong> to try the game. Pixels last 24 hours. Log in with Discord to save them and get 25 more.</span></div>
+    <div class="tip"><span>⚠️</span><span>Guest pixels are tracked by browser fingerprint — clearing cache does NOT reset the limit. One allowance per device per day.</span></div>
+  </div>
+
+  <!-- DISCORD LOGIN -->
+  <div class="section">
+    <div class="section-title">🔑 DISCORD LOGIN & ROLES</div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">🔐</div><div class="card-title">WHAT WE ACCESS</div><div class="card-desc">Only your Discord username, user ID, and avatar. We never access your messages, servers, or friends list.</div></div>
+      <div class="card"><div class="card-icon">🎁</div><div class="card-title">LOGIN BENEFITS</div><div class="card-desc">25 free pixels · Daily streak rewards · Weekly missions · Alliances & wars · Clan creation · Push raid alerts · Season history</div></div>
+      <div class="card"><div class="card-icon">🛡️</div><div class="card-title">ROLES</div><div class="card-desc"><span class="badge" style="background:rgba(255,215,0,.15);color:#FFD700">⚡ Admin</span> <span class="badge" style="background:rgba(0,170,255,.15);color:#00AAFF">🛡 Moderator</span> <span class="badge" style="background:rgba(255,45,120,.15);color:#FF2D78">⭐ VIP</span> — Special roles with bonus pixels and chat badges.</div></div>
+    </div>
+  </div>
+
+  <!-- LIVE BATTLE -->
+  <div class="section">
+    <div class="section-title">⚡ LIVE BATTLE MODE</div>
+    <div class="highlight">
+      <div class="highlight-title">🆓 FREE TO PLAY — NO PAYMENT NEEDED</div>
+      <p style="font-size:13px;color:rgba(192,200,232,.7);margin:0">A separate 200×200 arena that resets every 24 hours. Click ⚡ LIVE BATTLE in the season bar to join.</p>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">⚡</div><div class="card-title" style="color:#FF4400">CLAIM 10 SPOTS</div><div class="card-desc">Each fandom gets 10 spots per battle. Free, instant, no payment needed. Button shows remaining spots.</div></div>
+      <div class="card"><div class="card-icon">⚔️</div><div class="card-title" style="color:#FF4400">RAID 5 SPOTS</div><div class="card-desc">Logged-in players can raid 5 enemy spots per click. Steal territory and shift the leaderboard.</div></div>
+      <div class="card"><div class="card-icon">🏆</div><div class="card-title" style="color:#FFD700">WIN +5 PIXELS</div><div class="card-desc">Top fandom at reset wins +5 free pixels for all players. Discord announcement posted automatically.</div></div>
+      <div class="card"><div class="card-icon">🔥</div><div class="card-title" style="color:#FF6644">DAILY STREAK</div><div class="card-desc">Participate daily: 3d=+3px · 7d=+5px · 14d=+10px · 30d=+20px</div></div>
+    </div>
+  </div>
+
+  <!-- GETTING PIXELS -->
+  <div class="section">
+    <div class="section-title">💰 GETTING MORE PIXELS</div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">🎁</div><div class="card-title" style="color:#00FF88">FREE WAYS</div><div class="card-desc">Login bonus (25px) · Daily streak · Weekly missions · 1px/hour auto-recharge · Watch ads (+5px) · Live Battle wins · Referrals (+10px) · Daily Sector Challenge (50% off)</div></div>
+      <div class="card"><div class="card-icon">💰</div><div class="card-title" style="color:#C8FF00">PIXEL BUNDLES</div><div class="card-desc">Trial €0.99→15px · Small €1.99→100px · Medium €4.99→275px · Large €9.99→660px · Mega €24.99→2,400px · Whale €49.99→6,000px+badge</div></div>
+      <div class="card"><div class="card-icon">🏆</div><div class="card-title" style="color:#FFD700">SEASON PASS €4.99</div><div class="card-desc">2× XP · +50% War Chest gold · +50 free pixels · Exclusive badge · Never expires. Best value for active players.</div></div>
+      <div class="card"><div class="card-icon">🎬</div><div class="card-title" style="color:#00F5FF">WATCH ADS</div><div class="card-desc">Watch a short ad → +5 free pixels. Every 30 minutes. No payment. Access via Shop tab.</div></div>
+    </div>
+    <div class="tip" style="margin-top:12px"><span>🎁</span><span>New players see a <strong>Starter Pack</strong> for the first 3 days: 100px + 1 Power-Up + Season Pass for €2.99 — massive saving vs buying separately.</span></div>
+  </div>
+
+  <!-- WAR CHEST -->
+  <div class="section">
+    <div class="section-title">💰 WAR CHEST (PASSIVE ECONOMY)</div>
+    <div class="tip"><span>💰</span><span>Your fandom earns gold automatically — <strong>1 gold per 50 pixels</strong> every 5 minutes. Season Pass holders earn 50% more.</span></div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">⚔️</div><div class="card-title" style="color:#FFD700">GOLD RAID (20💰)</div><div class="card-desc">Instantly steal 20 random enemy pixels. No pixel cost.</div></div>
+      <div class="card"><div class="card-icon">🌍</div><div class="card-title" style="color:#FF4400">FACTION RAID (30💰)</div><div class="card-desc">Steal 30 pixels from enemy faction fandoms. Results posted to Discord. 5-min cooldown.</div></div>
+      <div class="card"><div class="card-icon">🔄</div><div class="card-title" style="color:#C8FF00">CONVERT (10💰)</div><div class="card-desc">Convert 10 gold into 5 free pixels anytime.</div></div>
+    </div>
+  </div>
+
+  <!-- SHARING -->
+  <div class="section">
+    <div class="section-title">📤 SHARE & INVITE</div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">📤</div><div class="card-title" style="color:#FF2D78">SHARE TERRITORY</div><div class="card-desc">Click <strong>📤 SHARE TERRITORY</strong> in the right panel. Copies a message with your fandom name, pixel count, rank and a direct link. Works on mobile with native share sheet.</div></div>
+      <div class="card"><div class="card-icon">🎵</div><div class="card-title" style="color:#fff">TIKTOK SHARE</div><div class="card-desc">Click <strong>🎵 TIKTOK</strong> to copy a pre-formatted TikTok caption with hashtags. Open TikTok → paste → go viral for your fandom!</div></div>
+    </div>
+  </div>
+
+  <!-- XP & LEVELS -->
+  <div class="section">
+    <div class="section-title">⭐ XP, LEVELS & LOYALTY</div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">⭐</div><div class="card-title" style="color:#FFD700">XP SYSTEM</div><div class="card-desc">Every pixel claimed or raided earns 1 XP. Level up for discounts and bonuses. Season Pass = 2× XP.</div></div>
+      <div class="card"><div class="card-icon">⏰</div><div class="card-title" style="color:#00FF88">PIXEL RECHARGE</div><div class="card-desc">+1 free pixel per hour automatically. Stockpiles up to 10+ pixels. Green badge on your level icon shows how many are ready.</div></div>
+      <div class="card"><div class="card-icon">🎖️</div><div class="card-title" style="color:#C8FF00">LOYALTY BONUS</div><div class="card-desc">Same fandom 7+ days in a row = 5% permanent build discount. Shown in every purchase confirmation.</div></div>
+      <div class="card"><div class="card-icon">📈</div><div class="card-title" style="color:#BB88FF">LEVEL PERKS</div><div class="card-desc">Level 10: 3% build discount · Level 20: 5% · Every level: +500💰 gold</div></div>
+    </div>
+  </div>
+
+  <!-- SHIELDS & DEFENCE -->
+  <div class="section">
+    <div class="section-title">🛡️ SHIELDS, DECAY & FORTRESSES</div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">🛡️</div><div class="card-title" style="color:#00AAFF">SHIELDS</div><div class="card-desc">Claimed pixels auto-shield for 24 hours (cyan glow). Shielded pixels cannot be raided by anyone.</div></div>
+      <div class="card"><div class="card-icon">⚠️</div><div class="card-title" style="color:#FFD700">PIXEL DECAY</div><div class="card-desc">Pixels fade after 30 days and disappear after 60. Use ♻️ Renewal Shield to reset the timer on 50 pixels.</div></div>
+      <div class="card"><div class="card-icon">🏰</div><div class="card-title" style="color:#FF4400">FORTIFIED SECTORS</div><div class="card-desc">4 random sectors per season (red dashed border) cost 3× to raid. Holding them earns bonus War Chest gold.</div></div>
+    </div>
+  </div>
+
+  <!-- POWER-UPS -->
+  <div class="section">
+    <div class="section-title">💥 POWER-UPS</div>
+    <div class="powerup-grid">
+      <div class="powerup"><div class="powerup-icon">💣</div><div><div class="powerup-name" style="color:#FF4400">CLUSTER BOMB</div><div class="powerup-desc">Destroy 8×8 unshielded enemy zone.</div><div class="powerup-price">€10</div></div></div>
+      <div class="powerup"><div class="powerup-icon">⚡</div><div><div class="powerup-name" style="color:#FFCC00">PIXEL STORM</div><div class="powerup-desc">Claim 50 random empty pixels in viewport.</div><div class="powerup-price">€15</div></div></div>
+      <div class="powerup"><div class="powerup-icon">🛡️</div><div><div class="powerup-name" style="color:#00AAFF">FORTRESS</div><div class="powerup-desc">Shield your last 30 pixels for 1 extra hour.</div><div class="powerup-price">€8</div></div></div>
+      <div class="powerup"><div class="powerup-icon">🎯</div><div><div class="powerup-name" style="color:#FF2D78">SNIPER</div><div class="powerup-desc">Steal 1 unshielded enemy pixel anywhere.</div><div class="powerup-price">€3</div></div></div>
+      <div class="powerup"><div class="powerup-icon">🪂</div><div><div class="powerup-name" style="color:#C8FF00">AIRDROP</div><div class="powerup-desc">Claim a 15×15 zone in your viewport instantly.</div><div class="powerup-price">€25</div></div></div>
+      <div class="powerup"><div class="powerup-icon">☢️</div><div><div class="powerup-name" style="color:#FF0000">NUKE</div><div class="powerup-desc">Wipe a random 20×20 unshielded enemy zone.</div><div class="powerup-price">€50</div></div></div>
+      <div class="powerup"><div class="powerup-icon">♻️</div><div><div class="powerup-name" style="color:#00FFAA">RENEWAL SHIELD</div><div class="powerup-desc">Renew 50 oldest pixels, reset decay timer.</div><div class="powerup-price">€5</div></div></div>
+      <div class="powerup"><div class="powerup-icon">⚡</div><div><div class="powerup-name" style="color:#FF2D78">SURGE</div><div class="powerup-desc">Drag pixels — only connected ones survive! High risk, high reward.</div><div class="powerup-price">€6</div></div></div>
+      <div class="powerup"><div class="powerup-icon">✨</div><div><div class="powerup-name" style="color:#BB88FF">DOUBLE OR NOTHING</div><div class="powerup-desc">50/50 gamble. Win: bonus territory. Lose: nothing.</div><div class="powerup-price">€5</div></div></div>
+    </div>
+  </div>
+
+  <!-- ALLIANCES & WARS -->
+  <div class="section">
+    <div class="section-title">🤝 ALLIANCES, WARS & PEACE</div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">🤝</div><div class="card-title" style="color:#00FFAA">ALLIANCES</div><div class="card-desc">Allied fandoms cannot raid each other. Betraying posts a public Discord announcement — the whole community knows.</div></div>
+      <div class="card"><div class="card-icon">⚔️</div><div class="card-title" style="color:#FF4400">WARS</div><div class="card-desc">Declare war to signal your intent. Announced to the whole Discord server. Track in the WARS tab.</div></div>
+      <div class="card"><div class="card-icon">🕊️</div><div class="card-title" style="color:#00F5FF">PEACE VOTE</div><div class="card-desc">Top 3 leaderboard fandoms can propose a 1-hour ceasefire. All players vote. Creates political drama!</div></div>
+      <div class="card"><div class="card-icon">⚔️</div><div class="card-title" style="color:#FFD700">RIVAL SYSTEM</div><div class="card-desc">Your most frequent war opponent becomes your Rival. Quick WAR and RAID buttons appear in the panel.</div></div>
+    </div>
+  </div>
+
+  <!-- WEEKLY EVENTS -->
+  <div class="section">
+    <div class="section-title">📅 WEEKLY THEMED EVENTS</div>
+    <div class="tip"><span>📅</span><span>Each week auto-rotates a themed event giving discounts to matching fandoms. Check the banner below the season bar. Matching fandoms see "✅ YOUR FANDOM BENEFITS!"</span></div>
+    <div class="cards">
+      <div class="card"><div class="card-icon">🎮</div><div class="card-title" style="color:#00F5FF">GAMING WEEK</div><div class="card-desc">Gaming fandoms: -15% raid cost + cheaper builds</div></div>
+      <div class="card"><div class="card-icon">🎌</div><div class="card-title" style="color:#FF2D78">ANIME INVASION</div><div class="card-desc">Anime fandoms: -20% build cost + War Chest ×2</div></div>
+      <div class="card"><div class="card-icon">🎵</div><div class="card-title" style="color:#FFD700">MUSIC TAKEOVER</div><div class="card-desc">Music fandoms: -15% build + double War Chest income</div></div>
+      <div class="card"><div class="card-icon">💥</div><div class="card-title" style="color:#FF4400">FREE FOR ALL</div><div class="card-desc">All fandoms: -10% on everything. Chaos week!</div></div>
+    </div>
+  </div>
+
+  <!-- KEYBOARD SHORTCUTS -->
+  <div class="section">
+    <div class="section-title">⌨️ KEYBOARD SHORTCUTS</div>
+    <div class="cards">
+      <div class="card"><div class="card-desc">
+        <strong style="color:#e0e8ff">B</strong> — Build mode &nbsp;·&nbsp; <strong style="color:#e0e8ff">R</strong> — Raid mode &nbsp;·&nbsp; <strong style="color:#e0e8ff">S</strong> — Shop<br/><br/>
+        <strong style="color:#e0e8ff">T</strong> — Season standings &nbsp;·&nbsp; <strong style="color:#e0e8ff">ESC</strong> — Deselect / close<br/><br/>
+        <strong style="color:#e0e8ff">Arrow keys</strong> — Pan the grid (10px per press)<br/><br/>
+        <strong style="color:#e0e8ff">+ / -</strong> — Zoom in/out &nbsp;·&nbsp; <strong style="color:#e0e8ff">0</strong> — Reset zoom<br/><br/>
+        <strong style="color:#e0e8ff">Scroll wheel</strong> — Zoom on the grid<br/><br/>
+        <strong style="color:#e0e8ff">Double-click grid</strong> — Fullscreen toggle
+      </div></div>
+    </div>
+  </div>
+
+  <!-- RANK SYSTEM -->
+  <div class="section">
+    <div class="section-title">👑 RANK SYSTEM</div>
+    <div class="rank-row"><span style="font-size:20px">🥉</span><div><div style="font-family:'Orbitron',monospace;font-size:10px;color:#CD7F32">BRONZE</div><div style="font-size:12px;color:rgba(192,200,232,.5)">0–49 pixels</div></div></div>
+    <div class="rank-row"><span style="font-size:20px">🥈</span><div><div style="font-family:'Orbitron',monospace;font-size:10px;color:#C0C0C0">SILVER</div><div style="font-size:12px;color:rgba(192,200,232,.5)">50–199 pixels</div></div></div>
+    <div class="rank-row"><span style="font-size:20px">🥇</span><div><div style="font-family:'Orbitron',monospace;font-size:10px;color:#FFD700">GOLD</div><div style="font-size:12px;color:rgba(192,200,232,.5)">200–499 pixels</div></div></div>
+    <div class="rank-row"><span style="font-size:20px">💎</span><div><div style="font-family:'Orbitron',monospace;font-size:10px;color:#00EAFF">PLATINUM</div><div style="font-size:12px;color:rgba(192,200,232,.5)">500–999 pixels</div></div></div>
+    <div class="rank-row"><span style="font-size:20px">💠</span><div><div style="font-family:'Orbitron',monospace;font-size:10px;color:#BB88FF">DIAMOND</div><div style="font-size:12px;color:rgba(192,200,232,.5)">1,000–2,499 pixels</div></div></div>
+    <div class="rank-row"><span style="font-size:20px">👑</span><div><div style="font-family:'Orbitron',monospace;font-size:10px;color:#FF2D78">LEGEND</div><div style="font-size:12px;color:rgba(192,200,232,.5)">2,500+ pixels</div></div></div>
+  </div>
+
+  <!-- PRO TIPS -->
+  <div class="section">
+    <div class="section-title">⚡ PRO TIPS</div>
+    <div class="tip"><span>🗺️</span><span><strong>Build connected territory</strong> — adjacent claims cost 10% less. Expand from your base, not randomly.</span></div>
+    <div class="tip"><span>🌍</span><span><strong>Save War Chest gold for Faction Raids</strong> — stealing 30 enemy-faction pixels at once swings the World War standings dramatically.</span></div>
+    <div class="tip"><span>⚡</span><span><strong>Check the Daily Sector Challenge every day</strong> — 50% off for 2 hours is the best free value in the game. Set a reminder.</span></div>
+    <div class="tip"><span>🏰</span><span><strong>Avoid fortified sectors</strong> when raiding — 3× cost. Target edges of enemy territory in regular sectors instead.</span></div>
+    <div class="tip"><span>⚡</span><span><strong>Use Surge carefully</strong> — only pixels connected to your existing territory survive. Plan your drag path before activating.</span></div>
+    <div class="tip"><span>📅</span><span><strong>Check the weekly theme</strong> — time your big purchases for weeks when your fandom category gets discounts.</span></div>
+    <div class="tip"><span>⚔️</span><span><strong>Create or join a Clan</strong> — coordinate Faction Raids with clan members in Discord for maximum impact on the World War.</span></div>
+    <div class="tip"><span>🏆</span><span><strong>Season Pass</strong> gives 2× XP and 50% more War Chest gold. Best investment if you play more than 3 times a week.</span></div>
+    <div class="tip"><span>🎵</span><span><strong>TikTok your territory</strong> — click 🎵 TIKTOK in the right panel to copy a pre-formatted caption. Post it and bring your fandom to the war!</span></div>
+  </div>
+
+  <div style="text-align:center;padding:32px 0 16px">
+    <a href="/" class="play-btn">⚔ ENTER THE WAR NOW</a>
+  </div>
+</div>
+</body>
+</html>
