@@ -249,6 +249,8 @@ export default function App(){
   const [hasSeasonPass,setHasSeasonPass]=useState(()=>{try{const d=JSON.parse(localStorage.getItem("pow_season_pass")||"null");return d&&d.season===1?d:null;}catch{return null;}});
   const [showPaywall,setShowPaywall]=useState(false);
   const [paywallTab,setPaywallTab]=useState("bundles");
+  const [purchases,setPurchases]=useState([]);
+  const [purchasesLoading,setPurchasesLoading]=useState(false);
   // ── NEW FEATURES ─────────────────────────────────────────────────────────────
   const [dailyChallenge,setDailyChallenge]=useState(null); // {sx,sy,endsAt}
   const [showCanvasChallenge,setShowCanvasChallenge]=useState(false);
@@ -258,6 +260,8 @@ export default function App(){
   const [clanInput,setClanInput]=useState("");
   const [showWorldWar,setShowWorldWar]=useState(false);
   const [wwLastRaid,setWwLastRaid]=useState(()=>{try{return parseInt(localStorage.getItem("pow_ww_raid")||"0");}catch{return 0;}});
+  const [purchases,setPurchases]=useState([]);
+  const [purchasesLoading,setPurchasesLoading]=useState(false);
   const [watchingAd,setWatchingAd]=useState(false);
   const [adCooldown,setAdCooldown]=useState(()=>{try{return parseInt(localStorage.getItem("pow_ad_cooldown")||"0");}catch{return 0;}});
   const [showStarterPack,setShowStarterPack]=useState(false);
@@ -337,6 +341,17 @@ export default function App(){
   const alreadyClaimedToday=streakData.last===todayStr();
 
   const pushToast=useCallback((msg,color,dur=3000)=>{const id=Date.now()+Math.random();setToasts(t=>[...t,{id,msg,color}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),dur);},[]);
+
+  // Fetch purchase history
+  const fetchPurchases=useCallback(async()=>{
+    if(!user?.id)return;
+    setPurchasesLoading(true);
+    try{
+      const{data}=await supabase.from("purchases").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(20);
+      if(data)setPurchases(data);
+    }catch(e){console.error("purchases fetch:",e);}
+    finally{setPurchasesLoading(false);}
+  },[user]);
 
   // ── STRIPE CHECKOUT ──────────────────────────────────────────────────────────
   const STRIPE_PK="pk_live_51TXp5DJ6WZdD3UBmyp9194J1r8WvXbcUCmU6Nlhw5vRWL8M5d4y46LrH98qZoLyhdCLzHrl6Bx0tcU9VPTObcjYJ0058NAhaZF";
@@ -2224,8 +2239,8 @@ export default function App(){
 
           {/* Tabs */}
           <div style={{display:"flex",gap:4,marginBottom:16,background:"rgba(255,255,255,.04)",borderRadius:8,padding:4}}>
-            {[["bundles","📦 Pixel Bundles"],["pass","🏆 Season Pass"],["free","🎬 Watch Ad"]].map(([id,label])=>(
-              <button key={id} onClick={()=>setPaywallTab(id)} style={{flex:1,padding:"7px",background:paywallTab===id?"rgba(200,255,0,.15)":"transparent",border:`1px solid ${paywallTab===id?"rgba(200,255,0,.4)":"transparent"}`,borderRadius:6,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:paywallTab===id?"#C8FF00":"rgba(255,255,255,.4)",fontWeight:900}}>{label}</button>
+            {[["bundles","📦 Bundles"],["pass","🏆 Pass"],["free","🎬 Ad"],["history","🧾 History"]].map(([id,label])=>(
+              <button key={id} onClick={()=>{setPaywallTab(id);if(id==="history")fetchPurchases();}} style={{flex:1,padding:"7px",background:paywallTab===id?"rgba(200,255,0,.15)":"transparent",border:`1px solid ${paywallTab===id?"rgba(200,255,0,.4)":"transparent"}`,borderRadius:6,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:paywallTab===id?"#C8FF00":"rgba(255,255,255,.4)",fontWeight:900}}>{label}</button>
             ))}
           </div>
 
@@ -2343,6 +2358,48 @@ export default function App(){
               </button>
             }
             <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.15)",marginTop:16}}>30-minute cooldown between ads. Max 10 free pixels/day via ads.</div>
+          </div>}
+
+          {/* PURCHASE HISTORY TAB */}
+          {paywallTab==="history"&&<div>
+            {!user?<div style={{textAlign:"center",padding:"30px 0"}}>
+              <div style={{fontSize:32,marginBottom:12}}>🔐</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)"}}>Log in with Discord to see your purchase history.</div>
+            </div>
+            :purchasesLoading?<div style={{textAlign:"center",padding:"30px 0"}}>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.3)",animation:"pulse 1s infinite"}}>⏳ Loading purchases...</div>
+            </div>
+            :purchases.length===0?<div style={{textAlign:"center",padding:"30px 0"}}>
+              <div style={{fontSize:32,marginBottom:12}}>🛒</div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"rgba(255,255,255,.3)",marginBottom:8}}>NO PURCHASES YET</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.2)"}}>Your purchase history will appear here after your first payment.</div>
+              <button onClick={()=>setPaywallTab("bundles")} style={{marginTop:16,padding:"10px 20px",background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.3)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#C8FF00",fontWeight:900}}>💰 BUY PIXELS →</button>
+            </div>
+            :<div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",marginBottom:12,textAlign:"right"}}>{purchases.length} purchase{purchases.length!==1?"s":""} · click any to view Stripe receipt</div>
+              {purchases.map((p,i)=>{
+                const productNames={trial:"Trial Pack",small:"Small Bundle",medium:"Medium Bundle",large:"Large Bundle",mega:"Mega Bundle",whale:"Whale Pack 👑",season_pass:"Season Pass 🏆",starter:"Starter Pack 🎁"};
+                const productColors={trial:"#00F5FF",small:"#00F5FF",medium:"#C8FF00",large:"#FFD700",mega:"#FF2D78",whale:"#FFD700",season_pass:"#FFD700",starter:"#FF4400"};
+                const date=new Date(p.created_at).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+                const time=new Date(p.created_at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+                return(
+                  <div key={p.id||i} style={{background:i%2===0?"rgba(255,255,255,.03)":"rgba(255,255,255,.01)",border:"1px solid rgba(255,255,255,.06)",borderRadius:8,padding:"12px 14px",marginBottom:6,display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:36,height:36,borderRadius:8,background:`${productColors[p.product_id]||"#888"}18`,border:`1px solid ${productColors[p.product_id]||"#888"}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:16}}>
+                      {p.product_id==="whale"?"👑":p.product_id==="season_pass"?"🏆":p.product_id==="starter"?"🎁":"💰"}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:productColors[p.product_id]||"#e0e8ff"}}>{productNames[p.product_id]||p.product_id}</div>
+                      <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.4)",marginTop:2}}>+{p.pixels_granted}px granted · {date} {time}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>€{Number(p.amount_eur).toFixed(2)}</div>
+                      <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(0,255,136,.5)",marginTop:2}}>✅ PAID</div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.15)",textAlign:"center",marginTop:12}}>Payment receipts sent to your email by Stripe · Secure payments via Stripe</div>
+            </div>}
           </div>}
         </div>
       </div>}
