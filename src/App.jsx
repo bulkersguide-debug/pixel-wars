@@ -338,6 +338,61 @@ export default function App(){
 
   const pushToast=useCallback((msg,color,dur=3000)=>{const id=Date.now()+Math.random();setToasts(t=>[...t,{id,msg,color}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),dur);},[]);
 
+  // ── STRIPE CHECKOUT ──────────────────────────────────────────────────────────
+  const STRIPE_PK="pk_live_51TXp5DJ6WZdD3UBmyp9194J1r8WvXbcUCmU6Nlhw5vRWL8M5d4y46LrH98qZoLyhdCLzHrl6Bx0tcU9VPTObcjYJ0058NAhaZF";
+  const [paymentLoading,setPaymentLoading]=useState(null);
+
+  const startCheckout=useCallback(async(productId)=>{
+    if(paymentLoading)return;
+    setPaymentLoading(productId);
+    try{
+      const res=await fetch("/api/create-checkout",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          productId,
+          userId:user?.id||null,
+          discordUsername:user?.user_metadata?.full_name||user?.user_metadata?.name||"player",
+          fandom:active?TM[active]?.name||"none":"none",
+        }),
+      });
+      const data=await res.json();
+      if(data.url){
+        window.location.href=data.url; // Redirect to Stripe Checkout
+      }else{
+        pushToast("❌ Payment error: "+( data.error||"Unknown error"),"#FF4400",4000);
+      }
+    }catch(err){
+      pushToast("❌ Connection error. Please try again.","#FF4400",4000);
+    }finally{
+      setPaymentLoading(null);
+    }
+  },[paymentLoading,user,active]);
+
+  // Check for payment success/cancel on page load
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    const payment=params.get("payment");
+    const product=params.get("product");
+    if(payment==="success"){
+      const names={trial:"Trial Pack",small:"Small Bundle",medium:"Medium Bundle",large:"Large Bundle",mega:"Mega Bundle",whale:"Whale Pack 👑",season_pass:"Season Pass 🏆",starter:"Starter Pack 🎁"};
+      pushToast(`✅ Payment successful! ${names[product]||"Purchase"} activated. Pixels added to your account!`,"#00FF88",8000);
+      // Clean URL
+      window.history.replaceState({},"","/");
+      // Re-sync pixels from Supabase after a short delay
+      setTimeout(()=>{
+        if(user?.id){
+          supabase.from("profiles").select("free_pixels").eq("id",user.id).single()
+            .then(({data})=>{if(data?.free_pixels!=null){syncFreePixels(data.free_pixels);}});
+        }
+      },2000);
+    }else if(payment==="cancelled"){
+      pushToast("Payment cancelled — no charge made.","#FFD700",4000);
+      window.history.replaceState({},"","/");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
   // ── SHARE URL generator ──────────────────────────────────────────────────
   const generateShareURL=(teamId)=>{
     const t=TM[teamId];if(!t)return "https://www.pixelsofwar.com";
@@ -2182,7 +2237,7 @@ export default function App(){
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.6)",marginBottom:10}}>100 pixels + 1 Power-Up + Season Pass · Best value for new players</div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div><span style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#C8FF00"}}>€2.99</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",marginLeft:6,textDecoration:"line-through"}}>€19.97</span></div>
-                <button onClick={()=>{pushToast("💳 Stripe coming soon! This will open checkout.","#C8FF00",3000);}} style={{padding:"10px 20px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#040408",fontWeight:900}}>BUY NOW →</button>
+                <button onClick={()=>startCheckout("starter")} disabled={paymentLoading==="starter"} style={{padding:"10px 20px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#040408",fontWeight:900}}>{paymentLoading==="starter"?"⏳...":"BUY NOW →"}</button>
               </div>
             </div>}
             {/* Impulse tier — full width */}
@@ -2196,15 +2251,15 @@ export default function App(){
               </div>
               <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                 <span style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#00F5FF"}}>€0.99</span>
-                <button onClick={()=>pushToast("💳 Stripe coming soon! Payment will open here.","#C8FF00",3000)} style={{padding:"6px 12px",background:"rgba(0,245,255,.15)",border:"1px solid rgba(0,245,255,.4)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00F5FF",fontWeight:900}}>BUY →</button>
+                <button onClick={()=>startCheckout("trial")} disabled={paymentLoading==="trial"} style={{padding:"6px 12px",background:"rgba(0,245,255,.15)",border:"1px solid rgba(0,245,255,.4)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00F5FF",fontWeight:900}}>{paymentLoading==="trial"?"⏳...":"BUY →"}</button>
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
               {[
-                {pixels:100,price:"€1.99",bonus:0,color:"#00F5FF",label:"SMALL",icon:"⚡"},
-                {pixels:250,price:"€4.99",bonus:25,color:"#C8FF00",label:"MEDIUM",icon:"🔥",popular:true},
-                {pixels:600,price:"€9.99",bonus:60,color:"#FFD700",label:"LARGE",icon:"💎"},
-                {pixels:2000,price:"€24.99",bonus:400,color:"#FF2D78",label:"MEGA",icon:"👑",whale:true},
+                {id:"small",pixels:100,price:"€1.99",bonus:0,color:"#00F5FF",label:"SMALL",icon:"⚡"},
+                {id:"medium",pixels:250,price:"€4.99",bonus:25,color:"#C8FF00",label:"MEDIUM",icon:"🔥",popular:true},
+                {id:"large",pixels:600,price:"€9.99",bonus:60,color:"#FFD700",label:"LARGE",icon:"💎"},
+                {id:"mega",pixels:2000,price:"€24.99",bonus:400,color:"#FF2D78",label:"MEGA",icon:"👑",whale:true},
               ].map(b=>(
                 <div key={b.pixels} style={{background:b.popular?"rgba(200,255,0,.08)":b.whale?"rgba(255,45,120,.08)":"rgba(255,255,255,.03)",border:`1px solid ${b.popular?"rgba(200,255,0,.4)":b.whale?"rgba(255,45,120,.4)":"rgba(255,255,255,.08)"}`,borderRadius:10,padding:"14px 12px",position:"relative",textAlign:"center"}}>
                   {b.popular&&<div style={{position:"absolute",top:-8,left:"50%",transform:"translateX(-50%)",background:"#C8FF00",color:"#040408",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,padding:"2px 8px",borderRadius:4}}>BEST VALUE</div>}
@@ -2214,7 +2269,7 @@ export default function App(){
                   <div style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#fff"}}>{b.pixels}<span style={{fontSize:10,color:"rgba(255,255,255,.4)"}}> px</span></div>
                   {b.bonus>0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700",marginBottom:2}}>+{b.bonus} bonus px</div>}
                   <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:b.color,margin:"6px 0"}}>{b.price}</div>
-                  <button onClick={()=>pushToast("💳 Stripe coming soon! Payment will open here.","#C8FF00",3000)} style={{width:"100%",padding:"7px",background:`rgba(${b.color==="#C8FF00"?"200,255,0":"0,245,255"},.12)`,border:`1px solid ${b.color}55`,borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:b.color,fontWeight:900}}>BUY →</button>
+                  <button onClick={()=>startCheckout(b.id)} disabled={paymentLoading===b.id} style={{width:"100%",padding:"7px",background:`rgba(${b.color==="#C8FF00"?"200,255,0":"0,245,255"},.12)`,border:`1px solid ${b.color}55`,borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:b.color,fontWeight:900}}>{paymentLoading===b.id?"⏳...":"BUY →"}</button>
                 </div>
               ))}
             </div>
@@ -2229,7 +2284,7 @@ export default function App(){
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
                   <div><span style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:"#FFD700"}}>€49.99</span></div>
-                  <button onClick={()=>pushToast("💳 Stripe coming soon! Whale Pack checkout will open here.","#FFD700",3000)} style={{padding:"10px 16px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#040408",fontWeight:900}}>GET IT →</button>
+                  <button onClick={()=>startCheckout("whale")} disabled={paymentLoading==="whale"} style={{padding:"10px 16px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#040408",fontWeight:900}}>{paymentLoading==="whale"?"⏳ PROCESSING...":"GET IT →"}</button>
                 </div>
               </div>
             </div>
@@ -2255,7 +2310,7 @@ export default function App(){
                   </div>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                     <div><span style={{fontFamily:"'Orbitron',monospace",fontSize:24,fontWeight:900,color:"#FFD700"}}>€4.99</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginLeft:8}}>one season</span></div>
-                    <button onClick={()=>pushToast("💳 Stripe coming soon! Season Pass checkout will open here.","#FFD700",3000)} style={{padding:"12px 24px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:11,color:"#040408",fontWeight:900}}>GET PASS →</button>
+                    <button onClick={()=>startCheckout("season_pass")} disabled={paymentLoading==="season_pass"} style={{padding:"12px 24px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:11,color:"#040408",fontWeight:900}}>{paymentLoading==="season_pass"?"⏳ PROCESSING...":"GET PASS →"}</button>
                   </div>
                 </>
               }
@@ -2310,7 +2365,7 @@ export default function App(){
             <div><span style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:"#C8FF00"}}>€2.99</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.3)",marginLeft:8,textDecoration:"line-through"}}>€14.97</span></div>
             <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400"}}>80% OFF · Today only</span>
           </div>
-          <button onClick={()=>{pushToast("💳 Stripe coming soon! Checkout will open here.","#C8FF00",3000);}} style={{width:"100%",padding:"14px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:12,color:"#040408",fontWeight:900,marginBottom:8}}>🎁 CLAIM STARTER PACK →</button>
+          <button onClick={()=>startCheckout("starter")} disabled={paymentLoading==="starter"} style={{width:"100%",padding:"14px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:12,color:"#040408",fontWeight:900,marginBottom:8}}>{paymentLoading==="starter"?"⏳ PROCESSING...":"🎁 CLAIM STARTER PACK →"}</button>
           <button onClick={()=>setShowStarterPack(false)} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.2)"}}>No thanks, I'll miss out</button>
         </div>
       </div>}
