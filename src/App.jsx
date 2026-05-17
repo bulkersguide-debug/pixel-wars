@@ -2416,7 +2416,7 @@ export default function App(){
                   {/* Big total */}
                   <div style={{background:"linear-gradient(90deg,rgba(0,245,255,.1),rgba(200,255,0,.05))",border:"1px solid rgba(0,245,255,.25)",borderRadius:10,padding:"14px",textAlign:"center",marginBottom:10}}>
                     <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.4)",letterSpacing:2,marginBottom:4}}>PIXEL BALANCE</div>
-                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:32,fontWeight:900,color:"#00F5FF"}}>{freePixels+myPixels}</div>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:32,fontWeight:900,color:"#00F5FF"}}>{walletItems.reduce((a,i)=>a+i.px,0)}</div>
                     <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:8}}>
                       <div style={{textAlign:"center"}}>
                         <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>{freePixels}</div>
