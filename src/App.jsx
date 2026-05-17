@@ -2061,30 +2061,59 @@ export default function App(){
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700",marginBottom:4}}>🎁 STARTER PACK</div>
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.6)",marginBottom:10}}>100 pixels + 1 Power-Up + Season Pass · Best value for new players</div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div><span style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#C8FF00"}}>€2.99</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",marginLeft:6,textDecoration:"line-through"}}>€14.97</span></div>
+                <div><span style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#C8FF00"}}>€2.99</span><span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",marginLeft:6,textDecoration:"line-through"}}>€19.97</span></div>
                 <button onClick={()=>{pushToast("💳 Stripe coming soon! This will open checkout.","#C8FF00",3000);}} style={{padding:"10px 20px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#040408",fontWeight:900}}>BUY NOW →</button>
               </div>
             </div>}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {/* Impulse tier — full width */}
+            <div style={{background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.25)",borderRadius:8,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:18}}>💧</span>
+                <div>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#00F5FF"}}>TRIAL PACK — Try before you commit</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.35)"}}>15 pixels · Perfect for your first purchase</div>
+                </div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                <span style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#00F5FF"}}>€0.99</span>
+                <button onClick={()=>pushToast("💳 Stripe coming soon! Payment will open here.","#C8FF00",3000)} style={{padding:"6px 12px",background:"rgba(0,245,255,.15)",border:"1px solid rgba(0,245,255,.4)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00F5FF",fontWeight:900}}>BUY →</button>
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
               {[
-                {pixels:50,price:"€1.99",bonus:0,color:"#00F5FF",label:"SMALL",icon:"💧"},
-                {pixels:200,price:"€4.99",bonus:20,color:"#C8FF00",label:"MEDIUM",icon:"⚡",popular:true},
-                {pixels:500,price:"€9.99",bonus:75,color:"#FFD700",label:"LARGE",icon:"🔥"},
-                {pixels:1500,price:"€24.99",bonus:300,color:"#FF2D78",label:"MEGA",icon:"👑",whale:true},
+                {pixels:100,price:"€1.99",bonus:0,color:"#00F5FF",label:"SMALL",icon:"⚡"},
+                {pixels:250,price:"€4.99",bonus:25,color:"#C8FF00",label:"MEDIUM",icon:"🔥",popular:true},
+                {pixels:600,price:"€9.99",bonus:60,color:"#FFD700",label:"LARGE",icon:"💎"},
+                {pixels:2000,price:"€24.99",bonus:400,color:"#FF2D78",label:"MEGA",icon:"👑",whale:true},
               ].map(b=>(
                 <div key={b.pixels} style={{background:b.popular?"rgba(200,255,0,.08)":b.whale?"rgba(255,45,120,.08)":"rgba(255,255,255,.03)",border:`1px solid ${b.popular?"rgba(200,255,0,.4)":b.whale?"rgba(255,45,120,.4)":"rgba(255,255,255,.08)"}`,borderRadius:10,padding:"14px 12px",position:"relative",textAlign:"center"}}>
                   {b.popular&&<div style={{position:"absolute",top:-8,left:"50%",transform:"translateX(-50%)",background:"#C8FF00",color:"#040408",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,padding:"2px 8px",borderRadius:4}}>BEST VALUE</div>}
-                  {b.whale&&<div style={{position:"absolute",top:-8,left:"50%",transform:"translateX(-50%)",background:"#FF2D78",color:"#fff",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,padding:"2px 8px",borderRadius:4}}>WHALE PACK</div>}
-                  <div style={{fontSize:24,marginBottom:4}}>{b.icon}</div>
+                  {b.whale&&<div style={{position:"absolute",top:-8,left:"50%",transform:"translateX(-50%)",background:"#FF2D78",color:"#fff",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,padding:"2px 8px",borderRadius:4}}>MOST POPULAR</div>}
+                  <div style={{fontSize:22,marginBottom:4}}>{b.icon}</div>
                   <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:b.color,fontWeight:900,marginBottom:4}}>{b.label}</div>
-                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:20,fontWeight:900,color:"#fff"}}>{b.pixels}<span style={{fontSize:11,color:"rgba(255,255,255,.4)"}}> px</span></div>
-                  {b.bonus>0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700",marginBottom:4}}>+{b.bonus} bonus px</div>}
-                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:b.color,margin:"8px 0"}}>{b.price}</div>
-                  <button onClick={()=>pushToast("💳 Stripe coming soon! Payment will open here.","#C8FF00",3000)} style={{width:"100%",padding:"8px",background:`rgba(${b.color==="#C8FF00"?"200,255,0":"0,245,255"},.15)`,border:`1px solid ${b.color}44`,borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:b.color,fontWeight:900}}>BUY →</button>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#fff"}}>{b.pixels}<span style={{fontSize:10,color:"rgba(255,255,255,.4)"}}> px</span></div>
+                  {b.bonus>0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FFD700",marginBottom:2}}>+{b.bonus} bonus px</div>}
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:b.color,margin:"6px 0"}}>{b.price}</div>
+                  <button onClick={()=>pushToast("💳 Stripe coming soon! Payment will open here.","#C8FF00",3000)} style={{width:"100%",padding:"7px",background:`rgba(${b.color==="#C8FF00"?"200,255,0":"0,245,255"},.12)`,border:`1px solid ${b.color}55`,borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:b.color,fontWeight:900}}>BUY →</button>
                 </div>
               ))}
             </div>
-            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.2)",textAlign:"center",marginTop:10}}>Pixels are free pixels added to your account. Secure payment via Stripe.</div>
+            {/* Whale tier — full width */}
+            <div style={{background:"linear-gradient(90deg,rgba(255,215,0,.1),rgba(200,255,0,.05))",border:"2px solid rgba(255,215,0,.4)",borderRadius:10,padding:"14px 16px",position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:0,right:0,background:"#FFD700",color:"#040408",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,padding:"3px 10px",borderRadius:"0 10px 0 6px"}}>👑 WHALE PACK</div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+                <div>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#FFD700",marginBottom:3}}>🐋 TERRITORIAL DOMINATION</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.5)"}}>5,000 pixels + 1,000 bonus · Enough to own entire sectors</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",marginTop:2}}>+ Permanent gold crown badge · Priority Discord role</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+                  <div><span style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:"#FFD700"}}>€49.99</span></div>
+                  <button onClick={()=>pushToast("💳 Stripe coming soon! Whale Pack checkout will open here.","#FFD700",3000)} style={{padding:"10px 16px",background:"linear-gradient(90deg,#FFD700,#C8FF00)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#040408",fontWeight:900}}>GET IT →</button>
+                </div>
+              </div>
+            </div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.2)",textAlign:"center",marginTop:10}}>Pixels added to your account instantly. Secure payment via Stripe. All prices in EUR.</div>
           </div>}
 
           {/* SEASON PASS TAB */}

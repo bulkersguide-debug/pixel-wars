@@ -26,6 +26,9 @@ export default function TermsOfService() {
         a  { color: #00F5FF; text-decoration: none; }
         a:hover { text-decoration: underline; }
         strong { color: #e0e8ff; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; }
+        th { background: rgba(0,245,255,.08); color: #00F5FF; font-family: 'Orbitron', monospace; font-size: 9px; letter-spacing: 1px; padding: 8px 12px; text-align: left; border: 1px solid #1a1a30; }
+        td { padding: 8px 12px; border: 1px solid #1a1a30; color: rgba(192,200,232,.7); vertical-align: top; }
       `}</style>
 
       <div style={{ background: "#06060e", borderBottom: "1px solid #1a1a30", padding: "14px 24px", display: "flex", alignItems: "center", gap: 16 }}>
@@ -54,20 +57,32 @@ export default function TermsOfService() {
         <p>New players receive <strong>25 free pixels</strong> on first login. Logged-in players earn <strong>1 free pixel per hour</strong> (auto-recharge, up to 10 stockpiled). Additional free pixels may be awarded through daily login streaks, weekly missions, Live Battle participation and wins, referrals, watching rewarded video ads, XP level-up bonuses, and admin grants. All free pixel bonuses have no monetary value, cannot be transferred, redeemed for cash, or carried between seasons.</p>
 
         <h2>4. ROLES AND MODERATION</h2>
-        <p>Roles (VIP, Moderator, Admin) are assigned at our discretion, convey no financial value or legal rights, and may be revoked without notice.</p>
+        <p>Roles (VIP, Moderator, Admin) are assigned at our discretion, convey no financial value or legal rights, and may be revoked without notice. The Whale Pack (€49.99) grants a permanent gold crown badge and priority Discord role for the current season.</p>
 
         <h2>5. VIRTUAL ITEMS AND PAYMENTS</h2>
         <h3>5.1 All Virtual Items</h3>
         <p>Pixels, War Chest gold, XP, and all in-game items are <strong>virtual items with no real-world monetary value</strong>. They cannot be exchanged for real money, transferred between accounts, or redeemed outside the platform.</p>
 
         <h3>5.2 Pixel Bundles</h3>
-        <p>Available at: €1.99 (50px) · €4.99 (200px + bonus) · €9.99 (500px + bonus) · €24.99 (1,500px + bonus). All prices shown in Euros before payment.</p>
+        <p>Pixel bundles are available at the following price points. All prices are in Euros (€) and displayed clearly before payment:</p>
+        <table>
+          <thead><tr><th>Bundle</th><th>Price</th><th>Pixels</th><th>Bonus Pixels</th></tr></thead>
+          <tbody>
+            <tr><td>Trial Pack</td><td>€0.99</td><td>15px</td><td>—</td></tr>
+            <tr><td>Small</td><td>€1.99</td><td>100px</td><td>—</td></tr>
+            <tr><td>Medium</td><td>€4.99</td><td>250px</td><td>+25px</td></tr>
+            <tr><td>Large</td><td>€9.99</td><td>600px</td><td>+60px</td></tr>
+            <tr><td>Mega</td><td>€24.99</td><td>2,000px</td><td>+400px</td></tr>
+            <tr><td>Whale Pack</td><td>€49.99</td><td>5,000px</td><td>+1,000px + crown badge + Discord role</td></tr>
+          </tbody>
+        </table>
+        <p>Pixel prices within the game vary by sector location, fill level, and active in-game events.</p>
 
         <h3>5.3 Season Pass (€4.99)</h3>
-        <p>Unlocks for the current season: 2× XP, 50% War Chest gold bonus, +50 free pixels, exclusive badge, and SEASON WARRIOR power-up. Not a subscription — one purchase per season, never expires within that season. A new Season Pass may be purchased each season.</p>
+        <p>Unlocks for the current season: 2× XP, 50% War Chest gold bonus, +50 free pixels, exclusive badge, and SEASON WARRIOR power-up. Not a subscription — one purchase per season, never expires within that season.</p>
 
         <h3>5.4 Starter Pack (€2.99)</h3>
-        <p>A one-time discounted bundle shown to new players during their first 3 days. Includes pixels, a power-up, and Season Pass. Cannot be reclaimed after dismissal or expiry.</p>
+        <p>A one-time discounted bundle shown to new players during their first 3 days. Includes 100px, a power-up, and Season Pass. Cannot be reclaimed after dismissal or expiry.</p>
 
         <h3>5.5 Sponsored Banners</h3>
         <p>Third parties may purchase scrolling sponsored banners. Content is subject to review. We reserve the right to reject or remove banners without refund if they violate our standards.</p>
@@ -85,13 +100,13 @@ export default function TermsOfService() {
         <p>Players with active territory earn War Chest gold passively based on pixel count (1 gold per 50 pixels every 5 minutes). Gold can fund Gold Raids (20 gold → steal 20 enemy pixels) or convert to free pixels (10 gold → 5 pixels). Gold has no monetary value, cannot be withdrawn, and resets at season end. Season Pass holders earn 50% bonus gold income.</p>
 
         <h2>8. XP, LEVELS, AND PROGRESSION</h2>
-        <p>Players earn 1 XP per pixel claimed or raided. XP determines player level (1–50), unlocking build cost discounts (Level 10: 3%, Level 20: 5%), higher pixel recharge caps, and War Chest bonuses. Season Pass doubles XP earnings. XP and levels persist across seasons. Level benefits may be adjusted in future updates.</p>
+        <p>Players earn 1 XP per pixel claimed or raided. XP determines player level (1–50), unlocking build cost discounts, higher pixel recharge caps, and War Chest bonuses. Season Pass doubles XP earnings. XP and levels persist across seasons.</p>
 
         <h2>9. SEASONAL RESETS</h2>
         <p>Seasons last approximately 90 days. At season end, all pixel territories and War Chest gold reset. This is a core game mechanic. Purchasing pixels constitutes acceptance of seasonal resets. Season results and Hall of Fame records are retained permanently.</p>
 
         <h2>10. LIVE BATTLE MODE</h2>
-        <p>Live Battle is a free 200×200 arena resetting every 24 hours. No pixel purchases required. Each fandom gets 10 spots. Daily streak bonuses from Live Battle participation are subject to the same terms as other free pixel bonuses. The winning fandom at reset receives +5 free pixels per player.</p>
+        <p>Live Battle is a free 200×200 arena resetting every 24 hours. No pixel purchases required. The winning fandom at reset receives +5 free pixels per player. Daily streak bonuses are subject to the same terms as other free pixel bonuses.</p>
 
         <h2>11. USER CONDUCT</h2>
         <p>You agree not to use bots or automated tools; exploit bugs; harass other players; reverse-engineer the platform; use the service for illegal purposes; impersonate staff; circumvent payment systems; or create multiple accounts to exploit guest pixel limits or referral bonuses. Violations may result in immediate permanent ban without refund.</p>
