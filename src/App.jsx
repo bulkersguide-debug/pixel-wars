@@ -3422,7 +3422,7 @@ export default function App(){
 
           {/* MOBILE BOTTOM TABS */}
           <div style={{display:"flex",borderBottom:"1px solid #1a1a30",borderTop:"1px solid #1a1a30",flexShrink:0,background:"#05050d"}}>
-            {[["GAME","🏴"],["FEED","📡"],["CHAT","💬"],["WARS","⚔️"],["DISC","🎮"]].map(([t,icon])=>{
+            {[["GAME","🏴"],["FEED","📡"],["WARS","⚔️"]].map(([t,icon])=>{
               const on=mobileTab===t;
               return(<button key={t} onClick={()=>setMobileTab(t)} style={{flex:1,padding:"7px 0",background:on?"#0a0a1a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,fontWeight:900,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",letterSpacing:.5}}>
                 <div style={{fontSize:13}}>{icon}</div>
@@ -3499,40 +3499,6 @@ export default function App(){
               ))}
             </div>}
 
-            {/* CHAT */}
-            {mobileTab==="CHAT"&&<div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-              {!active?<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:20,textAlign:"center"}}>
-                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"#2a2a4a",lineHeight:2}}>💬<br/>Select a fandom<br/>to join their War Room</div>
-              </div>:<>
-                <div style={{padding:"8px 10px",borderBottom:"1px solid #1a1a30",display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{width:8,height:8,borderRadius:1,background:at?.color||"#888",boxShadow:`0 0 5px ${at?.color}`}}/>
-                  <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:at?.color,fontWeight:900}}>{at?.name} WAR ROOM</span>
-                </div>
-                <div style={{flex:1,overflowY:"auto",padding:"8px 10px",display:"flex",flexDirection:"column",gap:5}}>
-                  {chatMessages.length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"#2a2a3a",textAlign:"center",paddingTop:20}}>No messages yet. Be first! 🔥</div>}
-                  {chatMessages.map((m,i)=>{
-                    const roleBadge=m.role==="admin"?"⚡":m.role==="moderator"?"🛡️":m.role==="vip"?"⭐":"";
-                    const roleColor=m.role==="admin"?"#FFD700":m.role==="moderator"?"#00AAFF":m.role==="vip"?"#FF2D78":"#7a7aaa";
-                    return(
-                    <div key={m.id||i} style={{padding:"7px 10px",background:"#09091a",borderRadius:7,border:`1px solid ${m.role==="admin"?"rgba(255,215,0,.2)":m.role==="moderator"?"rgba(0,170,255,.15)":"#1a1a2a"}`}}>
-                      <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
-                        {roleBadge&&<span style={{fontSize:9}}>{roleBadge}</span>}
-                        <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:roleColor}}>{m.username||"Warrior"}</span>
-                        <span style={{fontSize:9}}>{m.rank_icon||"🥉"}</span>
-                        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)",marginLeft:"auto"}}>{new Date(m.created_at).toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit"})}</span>
-                      </div>
-                      <div style={{fontSize:12,color:"#c0c8e8",lineHeight:1.4,wordBreak:"break-word"}}>{m.text}</div>
-                    </div>
-                  );})}
-
-                </div>
-                <div style={{padding:"8px",borderTop:"1px solid #1a1a30",display:"flex",gap:6}}>
-                  <input value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMessage()} placeholder="Rally the fans…" style={{flex:1,background:"#0c0c1c",border:`1px solid ${rgba(at?.color||"#1a1a2e",.3)}`,borderRadius:6,padding:"8px 12px",color:"#b0b8e0",fontSize:13,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
-                  <button onClick={sendMessage} style={{padding:"8px 14px",background:rgba(at?.color||"#00F5FF",.15),border:`1px solid ${rgba(at?.color||"#00F5FF",.3)}`,borderRadius:6,cursor:"pointer",color:at?.color||"#00F5FF",fontSize:16,fontWeight:900}}>→</button>
-                </div>
-              </>}
-            </div>}
-
             {/* WARS — leaderboard + wars + alliances */}
             {mobileTab==="WARS"&&<div style={{padding:"6px"}}>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:2,color:"#2a2a4a",marginBottom:6}}>TERRITORY RANKINGS</div>
@@ -3589,18 +3555,6 @@ export default function App(){
                   </div>
                 );})}
               </>}
-            </div>}
-
-            {/* DISC */}
-            {mobileTab==="DISC"&&<div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-              <div style={{padding:"10px",borderBottom:"1px solid #1a1a30",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <svg width="18" height="14" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
-                  <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#5865F2"}}>WAR COUNCIL</span>
-                </div>
-                <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{padding:"6px 12px",background:"linear-gradient(90deg,#5865F2,#7289DA)",borderRadius:6,textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#fff",letterSpacing:1}}>JOIN →</a>
-              </div>
-              <iframe src={`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`} style={{flex:1,border:"none",width:"100%"}} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" title="Discord"/>
             </div>}
 
           </div>
@@ -3725,7 +3679,7 @@ export default function App(){
         {/* ── RIGHT PANEL ── */}
         <div style={{width:194,borderLeft:"1px solid #1a1a30",background:"#05050d",flexShrink:0,display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{display:"flex",borderBottom:"1px solid #1a1a30",flexShrink:0}}>
-            {[["WAR","⚔"],["FEED","📡"],["CHAT","💬"],["WARS","🔥"],["SECT","🗺"]].map(([t,icon])=>{const on=tab===t;return(<button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"5px 0",background:on?"#08081a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:6,fontWeight:900,letterSpacing:.5,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",transition:"all .1s"}}>{icon}<br/>{t}</button>);})}
+            {[["WAR","⚔"],["FEED","📡"],["WARS","🔥"],["SECT","🗺"]].map(([t,icon])=>{const on=tab===t;return(<button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"5px 0",background:on?"#08081a":"transparent",border:"none",color:on?"#00F5FF":"#3a3a5a",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:6,fontWeight:900,letterSpacing:.5,borderBottom:on?"2px solid #00F5FF":"2px solid transparent",transition:"all .1s"}}>{icon}<br/>{t}</button>);})}
           </div>
           {/* Missions + Share quick actions */}
           <div style={{display:"flex",gap:4,padding:"5px 5px 0",flexShrink:0}}>
@@ -3816,131 +3770,10 @@ export default function App(){
             ))}
           </div>}
 
-          {/* CHAT TAB */}
-          {tab==="CHAT"&&<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-            {!active?
-              <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:12,textAlign:"center"}}>
-                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#2a2a4a",lineHeight:1.8}}>💬<br/>Select a fandom<br/>to join their<br/>War Room</div>
-              </div>:
-              <>
-                <div style={{padding:"5px 8px",borderBottom:"1px solid #1a1a30",flexShrink:0,display:"flex",alignItems:"center",gap:6}}>
-                  <div style={{width:6,height:6,borderRadius:1,background:at?.color||"#888",boxShadow:`0 0 5px ${at?.color}`}}/>
-                  <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:at?.color||"#888",fontWeight:900,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{at?.name} WAR ROOM</span>
-                </div>
-                <div style={{flex:1,overflowY:"auto",padding:"5px 6px",display:"flex",flexDirection:"column",gap:4}}>
-                  {chatMessages.length===0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#2a2a3a",textAlign:"center",paddingTop:16,lineHeight:1.8}}>No messages yet.<br/>Be the first to<br/>rally the fans! 🔥</div>}
-                  {chatMessages.map((m,i)=>(
-                    <div key={m.id||i} style={{padding:"5px 7px",background:"#09091a",borderRadius:5,border:"1px solid #1a1a2a",animation:"slideDown .15s ease"}}>
-                      <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:at?.color||"#888",marginBottom:2,opacity:.5}}>{new Date(m.created_at).toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit"})}</div>
-                      <div style={{fontSize:11,color:"#c0c8e8",lineHeight:1.4,wordBreak:"break-word"}}>{m.text}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{padding:"5px",borderTop:"1px solid #1a1a30",flexShrink:0,display:"flex",gap:4}}>
-                  <input value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendMessage()} placeholder="Rally the fans…" style={{flex:1,background:"#0c0c1c",border:`1px solid ${rgba(at?.color||"#1a1a2e",.3)}`,borderRadius:5,padding:"5px 8px",color:"#b0b8e0",fontSize:10,fontFamily:"'Rajdhani',sans-serif",outline:"none"}}/>
-                  <button onClick={sendMessage} style={{padding:"5px 9px",background:rgba(at?.color||"#00F5FF",.12),border:`1px solid ${rgba(at?.color||"#00F5FF",.3)}`,borderRadius:5,cursor:"pointer",color:at?.color||"#00F5FF",fontSize:13,fontWeight:900}}>→</button>
-                </div>
-              </>
-            }
-          </div>}
-
-          {/* WARS TAB — Alliances + War declarations */}
-          {tab==="WARS"&&<div style={{flex:1,overflowY:"auto",padding:"5px 5px"}}>
-            {active&&<div style={{display:"flex",gap:4,marginBottom:10}}>
-              <button onClick={()=>{if(!requireAuth("war"))return;setShowWarModal(true);}} style={{flex:1,padding:"7px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.3)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",letterSpacing:.5}}>⚔️ DECLARE WAR</button>
-              <button onClick={()=>{if(!requireAuth("alliance"))return;setShowAllianceModal(true);}} style={{flex:1,padding:"7px",background:"rgba(0,255,170,.06)",border:"1px solid rgba(0,255,170,.25)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00FFAA",letterSpacing:.5}}>🤝 ALLY</button>
-            </div>}
-
-            {/* Active alliances */}
-            {myActiveAlliances.length>0&&<>
-              <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#00FFAA",marginBottom:5}}>🤝 ACTIVE ALLIANCES</div>
-              {myActiveAlliances.map(a=>{const partnerId=a.proposer===active?a.target:a.proposer;const partner=TM[partnerId];return(
-                <div key={a.id} style={{marginBottom:5,padding:"7px 8px",background:"rgba(0,255,170,.05)",border:"1px solid rgba(0,255,170,.2)",borderRadius:7}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                    <div style={{display:"flex",alignItems:"center",gap:5}}>
-                      <div style={{width:5,height:5,borderRadius:1,background:partner?.color||"#888"}}/>
-                      <span style={{fontSize:10,fontWeight:700,color:partner?.color||"#888",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:80}}>{partner?.name||"?"}</span>
-                    </div>
-                    <button onClick={()=>betrayAlliance(a.id,partner?.name||"?")} style={{padding:"2px 6px",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.3)",borderRadius:4,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400"}}>BETRAY</button>
-                  </div>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(0,255,170,.4)"}}>✓ Cannot raid each other</div>
-                </div>
-              );})}
-            </>}
-
-            {/* Active wars */}
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#FF4400",marginBottom:5,marginTop:myActiveAlliances.length>0?10:0}}>⚔️ ACTIVE WARS</div>
-            {wars.length===0?<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#2a2a3a",lineHeight:1.6}}>No wars declared.<br/>Select a fandom and<br/>hit DECLARE WAR.</div>
-            :wars.slice(0,10).map(w=>{const att=TM[w.attacker];const def=TM[w.defender];const isMe=w.attacker===active||w.defender===active;return(
-              <div key={w.id} style={{marginBottom:4,padding:"6px 8px",background:isMe?"rgba(255,68,0,.07)":"rgba(255,68,0,.03)",border:`1px solid ${isMe?"rgba(255,68,0,.3)":"rgba(255,68,0,.15)"}`,borderRadius:6,animation:"slideDown .2s ease"}}>
-                <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap",marginBottom:2}}>
-                  <span style={{fontSize:9,fontWeight:700,color:att?.color||"#888",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:55}}>{att?.name||"?"}</span>
-                  <span style={{fontSize:10,color:"#FF4400",animation:isMe?"pulse .7s infinite":undefined}}>⚔️</span>
-                  <span style={{fontSize:9,fontWeight:700,color:def?.color||"#888",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:55}}>{def?.name||"?"}</span>
-                </div>
-                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)"}}>{new Date(w.declared_at).toLocaleDateString()}{isMe&&<span style={{color:"#FF4400",marginLeft:4}}>YOU</span>}</div>
-              </div>
-            );})}
-          </div>}
-
-          {/* DISCORD TAB */}
-          {/* SECTOR LEADERBOARD TAB */}
-          {tab==="SECT"&&<div style={{flex:1,overflowY:"auto",padding:"5px 5px"}}>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#2a2a4a",marginBottom:6}}>🗺 SECTOR CONTROL</div>
-            {sectorLeaderboard.length===0?<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#1a1a2a",paddingTop:6}}>No sectors claimed yet</div>
-            :sectorLeaderboard.slice(0,25).map(s=>{
-              const pct=s.leader?Math.round((s.leaderPx/s.total)*100):0;
-              return(
-                <div key={s.k} onClick={()=>{setVx(Math.max(0,s.sx*SECTOR-40));setVy(Math.max(0,s.sy*SECTOR-30));}} style={{marginBottom:4,padding:"6px 7px",background:"#09091a",borderRadius:5,border:`1px solid ${s.leader?rgba(s.leader.color,.2):"rgba(255,255,255,.06)"}`,cursor:"pointer",transition:"border-color .15s"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                    <div style={{display:"flex",alignItems:"center",gap:5}}>
-                      <div style={{width:6,height:6,borderRadius:1,background:s.leader?.color||"#333"}}/>
-                      <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"rgba(255,255,255,.5)"}}>S{s.sx+1}-{s.sy+1}</span>
-                      {s.contested&&<span style={{fontSize:7,animation:"pulse .8s infinite"}}>⚔️</span>}
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:7,fontWeight:700,color:s.leader?.color||"#555",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:65}}>{s.leader?.name||"Empty"}</span>
-                      <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.25)"}}>{s.total}px</span>
-                    </div>
-                  </div>
-                  <div style={{height:2,background:"rgba(255,255,255,.06)",borderRadius:1,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:`${pct}%`,background:s.leader?.color||"#333",borderRadius:1,transition:"width .5s"}}/>
-                  </div>
-                  {s.contested&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"rgba(255,68,0,.5)",marginTop:2}}>CONTESTED — {Object.keys({}).length} fandoms</div>}
-                </div>
-              );
-            })}
-          </div>}
-
-          {/* DISC TAB */}
-          {tab==="DISC"&&<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-            <div style={{padding:"8px 8px 6px",borderBottom:"1px solid #1a1a30",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div style={{display:"flex",alignItems:"center",gap:7}}>
-                <svg width="16" height="12" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
-                <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#5865F2",letterSpacing:1}}>WAR COUNCIL</span>
-              </div>
-              <button onClick={()=>setShowDiscord(s=>!s)} style={{padding:"3px 8px",background:"rgba(88,101,242,.15)",border:"1px solid rgba(88,101,242,.4)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#7289DA",letterSpacing:1}}>{showDiscord?"HIDE":"FLOAT"}</button>
-            </div>
-            <iframe src={`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`} width="100%" height="100%" style={{border:"none",flex:1}} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" title="Discord"/>
-            <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{display:"block",padding:"9px",background:"linear-gradient(90deg,#5865F2,#7289DA)",textAlign:"center",textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#fff",letterSpacing:1,flexShrink:0}}>JOIN SERVER →</a>
-          </div>}
 
         </div>
       </div>
       )} {/* end desktop layout ternary */}
-
-      {/* DISCORD FLOATING PANEL — triggered from DISC tab */}
-      {showDiscord&&<div style={{position:"fixed",bottom:70,right:200,zIndex:600,width:320,background:"#2f3136",borderRadius:12,overflow:"hidden",border:"2px solid #5865F2",boxShadow:"0 8px 40px rgba(88,101,242,.45)",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)",display:"flex",flexDirection:"column"}}>
-          <div style={{background:"#202225",padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <svg width="18" height="14" viewBox="0 0 71 55" fill="none"><path d="M60.1 4.9A58.5 58.5 0 0 0 45.5.9a40.7 40.7 0 0 0-1.8 3.7 54.1 54.1 0 0 0-16.4 0A38.9 38.9 0 0 0 25.5.9 58.4 58.4 0 0 0 10.9 4.9C1.6 19 -1 32.7.3 46.3a58.9 58.9 0 0 0 18 9.1 44.6 44.6 0 0 0 3.9-6.3 38.3 38.3 0 0 1-6.1-2.9l1.5-1.1a42.1 42.1 0 0 0 36 0l1.5 1.1a38.3 38.3 0 0 1-6.1 2.9 44.6 44.6 0 0 0 3.9 6.3 58.7 58.7 0 0 0 18-9.1C72 30.6 68.3 17 60.1 4.9ZM23.7 38c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.2s2.8-7.2 6.4-7.2 6.5 3.2 6.4 7.2c0 4-2.9 7.2-6.4 7.2Z" fill="#5865F2"/></svg>
-              <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#fff",letterSpacing:1}}>WAR COUNCIL</span>
-            </div>
-            <button onClick={()=>setShowDiscord(false)} style={{background:"none",border:"none",color:"#72767d",cursor:"pointer",fontSize:16,lineHeight:1}}>✕</button>
-          </div>
-          <iframe src={`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`} width="320" height="380" style={{border:"none",display:"block"}} sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts" title="Discord"/>
-          <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" style={{display:"block",padding:"11px",background:"linear-gradient(90deg,#5865F2,#7289DA)",textAlign:"center",textDecoration:"none",fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#fff",letterSpacing:1}}>JOIN SERVER →</a>
-      </div>}
 
     </div>
   );
