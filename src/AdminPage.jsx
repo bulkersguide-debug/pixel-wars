@@ -104,6 +104,7 @@ export default function AdminPage(){
   const [banners,setBanners]=useState([]);
   const [loadingBanners,setLoadingBanners]=useState(false);
   const [recentUsers,setRecentUsers]=useState([]);
+  const [onlineUsers,setOnlineUsers]=useState([]);
 
   const addLog=(msg,color="#00F5FF")=>setLog(l=>[{id:Date.now(),msg,color,ts:new Date().toLocaleTimeString()},...l].slice(0,50));
 
