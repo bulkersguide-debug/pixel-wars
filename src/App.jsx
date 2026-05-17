@@ -114,6 +114,21 @@ const WEEKLY_THEMES=[
   {cat:"⚽ Sports",label:"SPORTS BLITZ",desc:"Sports fandoms: free pixels doubled this week",icon:"⚽",color:"#00FF88",raidDiscount:1,claimBonus:0.85},
   {cat:"ALL",label:"FREE FOR ALL",desc:"All fandoms: -10% on everything. Let chaos reign!",icon:"💥",color:"#FF4400",raidDiscount:0.9,claimBonus:0.9},
 ];
+
+const CANVAS_CHALLENGES=[
+  {prompt:"🌅 Draw a SUNRISE — warm gradient from dark to bright",theme:"sunrise"},
+  {prompt:"⚔️ Draw your FANDOM'S SYMBOL or logo",theme:"symbol"},
+  {prompt:"🌊 Create an OCEAN WAVE — blues and whites",theme:"ocean"},
+  {prompt:"🔥 Make a FLAME — reds, oranges, yellows from bottom up",theme:"flame"},
+  {prompt:"🌙 Draw a NIGHT SKY — dark blues, stars, a moon",theme:"night"},
+  {prompt:"💎 Create a GEMSTONE — geometric, shiny, vivid",theme:"gem"},
+  {prompt:"🏰 Draw a CASTLE or FORTRESS",theme:"castle"},
+  {prompt:"🌺 Make a FLOWER — any style, any color",theme:"flower"},
+  {prompt:"🌈 Create a RAINBOW gradient across your sector",theme:"rainbow"},
+  {prompt:"🐉 Draw a DRAGON — your fandom's spirit animal",theme:"dragon"},
+  {prompt:"⚡ Make a LIGHTNING BOLT — electric, sharp, bright",theme:"lightning"},
+  {prompt:"🗺️ Draw a MAP of your fandom's territory",theme:"map"},
+];
 const SIM_TEAMS=["BTS","Naruto","Fortnite","BLACKPINK","Taylor Swift","Valorant","Attack on Titan","Drake","Minecraft","One Piece"];
 const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const RANKS=[{name:"BRONZE",min:0,max:49,icon:"🥉",color:"#CD7F32"},{name:"SILVER",min:50,max:199,icon:"🥈",color:"#C0C0C0"},{name:"GOLD",min:200,max:499,icon:"🥇",color:"#FFD700"},{name:"PLATINUM",min:500,max:999,icon:"💎",color:"#00EAFF"},{name:"DIAMOND",min:1000,max:2499,icon:"💠",color:"#BB88FF"},{name:"LEGEND",min:2500,max:Infinity,icon:"👑",color:"#FF2D78"}];
@@ -221,7 +236,14 @@ export default function App(){
   // ── MONETIZATION STATE ───────────────────────────────────────────────────────
   const [hasSeasonPass,setHasSeasonPass]=useState(()=>{try{const d=JSON.parse(localStorage.getItem("pow_season_pass")||"null");return d&&d.season===1?d:null;}catch{return null;}});
   const [showPaywall,setShowPaywall]=useState(false);
-  const [paywallTab,setPaywallTab]=useState("bundles"); // bundles | pass | starter
+  const [paywallTab,setPaywallTab]=useState("bundles");
+  // ── NEW FEATURES ─────────────────────────────────────────────────────────────
+  const [dailyChallenge,setDailyChallenge]=useState(null); // {sx,sy,endsAt}
+  const [showCanvasChallenge,setShowCanvasChallenge]=useState(false);
+  const [canvasChallenge,setCanvasChallenge]=useState(null); // weekly prompt
+  const [clan,setClan]=useState(()=>{try{return JSON.parse(localStorage.getItem("pow_clan")||"null");}catch{return null;}});
+  const [showClanModal,setShowClanModal]=useState(false);
+  const [clanInput,setClanInput]=useState("");
   const [watchingAd,setWatchingAd]=useState(false);
   const [adCooldown,setAdCooldown]=useState(()=>{try{return parseInt(localStorage.getItem("pow_ad_cooldown")||"0");}catch{return 0;}});
   const [showStarterPack,setShowStarterPack]=useState(false);
@@ -301,6 +323,32 @@ export default function App(){
   const alreadyClaimedToday=streakData.last===todayStr();
 
   const pushToast=useCallback((msg,color,dur=3000)=>{const id=Date.now()+Math.random();setToasts(t=>[...t,{id,msg,color}]);setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),dur);},[]);
+
+  // ── SHARE URL generator ──────────────────────────────────────────────────
+  const generateShareURL=(teamId)=>{
+    const t=TM[teamId];if(!t)return "https://www.pixelsofwar.com";
+    const slug=slugify(t.name);
+    return `https://www.pixelsofwar.com?fandom=${slug}`;
+  };
+
+  const shareTerritory=(teamId)=>{
+    const t=TM[teamId];if(!t)return;
+    const myPx=Object.values(pixels).filter(p=>p?.t===teamId).length;
+    const rank=getRank(myPx);
+    const url=generateShareURL(teamId);
+    const msg=`⚔️ ${t.name} is fighting for territory on Pixels of War!\n\n${rank.icon} ${myPx} pixels claimed · ${rank.name} rank\n\nJoin us and claim your pixels — FREE to start!\n👉 ${url}`;
+    if(navigator.share){navigator.share({title:`${t.name} — Pixels of War`,text:msg,url}).catch(()=>{});}
+    else if(navigator.clipboard?.writeText){navigator.clipboard.writeText(msg).then(()=>pushToast("📋 Territory link copied! Share anywhere.","#00FF88",3000)).catch(()=>{prompt("Copy this link:",msg);});}
+    else{prompt("Copy this link:",msg);}
+  };
+
+  const shareTikTok=(teamId)=>{
+    const t=TM[teamId];if(!t)return;
+    const myPx=Object.values(pixels).filter(p=>p?.t===teamId).length;
+    const url=generateShareURL(teamId);
+    const msg=`🎮 I'm claiming territory for ${t.name} on Pixels of War! ${myPx} pixels and counting 🔥\n\n#PixelsOfWar #${t.name.replace(/\s/g,"")} #Gaming #PixelArt\n\n${url}`;
+    navigator.clipboard?.writeText(msg).then(()=>pushToast("📋 TikTok caption copied! Open TikTok and paste.","#FF2D78",4000)).catch(()=>{prompt("Copy TikTok caption:",msg);});
+  };
   useEffect(()=>{vxRef.current=vx;},[vx]);
   useEffect(()=>{vyRef.current=vy;},[vy]);
 
@@ -570,6 +618,24 @@ export default function App(){
     if(joined&&Date.now()-parseInt(joined)<3*86400000&&!localStorage.getItem("pow_starter_used")){
       setTimeout(()=>setShowStarterPack(true),30000);
     }
+    // ── Daily Sector Challenge ───────────────────────────────────────────────
+    // A random sector gets 50% off for 2 hours every day
+    const savedDC=JSON.parse(localStorage.getItem("pow_daily_challenge")||"null");
+    if(savedDC&&savedDC.endsAt>Date.now()){
+      setDailyChallenge(savedDC);
+    }else{
+      // Pick a new random unlocked sector — seed by today's date for consistency
+      const seed2=today.split("-").reduce((a,b)=>a*31+parseInt(b),0);
+      const sx2=Math.abs(seed2*17)%NS,sy2=Math.abs(seed2*31)%NS;
+      const endsAt2=Date.now()+(2*3600000); // 2 hours
+      const dc={sx:sx2,sy:sy2,endsAt:endsAt2};
+      setDailyChallenge(dc);
+      localStorage.setItem("pow_daily_challenge",JSON.stringify(dc));
+    }
+    // ── Canvas Challenge (weekly) ────────────────────────────────────────────
+    const wn=getWeekNum();
+    const cc=CANVAS_CHALLENGES[wn%CANVAS_CHALLENGES.length];
+    setCanvasChallenge(cc);
     // Init live battle
     try{
       const lb=JSON.parse(localStorage.getItem("pow_live_battle")||"null");
@@ -1029,6 +1095,21 @@ export default function App(){
         ctx.fillStyle="rgba(255,215,0,.06)";ctx.fillRect(dx2,dy2,SECTOR*eC,SECTOR*eC);
       }
     }
+    // Daily challenge sector — green pulsing border + 50% OFF label
+    if(dailyChallenge&&dailyChallenge.endsAt>Date.now()){
+      const dcx=(dailyChallenge.sx*SECTOR-vx)*eC,dcy=(dailyChallenge.sy*SECTOR-vy)*eC;
+      if(dcx>-SECTOR*eC&&dcx<CW&&dcy>-SECTOR*eC&&dcy<CH){
+        const pulse2=0.5+0.3*Math.sin(frame*0.15);
+        ctx.strokeStyle=`rgba(200,255,0,${pulse2})`;ctx.lineWidth=3;ctx.setLineDash([10,4]);
+        ctx.strokeRect(dcx,dcy,SECTOR*eC,SECTOR*eC);ctx.setLineDash([]);
+        ctx.fillStyle=`rgba(200,255,0,${pulse2*0.07})`;ctx.fillRect(dcx,dcy,SECTOR*eC,SECTOR*eC);
+        const ccx=dcx+SECTOR*eC/2,ccy=dcy+SECTOR*eC/2;
+        ctx.fillStyle=`rgba(200,255,0,${pulse2})`;ctx.font="bold 11px monospace";ctx.textAlign="center";
+        ctx.fillText("⚡ DAILY CHALLENGE",ccx,ccy-7);
+        ctx.fillStyle=`rgba(255,255,255,${pulse2*0.7})`;ctx.font="9px monospace";
+        ctx.fillText("50% OFF",ccx,ccy+9);
+      }
+    }
     // Fortified sectors — red dashed border + shield icon
     fortifiedSectors.forEach(([fsx,fsy])=>{
       const dx2=(fsx*SECTOR-vx)*eC,dy2=(fsy*SECTOR-vy)*eC;
@@ -1118,7 +1199,7 @@ export default function App(){
         ctx.fillRect(sx2,sy2,CELL,CELL);
       }
     });
-  },[pixels,shields,pending,active,mode,vx,vy,unlockedSet,sectorFills,showPriceMap,showHeatmap,heatmapTick,miniSeason,animTick,surgeMode,fortifiedSectors,effCell,effVW,effVH]);
+  },[pixels,shields,pending,active,mode,vx,vy,unlockedSet,sectorFills,showPriceMap,showHeatmap,heatmapTick,miniSeason,animTick,surgeMode,fortifiedSectors,effCell,effVW,effVH,dailyChallenge]);
 
   // ── MINIMAP ────────────────────────────────────────────────────────────────
   useEffect(()=>{
@@ -1201,6 +1282,8 @@ export default function App(){
       // Level discount — higher level = small discount
       if(playerLevel>=10)price*=0.97;
       if(playerLevel>=20)price*=0.95;
+      // Daily sector challenge — 50% off for 2 hours in the challenge sector
+      if(mode==="BUILD"&&dailyChallenge&&dailyChallenge.endsAt>Date.now()&&sx===dailyChallenge.sx&&sy===dailyChallenge.sy)price*=0.5;
       idxs.forEach(idx=>{
         if(mode==="BUILD"&&active){
           const gx=idx%GW,gy=Math.floor(idx/GW);
@@ -2195,6 +2278,84 @@ export default function App(){
         </div>
       </div>}
 
+      {/* ── CANVAS CHALLENGE MODAL ──────────────────────────────────────────── */}
+      {showCanvasChallenge&&canvasChallenge&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(12px)"}} onClick={()=>setShowCanvasChallenge(false)}>
+        <div style={{background:"rgba(9,9,26,.98)",border:"2px solid rgba(255,45,120,.4)",borderRadius:20,padding:"28px",width:460,maxWidth:"96vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",boxShadow:"0 0 60px rgba(255,45,120,.15)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#FF2D78",letterSpacing:2}}>🎨 CANVAS CHALLENGE</div>
+            <button onClick={()=>setShowCanvasChallenge(false)} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:18}}>✕</button>
+          </div>
+          <div style={{background:"rgba(255,45,120,.06)",border:"1px solid rgba(255,45,120,.2)",borderRadius:12,padding:"16px 18px",marginBottom:16,textAlign:"center"}}>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginBottom:8,letterSpacing:2}}>THIS WEEK'S PROMPT</div>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#fff",lineHeight:1.5}}>{canvasChallenge.prompt}</div>
+          </div>
+          <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.55)",lineHeight:1.7,marginBottom:16}}>
+            Use your fandom's pixels to recreate this theme in your sector. Screenshot your art and share it in our Discord server for community voting. The most upvoted creation wins <strong style={{color:"#FFD700"}}>+50 bonus pixels</strong>!
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{window.open("https://discord.gg/4Da2avYyPF","_blank");setShowCanvasChallenge(false);}} style={{flex:1,padding:"11px",background:"rgba(88,101,242,.2)",border:"1px solid rgba(88,101,242,.4)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#5865F2",fontWeight:900}}>📢 JOIN DISCORD TO VOTE</button>
+              <button onClick={()=>{
+                if(!active){pushToast("Select a fandom first!","#FF4400",2000);return;}
+                if(dailyChallenge){setVx(Math.max(0,Math.min(GW-effVW,dailyChallenge.sx*SECTOR-10)));setVy(Math.max(0,Math.min(GH-effVH,dailyChallenge.sy*SECTOR-10)));}
+                setShowCanvasChallenge(false);
+                pushToast("🎨 Start painting! Screenshot your art and share on Discord!","#FF2D78",5000);
+              }} style={{flex:1,padding:"11px",background:"linear-gradient(90deg,#FF2D78,#FF0066)",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#fff",fontWeight:900}}>🎨 START PAINTING →</button>
+            </div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.2)",textAlign:"center"}}>New challenge every Monday · Community votes on Discord · Winners announced Sunday</div>
+          </div>
+        </div>
+      </div>}
+
+      {/* ── CLAN MODAL ─────────────────────────────────────────────────────── */}
+      {showClanModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(12px)"}} onClick={()=>setShowClanModal(false)}>
+        <div style={{background:"rgba(9,9,26,.98)",border:"1px solid rgba(0,245,255,.3)",borderRadius:20,padding:"28px",width:440,maxWidth:"96vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:"#00F5FF",letterSpacing:2}}>⚔️ CLAN SYSTEM</div>
+            <button onClick={()=>setShowClanModal(false)} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:18}}>✕</button>
+          </div>
+          {clan?<>
+            {/* Show current clan */}
+            <div style={{background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:12,padding:"16px",marginBottom:14,textAlign:"center"}}>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:18,fontWeight:900,color:"#00F5FF",marginBottom:4}}>[{clan.tag}] {clan.name}</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.4)"}}>Joined {new Date(clan.joinedAt).toLocaleDateString()} · {clan.role}</div>
+            </div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.5)",marginBottom:16,lineHeight:1.6}}>
+              Your clan tag <strong style={{color:"#00F5FF"}}>[{clan.tag}]</strong> appears in chat next to your name. Rally your clan members to claim territory together — coordinate raids and defenses in Discord!
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{
+                const shareMsg=`⚔️ Join my clan [${clan.tag}] ${clan.name} on Pixels of War!\n\nWe're conquering territory together — come fight with us!\n👉 https://www.pixelsofwar.com`;
+                navigator.clipboard?.writeText(shareMsg).then(()=>pushToast("📋 Clan invite copied!","#00F5FF",3000));
+              }} style={{flex:1,padding:"10px",background:"rgba(0,245,255,.1)",border:"1px solid rgba(0,245,255,.3)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#00F5FF",fontWeight:900}}>📤 INVITE TO CLAN</button>
+              <button onClick={()=>{setClan(null);localStorage.removeItem("pow_clan");pushToast("Left clan.","#FF4400",2000);setShowClanModal(false);}} style={{padding:"10px 14px",background:"rgba(255,68,0,.08)",border:"1px solid rgba(255,68,0,.25)",borderRadius:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#FF4400"}}>LEAVE</button>
+            </div>
+          </>:<>
+            {/* Create or join clan */}
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.5)",marginBottom:16,lineHeight:1.6}}>
+              Create a clan to unite players across fandoms. Your clan tag appears in chat, giving your group a persistent identity across seasons. Coordinate on Discord for maximum domination.
+            </div>
+            <div style={{marginBottom:12}}>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",marginBottom:4}}>CLAN NAME</div>
+              <input value={clanInput} onChange={e=>setClanInput(e.target.value)} placeholder="e.g. Anime Alliance" maxLength={24} style={{width:"100%",padding:"10px 12px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.12)",borderRadius:8,color:"#e0e8ff",fontFamily:"'Rajdhani',sans-serif",fontSize:13,outline:"none"}}/>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{
+                if(!requireAuth("clan"))return;
+                if(!clanInput.trim()||clanInput.trim().length<3){pushToast("Clan name must be at least 3 characters.","#FF4400",2000);return;}
+                const tag=clanInput.trim().slice(0,4).toUpperCase().replace(/[^A-Z0-9]/g,"");
+                const newClan={name:clanInput.trim(),tag,role:"Leader",joinedAt:Date.now(),members:[user?.user_metadata?.full_name||"You"]};
+                setClan(newClan);localStorage.setItem("pow_clan",JSON.stringify(newClan));
+                pushToast(`⚔️ Clan [${tag}] ${clanInput.trim()} created! Invite your allies.`,"#00F5FF",4000);
+                setShowClanModal(false);
+              }} style={{flex:1,padding:"11px",background:"linear-gradient(90deg,#00F5FF44,#00F5FF22)",border:"1px solid #00F5FF66",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:10,color:"#00F5FF",fontWeight:900}}>⚔️ CREATE CLAN</button>
+              <button onClick={()=>setShowClanModal(false)} style={{padding:"11px 16px",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.08)",borderRadius:8,cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.25)"}}>CANCEL</button>
+            </div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.2)",textAlign:"center",marginTop:10}}>Clan tag (first 4 letters) appears in chat · Free to create · No season reset</div>
+          </>}
+        </div>
+      </div>}
+
       {/* LEVEL UP CELEBRATION */}
       {showLevelUp&&<div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:1001,pointerEvents:"none",textAlign:"center",animation:"pop .5s cubic-bezier(.34,1.56,.64,1)"}}>
         <div style={{background:"rgba(9,9,26,.97)",border:"2px solid rgba(255,215,0,.6)",borderRadius:20,padding:"28px 40px",boxShadow:"0 0 80px rgba(255,215,0,.3)"}}>
@@ -2407,6 +2568,9 @@ export default function App(){
           <a href="/rivalries" style={{marginTop:3,display:"inline-block",background:"rgba(255,68,0,.06)",border:"1px solid rgba(255,68,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF4400",letterSpacing:1,textDecoration:"none"}}>⚔️ RIVALRIES</a>
           <button onClick={()=>setShowStandings(true)} style={{marginTop:3,background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FFD700",letterSpacing:1,fontWeight:900}}>🏆 STANDINGS</button>
           <button onClick={()=>{setShowPaywall(true);setPaywallTab("bundles");}} style={{marginTop:3,background:"linear-gradient(90deg,rgba(200,255,0,.15),rgba(200,255,0,.05))",border:"1px solid rgba(200,255,0,.4)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900,animation:"pulse 3s infinite"}}>💰 GET PIXELS</button>
+          <button onClick={()=>setShowClanModal(true)} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:`1px solid ${clan?"rgba(0,245,255,.4)":"rgba(0,245,255,.2)"}`,borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1,fontWeight:900}}>{clan?`⚔️ [${clan.tag}]`:"⚔️ CLAN"}</button>
+          {active&&<button onClick={()=>shareTerritory(active)} style={{marginTop:3,background:"rgba(255,45,120,.06)",border:"1px solid rgba(255,45,120,.25)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#FF2D78",letterSpacing:1}}>📤 SHARE</button>}
+          {active&&<button onClick={()=>shareTikTok(active)} style={{marginTop:3,background:"rgba(0,0,0,.3)",border:"1px solid rgba(255,255,255,.15)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#fff",letterSpacing:1}}>🎵 TIKTOK</button>}
           {hasSeasonPass&&<div style={{marginTop:3,background:"rgba(255,215,0,.1)",border:"1px solid rgba(255,215,0,.4)",borderRadius:4,padding:"2px 8px",fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FFD700",letterSpacing:1,fontWeight:900}}>🏆 PASS</div>}
           <button onClick={()=>{if(!requireAuth("fandom"))return;navigate("/request-fandom");}} style={{marginTop:3,background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.5)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,fontWeight:900}}>➕ REQUEST FANDOM</button>
 
@@ -2613,12 +2777,23 @@ export default function App(){
           <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:weeklyTheme.color,letterSpacing:1}}>{weeklyTheme.label}</span>
           <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.35)"}}>{weeklyTheme.desc}</span>
           {active&&isThemeFandom(active)&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:weeklyTheme.color,background:`${weeklyTheme.color}22`,border:`1px solid ${weeklyTheme.color}44`,borderRadius:4,padding:"1px 6px",animation:"pulse 1.5s infinite"}}>✅ YOUR FANDOM BENEFITS!</span>}
+          {canvasChallenge&&<button onClick={()=>setShowCanvasChallenge(true)} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF2D78",background:"rgba(255,45,120,.1)",border:"1px solid rgba(255,45,120,.3)",borderRadius:4,padding:"1px 8px",cursor:"pointer"}}>🎨 CANVAS CHALLENGE</button>}
         </div>
         {/* War Chest display */}
         {active&&<button onClick={()=>setShowWarChest(s=>!s)} style={{display:"flex",alignItems:"center",gap:5,padding:"3px 10px",background:"rgba(255,215,0,.1)",border:"1px solid rgba(255,215,0,.3)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700",fontWeight:900}}>
           💰 {warChest} GOLD
         </button>}
       </div>
+
+      {/* DAILY SECTOR CHALLENGE BANNER */}
+      {dailyChallenge&&dailyChallenge.endsAt>Date.now()&&<div style={{background:"linear-gradient(90deg,rgba(200,255,0,.12),rgba(200,255,0,.04),transparent)",borderBottom:"1px solid rgba(200,255,0,.3)",padding:"4px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,animation:"pulse 3s infinite"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:13,animation:"pulse .8s infinite"}}>⚡</span>
+          <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#C8FF00",letterSpacing:1}}>DAILY CHALLENGE</span>
+          <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.5)"}}>Sector {dailyChallenge.sx+1}-{dailyChallenge.sy+1} is <strong style={{color:"#C8FF00"}}>50% OFF</strong> for {Math.max(0,Math.floor((dailyChallenge.endsAt-Date.now())/60000))}min!</span>
+        </div>
+        <button onClick={()=>{setVx(Math.max(0,Math.min(GW-effVW,dailyChallenge.sx*SECTOR-10)));setVy(Math.max(0,Math.min(GH-effVH,dailyChallenge.sy*SECTOR-10)));pushToast(`⚡ Jumped to the Daily Challenge sector! 50% OFF!`,"#C8FF00",3000);}} style={{padding:"3px 10px",background:"rgba(200,255,0,.15)",border:"1px solid rgba(200,255,0,.4)",borderRadius:5,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#C8FF00",fontWeight:900,flexShrink:0}}>GO NOW →</button>
+      </div>}
 
       {/* WAR CHEST PANEL */}
       {showWarChest&&active&&<div style={{background:"rgba(6,6,18,.97)",borderBottom:"1px solid rgba(255,215,0,.25)",padding:"10px 14px",animation:"slideDown .2s ease"}}>
