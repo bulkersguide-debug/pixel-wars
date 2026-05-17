@@ -1003,16 +1003,23 @@ export default function App(){
             setFreePixels(data.free_pixels);
             localStorage.setItem("pow_free",String(data.free_pixels));
           }
-          if(data.role&&data.role!==profile?.role){
+          // Only show role toast if role changed FROM what we already have stored
+          const storedRole=localStorage.getItem("pow_role")||"player";
+          if(data.role&&data.role!==storedRole){
+            localStorage.setItem("pow_role",data.role);
             setProfile(p=>({...p,role:data.role}));
-            pushToast(`✨ Your role is now ${data.role.toUpperCase()}! Congrats!`,"#FFD700",6000);
+            if(data.role!=="player"){
+              pushToast(`✨ Your role is now ${data.role.toUpperCase()}! Congrats!`,"#FFD700",6000);
+            }
           }
         }).catch(()=>{});
     };
+    // Store current role on login so we can detect changes
+    if(profile?.role)localStorage.setItem("pow_role",profile.role);
     window.addEventListener("focus",sync);
     document.addEventListener("visibilitychange",()=>{if(!document.hidden)sync();});
     return()=>{window.removeEventListener("focus",sync);};
-  },[user,freePixels,profile]);
+  },[user,freePixels,profile?.role]);
   useEffect(()=>{
     if(!supabase||!isOnline)return;
     supabase.rpc("get_player_count").then(({data})=>data&&setTotalPlayers(data));
