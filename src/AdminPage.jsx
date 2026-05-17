@@ -133,6 +133,19 @@ export default function AdminPage(){
     else{
       setRoleUser(u=>({...u,role,free_pixels:(u.free_pixels||0)+bonus}));
       addLog(`✅ Role → ${role} for ${roleUser?.username}${bonus>0?` + ${bonus} free pixels`:""}`,  "#FFD700");
+      // Post to Discord to notify the community
+      const roleEmoji={admin:"⚡",moderator:"🛡️",vip:"⭐",player:"👤"}[role]||"👤";
+      const roleColor={admin:0xFFD700,moderator:0x00AAFF,vip:0xFF2D78,player:0x555577}[role]||0x555577;
+      fetch("https://discord.com/api/webhooks/1505216663786623178/zgC0xopUlfOex7rIIcRos4SxMQrTvtj8-Gjl4cvoqyEukuOP3a-xl9ekt7iIPIj_dBAb",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({embeds:[{
+          title:`${roleEmoji} ROLE ASSIGNED — Pixels of War`,
+          description:`**${roleUser?.username}** has been assigned the **${role.toUpperCase()}** role!${bonus>0?`\n\n🎁 **+${bonus} bonus pixels** granted.`:""}\n\nWelcome to the team! 🎮`,
+          color:roleColor,
+          timestamp:new Date().toISOString(),
+          footer:{text:"Pixels of War Staff System"}
+        }]})
+      }).catch(()=>{});
     }
     setRoleLoading(false);
   };
@@ -201,9 +214,16 @@ export default function AdminPage(){
           });
         }
       }).subscribe();
-    return()=>supabase.removeChannel(ch);
+    // Load recent signups
     supabase.from("profiles").select("id,username,email,role,free_pixels,created_at").order("created_at",{ascending:false}).limit(10)
       .then(({data})=>setRecentUsers(data||[]));
+
+    const ch=supabase.channel("admin-presence").on("presence",{event:"sync"},()=>{
+      const state=ch.presenceState();
+      const users=Object.values(state).flat().map(u=>u.username||"unknown");
+      setOnlineUsers(users);
+    }).subscribe();
+    return()=>supabase.removeChannel(ch);
   },[auth]);
 
   const loadStats=async()=>{
@@ -547,13 +567,19 @@ export default function AdminPage(){
 
           {/* RECENT SIGNUPS */}
           <div style={{background:"#09091a",border:"1px solid rgba(0,245,255,.2)",borderRadius:12,padding:"18px"}}>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#00F5FF",letterSpacing:3,marginBottom:14}}>👥 RECENT SIGNUPS</div>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#00F5FF",letterSpacing:3,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span>👥 RECENT SIGNUPS</span>
+              {onlineUsers.length>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#00FF88",background:"rgba(0,255,136,.08)",border:"1px solid rgba(0,255,136,.25)",borderRadius:4,padding:"2px 8px"}}>🟢 {onlineUsers.length} online</span>}
+            </div>
             {recentUsers.length===0?<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"#3a3a5a"}}>No users yet</div>
             :recentUsers.map(u=>(
               <div key={u.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
-                <div>
-                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#e0e8ff",fontWeight:900}}>{u.username||"—"}</div>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#3a3a5a"}}>{u.email||"no email"}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  {onlineUsers.includes(u.username)&&<div style={{width:6,height:6,borderRadius:"50%",background:"#00FF88",flexShrink:0,boxShadow:"0 0 4px #00FF88"}}/>}
+                  <div>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#e0e8ff",fontWeight:900}}>{u.username||"—"}</div>
+                    <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#3a3a5a"}}>{u.email||"no email"} · {u.created_at?new Date(u.created_at).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}):"—"}</div>
+                  </div>
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:{admin:"#FFD700",moderator:"#00AAFF",vip:"#FF2D78",player:"#3a3a5a"}[u.role]||"#3a3a5a"}}>{u.role||"player"}</div>
