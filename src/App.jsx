@@ -1597,6 +1597,7 @@ export default function App(){
     const t=TM[active];const isRaid=mode==="RAID";
     const bonus=pending.size>=15?Math.floor(pending.size*.3):pending.size>=10?Math.floor(pending.size*.15):0;
     const cost=calcCost(pending);const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;
+    const toClaim=new Set(pending); // declare BEFORE use
     const now=Date.now();const next={...pixels};const newShields={...shields};
     pending.forEach(idx=>{next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;});
     if(bonus>0){let added=0;for(let dy=0;dy<VH&&added<bonus;dy++)for(let dx=0;dx<VW&&added<bonus;dx++){const idx=(vy+dy)*GW+(vx+dx);const sx=Math.floor((vx+dx)/SECTOR),sy=Math.floor((vy+dy)/SECTOR);if(unlockedSet.has(sectorKey(sx,sy))&&!next[idx]){next[idx]={t:active,at:now};added++;}}}
@@ -1612,7 +1613,7 @@ export default function App(){
       }
     }
     // Earn XP — 1 per pixel claimed/raided
-    const xpEarned=(toClaim.size+bonus)*(hasSeasonPass?2:1); // Double XP with Season Pass
+    const xpEarned=(toClaim.size+bonus)*(hasSeasonPass?2:1);
     setXp(prevXp=>{
       const newXp=prevXp+xpEarned;
       localStorage.setItem("pow_xp",String(newXp));
@@ -1623,16 +1624,14 @@ export default function App(){
         localStorage.setItem("pow_level",String(newLevel));
         setShowLevelUp(newLevel);
         setTimeout(()=>setShowLevelUp(null),4000);
-        // Level up rewards
         const rechargeBonus=500;
         setWarChest(g=>{const next2=g+rechargeBonus;localStorage.setItem("pow_war_chest",String(next2));return next2;});
         pushToast(`🎉 LEVEL UP! You're now Level ${newLevel} ${LEVEL_BADGES[newLevel]||"⭐"} +500💰 gold!`,"#FFD700",6000);
       }
       return newXp;
     });
-    // 1 gold per pixel earned in War Chest
     setWarChest(g=>{const next2=g+xpEarned;localStorage.setItem("pow_war_chest",String(next2));return next2;});
-    const toClaim=new Set(pending);setPending(new Set());
+    setPending(new Set());
     if(isOnline)await dbUpsertPixels(toClaim,active,ACTIVE_SEASON_NUM);else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
     toClaim.forEach(idx=>trackHeatmap(idx));
     trackMission(isRaid?"raid":"claim", toClaim.size+bonus);
