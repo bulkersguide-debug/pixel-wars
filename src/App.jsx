@@ -2360,6 +2360,38 @@ export default function App(){
 
           {/* PURCHASE HISTORY TAB */}
           {paywallTab==="history"&&<div>
+            {/* Pixel Wallet Summary — always shown when logged in */}
+            {user&&<div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.08)",borderRadius:10,padding:"14px",marginBottom:12}}>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#C8FF00",letterSpacing:2,marginBottom:10}}>🏦 PIXEL WALLET</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+                <div style={{background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:8,padding:"10px",textAlign:"center"}}>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#00F5FF"}}>{freePixels}</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.4)",marginTop:3}}>FREE PIXELS</div>
+                </div>
+                <div style={{background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.2)",borderRadius:8,padding:"10px",textAlign:"center"}}>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#FFD700"}}>{warChest}</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.4)",marginTop:3}}>WAR CHEST 💰</div>
+                </div>
+                <div style={{background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:8,padding:"10px",textAlign:"center"}}>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#C8FF00"}}>€{purchases.reduce((a,p)=>a+Number(p.amount_eur||0),0).toFixed(2)}</div>
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.4)",marginTop:3}}>TOTAL SPENT</div>
+                </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                {[
+                  {label:"🎁 Login bonus",value:"+25px",color:"#00FF88"},
+                  {label:"🔥 Daily streak",value:`+${streakData?.days||0} day streak`,color:"#FF4400"},
+                  {label:"⏰ Hourly recharge",value:`+1px/hr (${rechargePixels||0} ready)`,color:"#00F5FF"},
+                  {label:"💳 Purchased",value:`+${purchases.reduce((a,p)=>a+(p.pixels_granted||0),0)}px total`,color:"#C8FF00"},
+                  {label:"⭐ XP Level",value:`Level ${playerLevel} · ${xp} XP`,color:"#FFD700"},
+                ].map(({label,value,color})=>(
+                  <div key={label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 8px",background:"rgba(255,255,255,.02)",borderRadius:5}}>
+                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.5)"}}>{label}</span>
+                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color}}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>}
             {!user?<div style={{textAlign:"center",padding:"30px 0"}}>
               <div style={{fontSize:32,marginBottom:12}}>🔐</div>
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)"}}>Log in with Discord to see your purchase history.</div>
@@ -2367,7 +2399,7 @@ export default function App(){
             :purchasesLoading?<div style={{textAlign:"center",padding:"30px 0"}}>
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.3)",animation:"pulse 1s infinite"}}>⏳ Loading purchases...</div>
             </div>
-            :purchases.length===0?<div style={{textAlign:"center",padding:"30px 0"}}>
+            :purchases.length===0?<div style={{textAlign:"center",padding:"20px 0"}}>
               <div style={{fontSize:32,marginBottom:12}}>🛒</div>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"rgba(255,255,255,.3)",marginBottom:8}}>NO PURCHASES YET</div>
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.2)"}}>Your purchase history will appear here after your first payment.</div>
