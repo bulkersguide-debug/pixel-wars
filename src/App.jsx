@@ -130,6 +130,18 @@ const CANVAS_CHALLENGES=[
   {prompt:"🗺️ Draw a MAP of your fandom's territory",theme:"map"},
 ];
 const SIM_TEAMS=["BTS","Naruto","Fortnite","BLACKPINK","Taylor Swift","Valorant","Attack on Titan","Drake","Minecraft","One Piece"];
+
+// ── WORLD WAR FACTIONS ────────────────────────────────────────────────────────
+const FACTIONS={
+  GAMING:{id:"GAMING",name:"GAMING EMPIRE",icon:"⚔️",color:"#00F5FF",cats:["🎮 Gaming"],desc:"All gaming fandoms united"},
+  ANIME: {id:"ANIME", name:"ANIME ALLIANCE",icon:"🎌",color:"#FF2D78",cats:["🎌 Anime"],desc:"All anime fandoms united"},
+  CULTURE:{id:"CULTURE",name:"CULTURE WAVE",icon:"🌟",color:"#FFD700",cats:["🎵 Music","🎬 TV & Film","⚽ Sports"],desc:"Music, TV & Sports united"},
+};
+const getFaction=(teamId)=>{
+  if(!teamId)return null;
+  const cat=teamId.split("|")[0];
+  return Object.values(FACTIONS).find(f=>f.cats.includes(cat))||FACTIONS.CULTURE;
+};
 const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const RANKS=[{name:"BRONZE",min:0,max:49,icon:"🥉",color:"#CD7F32"},{name:"SILVER",min:50,max:199,icon:"🥈",color:"#C0C0C0"},{name:"GOLD",min:200,max:499,icon:"🥇",color:"#FFD700"},{name:"PLATINUM",min:500,max:999,icon:"💎",color:"#00EAFF"},{name:"DIAMOND",min:1000,max:2499,icon:"💠",color:"#BB88FF"},{name:"LEGEND",min:2500,max:Infinity,icon:"👑",color:"#FF2D78"}];
 const getRank=(px)=>RANKS.find(r=>px>=r.min&&px<=r.max)||RANKS[0];
@@ -244,6 +256,8 @@ export default function App(){
   const [clan,setClan]=useState(()=>{try{return JSON.parse(localStorage.getItem("pow_clan")||"null");}catch{return null;}});
   const [showClanModal,setShowClanModal]=useState(false);
   const [clanInput,setClanInput]=useState("");
+  const [showWorldWar,setShowWorldWar]=useState(false);
+  const [wwLastRaid,setWwLastRaid]=useState(()=>{try{return parseInt(localStorage.getItem("pow_ww_raid")||"0");}catch{return 0;}});
   const [watchingAd,setWatchingAd]=useState(false);
   const [adCooldown,setAdCooldown]=useState(()=>{try{return parseInt(localStorage.getItem("pow_ad_cooldown")||"0");}catch{return 0;}});
   const [showStarterPack,setShowStarterPack]=useState(false);
@@ -1210,7 +1224,12 @@ export default function App(){
     for(let i=0;i<=NS;i++){const p=i*(MM/NS);ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,MM);ctx.stroke();ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(MM,p);ctx.stroke();}
     Object.entries(pixels).forEach(([idxStr,px])=>{if(!px?.t)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle=TM[px.t]?.color||"#888";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
     const now=Date.now();Object.entries(shields).forEach(([idxStr,exp])=>{if(exp<=now)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle="rgba(0,245,255,0.4)";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
-    ctx.strokeStyle="#00F5FF";ctx.lineWidth=1.5;ctx.strokeRect(Math.floor(vx/MMS),Math.floor(vy/MMS),Math.ceil(VW/MMS),Math.ceil(VH/MMS));
+    ctx.strokeStyle="#00F5FF";ctx.lineWidth=1.5;ctx.strokeRect(Math.floor(vx/MMS),Math.floor(vy/MMS),Math.ceil(effVW/MMS),Math.ceil(effVH/MMS));
+    // Faction dominance corners on minimap
+    factionStandings.slice(0,3).forEach((f,i)=>{
+      ctx.fillStyle=f.color+"22";ctx.fillStyle=f.color;ctx.font="bold 7px monospace";ctx.textAlign="left";
+      ctx.fillText(`${f.icon}${Math.round(f.pixels/(factionStandings.reduce((a,b)=>a+b.pixels,0)||1)*100)}%`,2,MM-2-i*9);
+    });
     // Remote activity flashes on minimap
     const now2=Date.now();
     mmFlashRef.current=mmFlashRef.current.filter(f=>now2-f.ts<2000);
@@ -1224,7 +1243,7 @@ export default function App(){
       ctx.strokeStyle=f.color+(Math.round(alpha*255).toString(16).padStart(2,"0"));
       ctx.lineWidth=1;ctx.stroke();
     });
-  },[pixels,shields,unlockedSet,vx,vy,animTick]);
+  },[pixels,shields,unlockedSet,vx,vy,animTick,factionStandings]);
 
   // ── MOUSE ──────────────────────────────────────────────────────────────────
   const mouseToGrid=(e)=>{const rc=cvs.current.getBoundingClientRect(),cx=(e.clientX-rc.left)*CW/rc.width,cy=(e.clientY-rc.top)*CH/rc.height,gx=vx+Math.floor(cx/effCell),gy=vy+Math.floor(cy/effCell);if(gx<0||gx>=GW||gy<0||gy>=GH)return null;return{gx,gy,idx:gy*GW+gx};};
@@ -1560,6 +1579,17 @@ export default function App(){
     return list.sort((a,b)=>{const pa=Object.values(pixels).filter(p=>p?.t===a.id).length;const pb=Object.values(pixels).filter(p=>p?.t===b.id).length;return pb-pa;});
   },[selCat,selSub,q,pixels]);
   const board=useMemo(()=>{const cnt={};Object.values(pixels).forEach(p=>{if(p?.t)cnt[p.t]=(cnt[p.t]||0)+1;});return Object.entries(cnt).map(([id,count])=>({...(TM[id]||{}),id,count,trend:territoryTrend[id]||0})).filter(t=>t.name).sort((a,b)=>b.count-a.count).slice(0,20);},[pixels,territoryTrend]);
+
+  // Faction standings — aggregate pixel counts by faction
+  const factionStandings=useMemo(()=>{
+    const counts={GAMING:0,ANIME:0,CULTURE:0};
+    Object.values(pixels).forEach(p=>{
+      if(!p?.t)return;
+      const f=getFaction(p.t);
+      if(f)counts[f.id]=(counts[f.id]||0)+1;
+    });
+    return Object.values(FACTIONS).map(f=>({...f,pixels:counts[f.id]||0})).sort((a,b)=>b.pixels-a.pixels);
+  },[pixels]);
   const totalSold=Object.keys(pixels).length;
   const at=active?TM[active]:null;
   const modeColor=mode==="BUILD"?"#00F5FF":mode==="RAID"?"#FF4400":"#C8FF00";
@@ -2278,6 +2308,117 @@ export default function App(){
         </div>
       </div>}
 
+      {/* ── WORLD WAR MODAL ──────────────────────────────────────────────────── */}
+      {showWorldWar&&(()=>{
+        const myFaction=active?getFaction(active):null;
+        const totalPx=factionStandings.reduce((a,f)=>a+f.pixels,0)||1;
+        const leader=factionStandings[0];
+        const wwCooldown=5*60*1000; // 5 min between faction raids
+        const canRaid=Date.now()-wwLastRaid>wwCooldown;
+
+        const doFactionRaid=()=>{
+          if(!requireAuth("worldwar"))return;
+          if(!active){pushToast("Select a fandom first!","#FF4400",2000);return;}
+          if(!canRaid){pushToast(`⏳ Faction raid cooling down — ${Math.ceil((wwCooldown-(Date.now()-wwLastRaid))/60000)}min left`,"#FF4400",3000);return;}
+          if(warChest<30){pushToast("Need 30💰 gold for a Faction Raid!","#FFD700",3000);return;}
+          // Steal from enemy factions — find enemy pixels
+          const enemies=Object.entries(pixels).filter(([,v])=>{
+            if(!v?.t||v.t===active)return false;
+            const ef=getFaction(v.t);
+            return ef&&myFaction&&ef.id!==myFaction.id;
+          });
+          if(enemies.length===0){pushToast("No enemy faction pixels nearby!","#FF4400",2000);return;}
+          const targets=enemies.sort(()=>Math.random()-.5).slice(0,30);
+          const now2=Date.now();const next={...pixels};const toUpsert=[];
+          targets.forEach(([idx])=>{next[parseInt(idx)]={t:active,at:now2};toUpsert.push(parseInt(idx));});
+          setPixels(next);
+          if(isOnline)dbUpsertPixels(new Set(toUpsert),active,currentSeasonNum);
+          const newGold=warChest-30;setWarChest(newGold);localStorage.setItem("pow_war_chest",String(newGold));
+          setWwLastRaid(Date.now());localStorage.setItem("pow_ww_raid",String(Date.now()));
+          spawnParticles(myFaction.color,vxRef?.current||vx+90,vyRef?.current||vy+58,25,true);
+          triggerFlash(myFaction.color,true);
+          pushToast(`⚔️ FACTION RAID! ${myFaction.name} stole ${targets.length}px from enemy factions! (${newGold}💰 left)`,"#FF4400",5000);
+          postToDiscord({title:`⚔️ FACTION RAID — ${myFaction.name}!`,description:`**${TM[active]?.name}** launched a Faction Raid for the **${myFaction.name}** (${myFaction.icon})!\n\nStole **${targets.length} pixels** from enemy factions.\n\n**Current Standings:**\n${factionStandings.map((f,i)=>`${["🥇","🥈","🥉"][i]} ${f.icon} ${f.name}: ${f.pixels.toLocaleString()}px (${Math.round(f.pixels/totalPx*100)}%)`).join("\n")}`,color:parseInt(myFaction.color.slice(1),16),url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War World War"},timestamp:new Date().toISOString()});
+        };
+
+        return(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(16px)"}} onClick={()=>setShowWorldWar(false)}>
+          <div style={{background:"rgba(9,9,26,.99)",border:`2px solid ${myFaction?.color||"#FF4400"}55`,borderRadius:20,padding:"24px",width:520,maxWidth:"96vw",maxHeight:"90vh",overflow:"auto",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",boxShadow:`0 0 80px ${myFaction?.color||"#FF4400"}22`}} onClick={e=>e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+              <div>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#FF4400",letterSpacing:3}}>🌍 WORLD WAR</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",marginTop:2}}>3 FACTIONS · PERMANENT · EVERY PIXEL COUNTS</div>
+              </div>
+              <button onClick={()=>setShowWorldWar(false)} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:18}}>✕</button>
+            </div>
+
+            {/* Your faction badge */}
+            {myFaction&&<div style={{background:`${myFaction.color}12`,border:`1px solid ${myFaction.color}44`,borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:24}}>{myFaction.icon}</span>
+              <div>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:myFaction.color}}>{myFaction.name}</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.4)"}}>YOUR FACTION · {myFaction.desc}</div>
+              </div>
+              {myFaction.id===leader?.id&&<div style={{marginLeft:"auto",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#FFD700",animation:"pulse 1s infinite"}}>🥇 LEADING!</div>}
+            </div>}
+
+            {/* Faction standings */}
+            <div style={{marginBottom:16}}>
+              {factionStandings.map((f,i)=>{
+                const pct=Math.round(f.pixels/totalPx*100);
+                const isMe=myFaction?.id===f.id;
+                const gap=i>0?factionStandings[0].pixels-f.pixels:0;
+                return(
+                  <div key={f.id} style={{marginBottom:8}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                      <span style={{fontSize:16}}>{f.icon}</span>
+                      <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:isMe?f.color:"#e0e8ff",flex:1}}>{f.name}{isMe?" (YOU)":""}</span>
+                      <span style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:f.color}}>{f.pixels.toLocaleString()}</span>
+                      <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.3)",width:36,textAlign:"right"}}>{pct}%</span>
+                    </div>
+                    <div style={{height:6,background:"rgba(255,255,255,.06)",borderRadius:3,overflow:"hidden",position:"relative"}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${f.color},${f.color}aa)`,borderRadius:3,transition:"width .8s",boxShadow:`0 0 8px ${f.color}88`}}/>
+                    </div>
+                    {i>0&&gap>0&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.25)",textAlign:"right",marginTop:2}}>-{gap.toLocaleString()}px from #1</div>}
+                    {/* Fandom breakdown */}
+                    <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                      {board.filter(t=>getFaction(t.id)?.id===f.id).slice(0,5).map(t=>(
+                        <span key={t.id} style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:t.color||"#888",background:`${t.color||"#888"}18`,border:`1px solid ${t.color||"#888"}33`,borderRadius:3,padding:"1px 5px"}}>{t.name} {t.count}px</span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Faction Raid button */}
+            {myFaction&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <button onClick={doFactionRaid} disabled={!canRaid||warChest<30||!active} style={{width:"100%",padding:"14px",background:(!canRaid||warChest<30||!active)?"rgba(255,255,255,.05)":`linear-gradient(90deg,${myFaction.color}44,${myFaction.color}22)`,border:`1px solid ${(!canRaid||warChest<30||!active)?"rgba(255,255,255,.1)":myFaction.color+"66"}`,borderRadius:10,cursor:(!canRaid||warChest<30||!active)?"default":"pointer",fontFamily:"'Orbitron',monospace",fontSize:11,color:(!canRaid||warChest<30||!active)?"rgba(255,255,255,.3)":myFaction.color,fontWeight:900,letterSpacing:1}}>
+                {!active?"SELECT A FANDOM FIRST":warChest<30?`NEED 30💰 GOLD (have ${warChest})`:`⚔️ FACTION RAID — STEAL 30px FOR ${myFaction.name} (30💰)`}
+              </button>
+              {!canRaid&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",textAlign:"center"}}>
+                ⏳ Next raid in {Math.ceil((wwCooldown-(Date.now()-wwLastRaid))/60000)} minutes
+              </div>}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+                {Object.values(FACTIONS).map(f=>(
+                  <div key={f.id} style={{background:`${f.color}08`,border:`1px solid ${f.color}22`,borderRadius:7,padding:"8px",textAlign:"center"}}>
+                    <div style={{fontSize:18,marginBottom:3}}>{f.icon}</div>
+                    <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:f.color,lineHeight:1.3}}>{f.cats.join(", ")}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.2)",textAlign:"center"}}>
+                Faction is auto-assigned by fandom category · Costs 30💰 War Chest gold · 5min cooldown · Posted to Discord
+              </div>
+            </div>}
+            {!myFaction&&<div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)",textAlign:"center",padding:"20px"}}>Select a fandom to join a faction and participate in the World War!</div>}
+          </div>
+        </div>
+        );
+      })()}
+
       {/* ── CANVAS CHALLENGE MODAL ──────────────────────────────────────────── */}
       {showCanvasChallenge&&canvasChallenge&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(12px)"}} onClick={()=>setShowCanvasChallenge(false)}>
         <div style={{background:"rgba(9,9,26,.98)",border:"2px solid rgba(255,45,120,.4)",borderRadius:20,padding:"28px",width:460,maxWidth:"96vw",animation:"pop .4s cubic-bezier(.34,1.56,.64,1)",boxShadow:"0 0 60px rgba(255,45,120,.15)"}} onClick={e=>e.stopPropagation()}>
@@ -2620,6 +2761,14 @@ export default function App(){
           <div style={{display:"flex",alignItems:"center",gap:5,background:rgba(myRank.color,.07),border:`1px solid ${rgba(myRank.color,.25)}`,borderRadius:7,padding:"4px 9px"}}>
             <span style={{fontSize:13}}>{myRank.icon}</span><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:myRank.color}}>{myRank.name}</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{myPixels}px</div></div>
           </div>
+          {/* Faction badge */}
+          {active&&(()=>{const f=getFaction(active);if(!f)return null;return(
+            <div onClick={()=>setShowWorldWar(true)} style={{display:"flex",alignItems:"center",gap:4,background:`${f.color}10`,border:`1px solid ${f.color}44`,borderRadius:7,padding:"4px 9px",cursor:"pointer"}} title={f.name}>
+              <span style={{fontSize:12}}>{f.icon}</span>
+              <div><div style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:f.color}}>{f.id}</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{(factionStandings.find(fs=>fs.id===f.id)?.pixels||0).toLocaleString()}px</div></div>
+            </div>
+          );})()}
           {/* XP Level badge */}
           {user&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,215,0,.07)",border:"1px solid rgba(255,215,0,.25)",borderRadius:7,padding:"4px 9px",cursor:"pointer",position:"relative"}} title={`XP: ${xp} | Next level: ${xpForLevel(playerLevel+1)} XP`}>
             <span style={{fontSize:12}}>{LEVEL_BADGES[playerLevel]||"⭐"}</span>
@@ -2738,6 +2887,7 @@ export default function App(){
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <button onClick={()=>setShowHeatmap(s=>!s)} style={{background:showHeatmap?"rgba(255,100,0,.2)":"rgba(255,100,0,.05)",border:`1px solid ${showHeatmap?"rgba(255,100,0,.6)":"rgba(255,100,0,.2)"}`,borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF6422",letterSpacing:1,transition:"all .15s"}}>{showHeatmap?"HIDE":"🔥 HEATMAP"}</button>
           <button onClick={()=>setShowLiveBattle(true)} style={{background:"rgba(255,68,0,.15)",border:"1px solid rgba(255,68,0,.5)",borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"#FF4400",letterSpacing:1,animation:"pulse 2s infinite"}}>⚡ LIVE BATTLE</button>
+          <button onClick={()=>setShowWorldWar(true)} style={{background:"rgba(255,68,0,.12)",border:"1px solid rgba(255,100,0,.45)",borderRadius:5,padding:"2px 9px",cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF6600",letterSpacing:1,fontWeight:900}}>🌍 WORLD WAR</button>
           <button onClick={()=>{
             // Random Sector — pan to a random active sector
             const activeSectors=sectorLeaderboard.filter(s=>s.total>10);
