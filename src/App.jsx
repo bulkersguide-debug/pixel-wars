@@ -915,7 +915,20 @@ export default function App(){
     // Listen for auth changes
     const{data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
       setUser(session?.user||null);
-      if(session?.user)loadProfile(session.user.id);
+      if(session?.user){
+        loadProfile(session.user.id);
+        // Reload pixels from Supabase after login to prevent disappearing pixels on refresh
+        if(_event==="SIGNED_IN"||_event==="TOKEN_REFRESHED"){
+          setTimeout(async()=>{
+            try{
+              const dbSeason=await dbLoadSeason();
+              const sNum=dbSeason?.num||1;
+              const px=await dbLoadPixels(sNum);
+              if(px&&Object.keys(px).length>0)setPixels(px);
+            }catch(e){console.error("Pixel reload error:",e);}
+          },2000);
+        }
+      }
       else setProfile(null);
     });
     return()=>subscription.unsubscribe();
@@ -938,6 +951,23 @@ export default function App(){
         if(sub)await saveSubscription(sub);
       }).catch(()=>{});
     }
+    // Record login bonus if first time (no purchase record exists)
+    setTimeout(async()=>{
+      const{data:existing}=await supabase.from("purchases")
+        .select("id").eq("user_id",userId).eq("product_id","login_bonus").limit(1);
+      if(!existing||existing.length===0){
+        await supabase.from("purchases").insert({
+          user_id:userId,
+          discord_username:data?.username||"player",
+          product_id:"login_bonus",
+          pixels_granted:25,
+          amount_eur:0,
+          stripe_session_id:`login_bonus_${userId}`,
+          fandom:"none",
+          created_at:new Date().toISOString(),
+        }).then(()=>{}).catch(()=>{});
+      }
+    },2000);
   };
 
   // Sync free pixels to Supabase
@@ -1312,18 +1342,6 @@ export default function App(){
     Object.entries(pixels).forEach(([idxStr,px])=>{if(!px?.t)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle=TM[px.t]?.color||"#888";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
     const now=Date.now();Object.entries(shields).forEach(([idxStr,exp])=>{if(exp<=now)return;const idx=parseInt(idxStr),gx=idx%GW,gy=Math.floor(idx/GW);ctx.fillStyle="rgba(0,245,255,0.4)";ctx.fillRect(Math.floor(gx/MMS),Math.floor(gy/MMS),1,1);});
     ctx.strokeStyle="#00F5FF";ctx.lineWidth=1.5;ctx.strokeRect(Math.floor(vx/MMS),Math.floor(vy/MMS),Math.ceil(VW/MMS),Math.ceil(VH/MMS));
-    // Faction dominance on minimap — safe check
-    try{
-      const fs=Object.values(FACTIONS).map(f=>{
-        const cnt=Object.values(pixels).filter(p=>p?.t&&getFaction(p.t)?.id===f.id).length;
-        return{...f,pixels:cnt};
-      }).sort((a,b)=>b.pixels-a.pixels);
-      const tot=fs.reduce((a,b)=>a+b.pixels,0)||1;
-      fs.forEach((f,i)=>{
-        ctx.fillStyle=f.color;ctx.font="bold 7px monospace";ctx.textAlign="left";
-        ctx.fillText(`${f.icon}${Math.round(f.pixels/tot*100)}%`,2,MM-2-i*9);
-      });
-    }catch{}
     // Remote activity flashes on minimap
     const now2=Date.now();
     mmFlashRef.current=mmFlashRef.current.filter(f=>now2-f.ts<2000);
