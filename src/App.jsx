@@ -345,11 +345,29 @@ export default function App(){
     if(!user?.id)return;
     setPurchasesLoading(true);
     try{
-      const{data}=await supabase.from("purchases").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(20);
+      const{data}=await supabase.from("purchases").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(50);
       if(data)setPurchases(data);
     }catch(e){console.error("purchases fetch:",e);}
     finally{setPurchasesLoading(false);}
   },[user]);
+
+  // Record any pixel grant to purchases table for wallet history
+  const recordPixelGrant=useCallback(async(productId,pixels,amountEur=0,label=null)=>{
+    if(!user?.id)return;
+    try{
+      const sessionId=`free_${productId}_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+      await supabase.from("purchases").insert({
+        user_id:user.id,
+        discord_username:user?.user_metadata?.full_name||user?.user_metadata?.name||"player",
+        product_id:productId,
+        pixels_granted:pixels,
+        amount_eur:amountEur,
+        stripe_session_id:sessionId,
+        fandom:active?TM[active]?.name||"none":"none",
+        created_at:new Date().toISOString(),
+      });
+    }catch(e){console.error("recordPixelGrant error:",e);}
+  },[user,active]);
 
   // ── STRIPE CHECKOUT ──────────────────────────────────────────────────────────
   const STRIPE_PK="pk_live_51TXp5DJ6WZdD3UBmyp9194J1r8WvXbcUCmU6Nlhw5vRWL8M5d4y46LrH98qZoLyhdCLzHrl6Bx0tcU9VPTObcjYJ0058NAhaZF";
@@ -812,7 +830,7 @@ export default function App(){
     openDailyModal();
   };
 
-  const claimDaily=()=>{if(!dailyInfo||alreadyClaimedToday)return;const today=todayStr();const ns={days:dailyInfo.days,last:today,total:(streakData.total||0)+1};setStreakData(ns);localStorage.setItem("pow_streak",JSON.stringify(ns));syncFreePixels(freePixels+dailyInfo.reward.px);pushToast(`🎁 +${dailyInfo.reward.px} FREE PIXELS!`,"#FFD700",5000);if(dailyInfo.reward.bonus)setTimeout(()=>pushToast(dailyInfo.reward.bonus,"#FF2D78",4000),800);setDailyInfo(null);setShowDaily(false);};
+  const claimDaily=()=>{if(!dailyInfo||alreadyClaimedToday)return;const today=todayStr();const ns={days:dailyInfo.days,last:today,total:(streakData.total||0)+1};setStreakData(ns);localStorage.setItem("pow_streak",JSON.stringify(ns));syncFreePixels(freePixels+dailyInfo.reward.px);recordPixelGrant(`daily_streak_day_${dailyInfo.days}`,dailyInfo.reward.px,0,`Daily Streak Day ${dailyInfo.days}`);pushToast(`🎁 +${dailyInfo.reward.px} FREE PIXELS!`,"#FFD700",5000);if(dailyInfo.reward.bonus)setTimeout(()=>pushToast(dailyInfo.reward.bonus,"#FF2D78",4000),800);setDailyInfo(null);setShowDaily(false);};
   const openDailyModal=()=>{if(alreadyClaimedToday)pushToast("✅ Already claimed!","#FFD700",3000);else setShowDaily(true);};
 
   const startNewSeason=async()=>{
@@ -1047,6 +1065,7 @@ export default function App(){
       saveMissions(next);return next;
     });
     const nf=freePixels+mission.reward;syncFreePixels(nf);
+    recordPixelGrant(`mission_${mission.id}`,mission.reward,0,`Mission: ${mission.label||"Complete"}`);
     pushToast(`🎯 MISSION COMPLETE! +${mission.reward} free pixels!`,"#FFD700",5000);
   };
   const pendingMissionCount=MISSIONS.filter(m=>{const p=missionProgress[m.id];const cur=m.id==="login7"?streakData.days:(p?.count||0);return cur>=m.goal&&!p?.claimed;}).length;
@@ -2019,6 +2038,7 @@ export default function App(){
             if([3,7,14,30].includes(newDays)){
               const bonus=newDays>=30?20:newDays>=14?10:newDays>=7?5:3;
               syncFreePixels(freePixels+bonus);
+              recordPixelGrant(`live_battle_streak_${newDays}d`,bonus,0,`Live Battle ${newDays}-Day Streak`);
               pushToast(`🏆 ${newDays}-day Live Battle streak! +${bonus} free pixels!`,"#FFD700",5000);
             }
           }
@@ -2064,6 +2084,7 @@ export default function App(){
           // Grant bonus pixels if player's fandom won
           if(leader===active&&user){
             syncFreePixels(freePixels+5);
+            recordPixelGrant("live_battle_win",5,0,"Live Battle Win");
             pushToast(`🏆 ${winnerName} WON the Live Battle! +5 free pixels!`,"#FFD700",8000);
           }
           // Discord announcement
@@ -2348,6 +2369,7 @@ export default function App(){
                   setAdCooldown(cooldown);
                   localStorage.setItem("pow_ad_cooldown",String(cooldown));
                   syncFreePixels(freePixels+5);
+                  recordPixelGrant("rewarded_ad",5,0,"Watched Ad");
                   pushToast("✅ +5 free pixels earned! Thanks for watching.","#00FF88",4000);
                   setShowPaywall(false);
                 },3000);
@@ -2360,48 +2382,93 @@ export default function App(){
 
           {/* PURCHASE HISTORY TAB */}
           {paywallTab==="history"&&<div>
-            {/* Pixel Wallet Summary — always shown when logged in */}
-            {user&&<div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.08)",borderRadius:10,padding:"14px",marginBottom:12}}>
-              <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#C8FF00",letterSpacing:2,marginBottom:10}}>🏦 PIXEL WALLET</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-                <div style={{background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:8,padding:"10px",textAlign:"center"}}>
-                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#00F5FF"}}>{freePixels}</div>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.4)",marginTop:3}}>FREE PIXELS</div>
-                </div>
-                <div style={{background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.2)",borderRadius:8,padding:"10px",textAlign:"center"}}>
-                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#FFD700"}}>{warChest}</div>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.4)",marginTop:3}}>WAR CHEST 💰</div>
-                </div>
-                <div style={{background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:8,padding:"10px",textAlign:"center"}}>
-                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#C8FF00"}}>€{purchases.reduce((a,p)=>a+Number(p.amount_eur||0),0).toFixed(2)}</div>
-                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.4)",marginTop:3}}>TOTAL SPENT</div>
-                </div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                {[
-                  {label:"🎁 Login bonus",value:"+25px",color:"#00FF88"},
-                  {label:"🔥 Daily streak",value:`+${streakData?.days||0} day streak`,color:"#FF4400"},
-                  {label:"⏰ Hourly recharge",value:`+1px/hr (${rechargePixels||0} ready)`,color:"#00F5FF"},
-                  {label:"💳 Purchased",value:`+${purchases.reduce((a,p)=>a+(p.pixels_granted||0),0)}px total`,color:"#C8FF00"},
-                  {label:"⭐ XP Level",value:`Level ${playerLevel} · ${xp} XP`,color:"#FFD700"},
-                ].map(({label,value,color})=>(
-                  <div key={label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 8px",background:"rgba(255,255,255,.02)",borderRadius:5}}>
-                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.5)"}}>{label}</span>
-                    <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color}}>{value}</span>
+            {/* Pixel Wallet Summary */}
+            {user&&(()=>{
+              const purchasedPx=purchases.reduce((a,p)=>a+(p.pixels_granted||0),0);
+              const totalSpent=purchases.reduce((a,p)=>a+Number(p.amount_eur||0),0);
+              const loginPx=25;
+              const streakPx=streakData?.total||0;
+              const totalEverReceived=loginPx+streakPx+purchasedPx+(xp||0);
+              const walletItems=[
+                {icon:"🎁",label:"Login bonus",px:loginPx,color:"#00FF88",date:"First login"},
+                {icon:"🔥",label:`Daily streak (${streakData?.days||0} day streak)`,px:Math.min(streakData?.total||0,50),color:"#FF4400",date:"Daily"},
+                {icon:"⏰",label:"Hourly recharge",px:rechargePixels||0,color:"#00F5FF",date:"Accumulating"},
+                ...purchases.map(p=>{
+                  const names={trial:"Trial Pack",small:"Small Bundle",medium:"Medium Bundle",large:"Large Bundle",mega:"Mega Bundle",whale:"Whale Pack",season_pass:"Season Pass",starter:"Starter Pack",rewarded_ad:"Watched Ad",live_battle_win:"Live Battle Win",live_battle_streak_3d:"Live Battle 3-Day Streak",live_battle_streak_7d:"Live Battle 7-Day Streak",live_battle_streak_14d:"Live Battle 14-Day Streak",live_battle_streak_30d:"Live Battle 30-Day Streak"};
+                  const icons={trial:"💳",small:"💳",medium:"💳",large:"💳",mega:"💳",whale:"👑",season_pass:"🏆",starter:"🎁",rewarded_ad:"🎬",live_battle_win:"⚡",live_battle_streak_3d:"🔥",live_battle_streak_7d:"🔥",live_battle_streak_14d:"🔥",live_battle_streak_30d:"🔥"};
+                  const isMission=p.product_id?.startsWith("mission_");
+                  const isStreak=p.product_id?.startsWith("daily_streak_");
+                  return{
+                    icon:isMission?"🎯":isStreak?"📅":(icons[p.product_id]||"💰"),
+                    label:isMission?`Mission: ${p.product_id.replace("mission_","").replace(/_/g," ")}`:isStreak?`Daily Streak Day ${p.product_id.replace("daily_streak_day_","")}`:( names[p.product_id]||p.product_id?.replace(/_/g," ")||"Reward"),
+                    px:p.pixels_granted,
+                    color:Number(p.amount_eur)>0?"#C8FF00":"#00FF88",
+                    date:new Date(p.created_at).toLocaleDateString("en-GB",{day:"2-digit",month:"short"}),
+                    amount:Number(p.amount_eur)>0?`€${Number(p.amount_eur).toFixed(2)}`:null,
+                  };
+                }),
+              ].filter(i=>i.px>0);
+
+              return(
+                <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.08)",borderRadius:10,padding:"14px",marginBottom:12}}>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,color:"#C8FF00",letterSpacing:2,marginBottom:10}}>🏦 PIXEL WALLET</div>
+
+                  {/* Big total */}
+                  <div style={{background:"linear-gradient(90deg,rgba(0,245,255,.1),rgba(200,255,0,.05))",border:"1px solid rgba(0,245,255,.25)",borderRadius:10,padding:"14px",textAlign:"center",marginBottom:10}}>
+                    <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.4)",letterSpacing:2,marginBottom:4}}>TOTAL PIXELS EVER RECEIVED</div>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:32,fontWeight:900,color:"#00F5FF"}}>{freePixels+myPixels}</div>
+                    <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:8}}>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#C8FF00"}}>{freePixels}</div>
+                        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)"}}>FREE LEFT</div>
+                      </div>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FF2D78"}}>{myPixels}</div>
+                        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)"}}>ON GRID</div>
+                      </div>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700"}}>€{totalSpent.toFixed(2)}</div>
+                        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)"}}>SPENT</div>
+                      </div>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:900,color:"#FFD700"}}>{warChest}💰</div>
+                        <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.3)"}}>WAR CHEST</div>
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>}
+
+                  {/* Itemized list */}
+                  <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)",marginBottom:6,letterSpacing:1}}>PIXEL SOURCES — ALL TIME</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                    {walletItems.map((item,i)=>(
+                      <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:i%2===0?"rgba(255,255,255,.02)":"transparent",borderRadius:6}}>
+                        <span style={{fontSize:14,flexShrink:0}}>{item.icon}</span>
+                        <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.55)",flex:1}}>{item.label}</span>
+                        {item.date&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)"}}>{item.date}</span>}
+                        {item.amount&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,215,0,.6)"}}>{item.amount}</span>}
+                        <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:item.color,flexShrink:0}}>+{item.px}px</span>
+                      </div>
+                    ))}
+                    {/* Running total row */}
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",background:"rgba(200,255,0,.05)",border:"1px solid rgba(200,255,0,.2)",borderRadius:6,marginTop:4}}>
+                      <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:"#C8FF00"}}>TOTAL RECEIVED</span>
+                      <span style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#C8FF00"}}>+{walletItems.reduce((a,i)=>a+i.px,0)}px</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             {!user?<div style={{textAlign:"center",padding:"30px 0"}}>
               <div style={{fontSize:32,marginBottom:12}}>🔐</div>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)"}}>Log in with Discord to see your purchase history.</div>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)"}}>Log in with Discord to see your pixel wallet.</div>
             </div>
-            :purchasesLoading?<div style={{textAlign:"center",padding:"30px 0"}}>
-              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.3)",animation:"pulse 1s infinite"}}>⏳ Loading purchases...</div>
+            :purchasesLoading?<div style={{textAlign:"center",padding:"20px 0"}}>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.3)",animation:"pulse 1s infinite"}}>⏳ Loading...</div>
             </div>
-            :purchases.length===0?<div style={{textAlign:"center",padding:"20px 0"}}>
-              <div style={{fontSize:32,marginBottom:12}}>🛒</div>
-              <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"rgba(255,255,255,.3)",marginBottom:8}}>NO PURCHASES YET</div>
+            :purchases.length===0?<div style={{textAlign:"center",padding:"16px 0"}}>
+              <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.2)"}}>No paid purchases yet — your free pixels are listed above.</div>
+              <button onClick={()=>setPaywallTab("bundles")} style={{marginTop:12,padding:"10px 20px",background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.3)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#C8FF00",fontWeight:900}}>💰 BUY PIXELS →</button>
+            </div>
               <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:"rgba(255,255,255,.2)"}}>Your purchase history will appear here after your first payment.</div>
               <button onClick={()=>setPaywallTab("bundles")} style={{marginTop:16,padding:"10px 20px",background:"rgba(200,255,0,.1)",border:"1px solid rgba(200,255,0,.3)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#C8FF00",fontWeight:900}}>💰 BUY PIXELS →</button>
             </div>
