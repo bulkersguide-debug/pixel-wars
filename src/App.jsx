@@ -214,6 +214,7 @@ export default function App(){
 
   // New feature state
   const [onlineCount,setOnlineCount]=useState(1);
+  const [botOnlineCount,setBotOnlineCount]=useState(0);
   const [showHeatmap,setShowHeatmap]=useState(false);
   const [heatmapTick,setHeatmapTick]=useState(0);
   const [animTick,setAnimTick]=useState(0);
@@ -651,33 +652,24 @@ export default function App(){
   async function setupPresence(){
     if(!supabase)return;
 
-    // Set bot count immediately on load — don't wait for presence
-    try{
-      const{data}=await supabase.from("bot_presence").select("username,fandom").eq("is_online",true);
-      const bots=data||[];
-      setOnlineCount(1+bots.length); // 1 = current player + bots
-      const byFandom={};
-      bots.forEach(b=>{if(b.fandom)byFandom[b.fandom]=(byFandom[b.fandom]||0)+1;});
-      setOnlineByFandom(byFandom);
-    }catch{}
-
-    // Presence channel — track real players
-    const ch=supabase.channel("online-users",{config:{presence:{key:Math.random().toString(36).slice(2)}}});
-    ch.on("presence",{event:"sync"},async()=>{
-      const st=ch.presenceState();
-      const real=Math.max(1,Object.keys(st).length);
-      // Always re-fetch bots on each sync
-      try{
-        const{data}=await supabase.from("bot_presence").select("username,fandom").eq("is_online",true);
+    // Load bot count into separate state — never overwritten by presence
+    supabase.from("bot_presence").select("username,fandom").eq("is_online",true)
+      .then(({data})=>{
         const bots=data||[];
-        setOnlineCount(real+bots.length);
+        setBotOnlineCount(bots.length);
         const byFandom={};
-        Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
         bots.forEach(b=>{if(b.fandom)byFandom[b.fandom]=(byFandom[b.fandom]||0)+1;});
-        setOnlineByFandom(byFandom);
-      }catch{
-        setOnlineCount(real);
-      }
+        setOnlineByFandom(prev=>({...prev,...byFandom}));
+      }).catch(()=>{});
+
+    // Presence only tracks real players
+    const ch=supabase.channel("online-users",{config:{presence:{key:Math.random().toString(36).slice(2)}}});
+    ch.on("presence",{event:"sync"},()=>{
+      const st=ch.presenceState();
+      setOnlineCount(Math.max(1,Object.keys(st).length));
+      const byFandom={};
+      Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
+      setOnlineByFandom(prev=>({...prev,...byFandom}));
     }).subscribe(async(status)=>{if(status==="SUBSCRIBED")await ch.track({t:Date.now(),fandom:null});});
     presenceRef.current=ch;
   }
@@ -3139,7 +3131,7 @@ export default function App(){
             S{season.num} · {currentTheme.icon} {currentTheme.name}
             <span style={{width:5,height:5,borderRadius:"50%",background:isOnline?"#00FF88":"#FF4400",display:"inline-block",animation:isOnline?"pulse 2s infinite":undefined}}/>
             <span style={{color:isOnline?"#00FF88":"#FF4400"}}>{isOnline?"LIVE":"OFFLINE"}</span>
-            <span style={{color:onlineCount>1?"#00FF88":"rgba(0,255,136,.4)",fontWeight:onlineCount>1?900:400,animation:onlineCount>1?"pulse 1.5s infinite":undefined}}>· {onlineCount>1?`⚔️ ${onlineCount} WARRIORS ONLINE`:`🟢 ${onlineCount} online`}</span>
+            <span style={{color:(onlineCount+botOnlineCount)>1?"#00FF88":"rgba(0,255,136,.4)",fontWeight:(onlineCount+botOnlineCount)>1?900:400,animation:(onlineCount+botOnlineCount)>1?"pulse 1.5s infinite":undefined}}>· {(onlineCount+botOnlineCount)>1?`⚔️ ${onlineCount+botOnlineCount} WARRIORS ONLINE`:`🟢 ${onlineCount+botOnlineCount} online`}</span>
             {totalPlayers>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a"}}>· {totalPlayers} joined</span>}
           </div>
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 FANDOMS</button>
@@ -3894,7 +3886,7 @@ export default function App(){
             {(1-seasonDaysLeft/SEASON_DAYS)>=0.1&&<div style={{height:3,background:"#1a1a2e",borderRadius:2,overflow:"hidden",marginBottom:3}}>
               <div style={{height:"100%",width:`${(1-seasonDaysLeft/SEASON_DAYS)*100}%`,background:"linear-gradient(90deg,#FFD700,#FF4400)",borderRadius:2,transition:"width 1s"}}/>
             </div>}
-            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)"}}>🟢 {onlineCount} online · {unlockedSectors.length}/400 sectors</div>
+            <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.2)"}}>🟢 {onlineCount+botOnlineCount} online · {unlockedSectors.length}/400 sectors</div>
           </div>
 
           <div onClick={gatedOpenDaily} style={{margin:"4px 5px 0",padding:"4px 8px",background:"rgba(255,215,0,.04)",border:"1px solid rgba(255,215,0,.12)",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
