@@ -1003,18 +1003,7 @@ export default function App(){
       if(session?.user){
         loadProfile(session.user.id);
         // Reload pixels from Supabase after login to prevent disappearing pixels on refresh
-        if(_event==="SIGNED_IN"||_event==="TOKEN_REFRESHED"){
-          setTimeout(async()=>{
-            try{
-              const dbSeason=await dbLoadSeason();
-              const sNum=dbSeason?.num||1;
-              ACTIVE_SEASON_NUM=sNum;
-              const px=await dbLoadPixels(sNum);
-              if(px&&Object.keys(px).length>0)setPixels(px);
-            }catch(e){console.error("Pixel reload error:",e);}
-          },2000);
-        }
-      }
+              }
       else setProfile(null);
     });
     return()=>subscription.unsubscribe();
