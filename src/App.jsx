@@ -1569,8 +1569,14 @@ export default function App(){
     setTimeout(()=>setSectorZoom(null),8000);
   };
   const rs=(x1,y1,x2,y2)=>{const s=new Set(),now=Date.now();for(let gy=Math.min(y1,y2);gy<=Math.max(y1,y2);gy++)for(let gx=Math.min(x1,x2);gx<=Math.max(x1,x2);gx++){const idx=gy*GW+gx;const sx=Math.floor(gx/SECTOR),sy=Math.floor(gy/SECTOR);if(!unlockedSet.has(sectorKey(sx,sy)))continue;const isShielded=shields[idx]&&shields[idx]>now;if(mode==="RAID"&&pixels[idx]&&isAllied(pixels[idx].t))continue;if(mode==="BUILD"?!pixels[idx]:(pixels[idx]&&pixels[idx].t!==active&&!isShielded))s.add(idx);}return s;};
+  const panRef=useRef(null);
+
   const onMD=(e)=>{
-    if(!active||mode==="SHOP")return;
+    // If no fandom selected — pan the map
+    if(!active||mode==="SHOP"){
+      panRef.current={x:e.clientX,y:e.clientY};
+      return;
+    }
     const g=mouseToGrid(e);if(!g)return;
     const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);
     if(!unlockedSet.has(sectorKey(sx,sy))){pushToast("🔒 Locked! Fill the center sectors first.","#FF4400",3000);return;}
@@ -1580,7 +1586,19 @@ export default function App(){
     const ok=mode==="BUILD"?!pixels[g.idx]:(pixels[g.idx]&&pixels[g.idx].t!==active&&!isShielded&&!allyBlock);
     setPending(ok?new Set([g.idx]):new Set());
   };
-  const onMM_h=(e)=>{const g=mouseToGrid(e);if(g){setHov(pixels[g.idx]?TM[pixels[g.idx].t]:null);const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);setHovSector({sx,sy,unlocked:unlockedSet.has(sectorKey(sx,sy)),fill:sectorFills[sectorKey(sx,sy)]||0});}if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}};
+  const onMM_h=(e)=>{
+    // Pan map if no fandom selected
+    if(panRef.current){
+      const dx=Math.round((panRef.current.x-e.clientX)/effCell);
+      const dy=Math.round((panRef.current.y-e.clientY)/effCell);
+      if(dx!==0||dy!==0){
+        pan(dx,dy);
+        panRef.current={x:e.clientX,y:e.clientY};
+      }
+      return;
+    }
+    const g=mouseToGrid(e);if(g){setHov(pixels[g.idx]?TM[pixels[g.idx].t]:null);const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);setHovSector({sx,sy,unlocked:unlockedSet.has(sectorKey(sx,sy)),fill:sectorFills[sectorKey(sx,sy)]||0});}if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}
+  };
   const triggerFlash=(color,shake=false)=>{setFlashColor(color);setTimeout(()=>setFlashColor(null),300);if(shake){setShakeCanvas(true);setTimeout(()=>setShakeCanvas(false),500);}};
   const isFortified=(sx,sy)=>fortifiedSectors.some(([fx,fy])=>fx===sx&&fy===sy);
   const isThemeFandom=(teamId)=>weeklyTheme.cat==="ALL"||teamId?.startsWith(weeklyTheme.cat)||TM[teamId]?.cat===weeklyTheme.cat;
@@ -1657,6 +1675,7 @@ export default function App(){
     setShowConfirm(true);
   };
   const onMU=()=>{
+    panRef.current=null;
     setDrag(false);
     if(surgeMode&&pending.size>0){
       // Surge: only keep pixels connected to existing territory (BFS flood fill)
@@ -1705,7 +1724,7 @@ export default function App(){
     }
     setOrig(null);
   };
-  const onML=()=>{setHov(null);setHovSector(null);if(drag){setDrag(false);if(pending.size>0)requestClaim();}};
+  const onML=()=>{panRef.current=null;setHov(null);setHovSector(null);if(drag){setDrag(false);if(pending.size>0)requestClaim();}};
 
   // ── AUTH GATE ─────────────────────────────────────────────────────────────
   const requireAuth=(reason="join")=>{
@@ -3519,7 +3538,7 @@ export default function App(){
             <div className={gridFullscreen?"pow-canvas-wrap-fs":""} style={gridFullscreen?{}:{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 20px ${rgba(at?.color||modeColor,.1)}`}}>
               <canvas ref={cvs} width={CW} height={CH}
                 className={gridFullscreen?"pow-canvas-fs":""}
-                style={gridFullscreen?{}:{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"40vw",touchAction:"none",cursor:active&&mode!=="SHOP"?"crosshair":"default"}}
+                style={gridFullscreen?{}:{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"40vw",touchAction:"none",cursor:active&&mode!=="SHOP"?"crosshair":"grab"}}
                 onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML}
                 onDragStart={e=>e.preventDefault()}
                 onDoubleClick={()=>setGridFullscreen(f=>!f)}
@@ -3758,7 +3777,7 @@ export default function App(){
 
           {/* CANVAS */}
           <div style={{padding:"5px 5px 0",flexShrink:0}}>
-            <div style={{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"default",position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 30px ${rgba(at?.color||modeColor,.12)},0 0 60px ${rgba(at?.color||modeColor,.06)},inset 0 0 30px rgba(0,0,0,.3)`}}>
+            <div style={{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"grab",position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 30px ${rgba(at?.color||modeColor,.12)},0 0 60px ${rgba(at?.color||modeColor,.06)},inset 0 0 30px rgba(0,0,0,.3)`}}>
               <canvas ref={cvs} width={CW} height={CH} style={{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:isMobile?"45vw":"38vh",touchAction:"none"}}
                 onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onDragStart={e=>e.preventDefault()}
                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}/>
