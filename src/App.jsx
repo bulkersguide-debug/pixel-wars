@@ -634,7 +634,7 @@ export default function App(){
         }
         const[als,ws,ms]=await Promise.all([dbLoadAlliances(sNum),dbLoadWars(sNum),dbLoadMiniSeason(sNum)]);
         setAlliances(als);setWars(ws);setMiniSeason(ms);
-        setupRealtime(sNum);setupPresence();
+        setupRealtime(sNum);await setupPresence();
         pushToast("🌐 MULTIPLAYER ACTIVE","#00F5FF",4000);
       }else{
         try{const px=JSON.parse(localStorage.getItem("pw2k_v2")||"{}");setPixels(px);const se=JSON.parse(localStorage.getItem("pow_season")||`{"num":1,"startDate":"${new Date().toISOString()}","theme":0,"winners":[]}`);setSeason(se);const sec=JSON.parse(localStorage.getItem("pow_sectors")||JSON.stringify(INIT_SECTORS));setUnlockedSectors(sec);}catch{}
@@ -648,43 +648,45 @@ export default function App(){
 
   const [onlineByFandom,setOnlineByFandom]=useState({});
 
-  function setupPresence(){
+  async function setupPresence(){
     if(!supabase)return;
-    const ch=supabase.channel("online-users",{config:{presence:{key:Math.random().toString(36).slice(2)}}});
+
+    // Load bot cache FIRST before any presence events fire
     let botCache=[];
+    try{
+      const{data}=await supabase.from("bot_presence").select("username,fandom").eq("is_online",true);
+      botCache=data||[];
+    }catch{}
 
-    // Load bots once immediately
-    supabase.from("bot_presence").select("username,fandom").eq("is_online",true)
-      .then(({data})=>{
-        botCache=data||[];
-        const st=ch.presenceState();
-        const real=Math.max(1,Object.keys(st).length);
-        setOnlineCount(real+botCache.length);
-        const byFandom={};
-        Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
-        botCache.forEach(b=>{if(b.fandom)byFandom[b.fandom]=(byFandom[b.fandom]||0)+1;});
-        setOnlineByFandom(byFandom);
-      }).catch(()=>{});
+    const ch=supabase.channel("online-users",{config:{presence:{key:Math.random().toString(36).slice(2)}}});
 
-    ch.on("presence",{event:"sync"},()=>{
-      const st=ch.presenceState();
+    const updateCounts=(st)=>{
       const real=Math.max(1,Object.keys(st).length);
       setOnlineCount(real+botCache.length);
       const byFandom={};
       Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
       botCache.forEach(b=>{if(b.fandom)byFandom[b.fandom]=(byFandom[b.fandom]||0)+1;});
       setOnlineByFandom(byFandom);
-    }).subscribe(async(status)=>{if(status==="SUBSCRIBED")await ch.track({t:Date.now(),fandom:null});});
+    };
+
+    ch.on("presence",{event:"sync"},()=>{
+      updateCounts(ch.presenceState());
+    }).subscribe(async(status)=>{
+      if(status==="SUBSCRIBED"){
+        await ch.track({t:Date.now(),fandom:null});
+        // Update immediately after subscribing with fresh state
+        updateCounts(ch.presenceState());
+      }
+    });
     presenceRef.current=ch;
 
     // Refresh bot cache every 5 minutes
-    const iv=setInterval(()=>{
-      supabase.from("bot_presence").select("username,fandom").eq("is_online",true)
-        .then(({data})=>{
-          botCache=data||[];
-          const st=ch.presenceState();
-          setOnlineCount(Math.max(1,Object.keys(st).length)+botCache.length);
-        }).catch(()=>{});
+    const iv=setInterval(async()=>{
+      try{
+        const{data}=await supabase.from("bot_presence").select("username,fandom").eq("is_online",true);
+        botCache=data||[];
+        updateCounts(ch.presenceState());
+      }catch{}
     },300000);
     return()=>clearInterval(iv);
   }
