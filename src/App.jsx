@@ -651,44 +651,35 @@ export default function App(){
   async function setupPresence(){
     if(!supabase)return;
 
-    // Load bot cache FIRST before any presence events fire
-    let botCache=[];
+    // Set bot count immediately on load — don't wait for presence
     try{
       const{data}=await supabase.from("bot_presence").select("username,fandom").eq("is_online",true);
-      botCache=data||[];
+      const bots=data||[];
+      setOnlineCount(1+bots.length); // 1 = current player + bots
+      const byFandom={};
+      bots.forEach(b=>{if(b.fandom)byFandom[b.fandom]=(byFandom[b.fandom]||0)+1;});
+      setOnlineByFandom(byFandom);
     }catch{}
 
+    // Presence channel — track real players
     const ch=supabase.channel("online-users",{config:{presence:{key:Math.random().toString(36).slice(2)}}});
-
-    const updateCounts=(st)=>{
+    ch.on("presence",{event:"sync"},async()=>{
+      const st=ch.presenceState();
       const real=Math.max(1,Object.keys(st).length);
-      setOnlineCount(real+botCache.length);
-      const byFandom={};
-      Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
-      botCache.forEach(b=>{if(b.fandom)byFandom[b.fandom]=(byFandom[b.fandom]||0)+1;});
-      setOnlineByFandom(byFandom);
-    };
-
-    ch.on("presence",{event:"sync"},()=>{
-      updateCounts(ch.presenceState());
-    }).subscribe(async(status)=>{
-      if(status==="SUBSCRIBED"){
-        await ch.track({t:Date.now(),fandom:null});
-        // Update immediately after subscribing with fresh state
-        updateCounts(ch.presenceState());
-      }
-    });
-    presenceRef.current=ch;
-
-    // Refresh bot cache every 5 minutes
-    const iv=setInterval(async()=>{
+      // Always re-fetch bots on each sync
       try{
         const{data}=await supabase.from("bot_presence").select("username,fandom").eq("is_online",true);
-        botCache=data||[];
-        updateCounts(ch.presenceState());
-      }catch{}
-    },300000);
-    return()=>clearInterval(iv);
+        const bots=data||[];
+        setOnlineCount(real+bots.length);
+        const byFandom={};
+        Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
+        bots.forEach(b=>{if(b.fandom)byFandom[b.fandom]=(byFandom[b.fandom]||0)+1;});
+        setOnlineByFandom(byFandom);
+      }catch{
+        setOnlineCount(real);
+      }
+    }).subscribe(async(status)=>{if(status==="SUBSCRIBED")await ch.track({t:Date.now(),fandom:null});});
+    presenceRef.current=ch;
   }
 
   function setupRealtime(sNum){
