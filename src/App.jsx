@@ -651,24 +651,34 @@ export default function App(){
   function setupPresence(){
     if(!supabase)return;
     const ch=supabase.channel("online-users",{config:{presence:{key:Math.random().toString(36).slice(2)}}});
-    ch.on("presence",{event:"sync"},()=>{
+
+    // Load bot online count once on setup and every 5 minutes
+    const loadBotCount=async()=>{
+      try{
+        const{data}=await supabase.from("bot_presence").select("username,fandom").eq("is_online",true);
+        return data||[];
+      }catch{return[];}
+    };
+
+    ch.on("presence",{event:"sync"},async()=>{
       const st=ch.presenceState();
       const realPlayers=Object.keys(st).length||1;
-      // Add online bots to the count
-      supabase.from("bot_presence").select("username,fandom",{count:"exact"}).eq("is_online",true)
-        .then(({data,count})=>{
-          const botCount=count||0;
-          setOnlineCount(realPlayers+botCount);
-          // Add bot fandoms to online by fandom
-          const byFandom={};
-          Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
-          (data||[]).forEach(b=>{if(b.fandom)byFandom[b.fandom]=(byFandom[b.fandom]||0)+1;});
-          setOnlineByFandom(byFandom);
-        }).catch(()=>{
-          setOnlineCount(realPlayers);
-        });
+      const bots=await loadBotCount();
+      const botCount=bots.length;
+      setOnlineCount(realPlayers+botCount);
+      const byFandom={};
+      Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
+      bots.forEach(b=>{if(b.fandom)byFandom[b.fandom]=(byFandom[b.fandom]||0)+1;});
+      setOnlineByFandom(byFandom);
     }).subscribe(async(status)=>{if(status==="SUBSCRIBED")await ch.track({t:Date.now(),fandom:null});});
     presenceRef.current=ch;
+
+    // Refresh bot count every 5 minutes independently
+    const iv=setInterval(async()=>{
+      const bots=await loadBotCount();
+      setOnlineCount(prev=>Math.max(1,prev-0)+bots.length); // recompute with fresh bot data
+    },300000);
+    return()=>clearInterval(iv);
   }
 
   function setupRealtime(sNum){
