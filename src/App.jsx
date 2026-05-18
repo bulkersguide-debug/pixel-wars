@@ -1008,7 +1008,7 @@ export default function App(){
             try{
               const dbSeason=await dbLoadSeason();
               const sNum=dbSeason?.num||1;
-              currentSeasonNum=sNum;
+              ACTIVE_SEASON_NUM=sNum;
               const px=await dbLoadPixels(sNum);
               if(px&&Object.keys(px).length>0)setPixels(px);
             }catch(e){console.error("Pixel reload error:",e);}
