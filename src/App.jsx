@@ -194,6 +194,14 @@ export default function App(){
   const heatmapRef=useRef({});
   const prevPixelCounts=useRef({});
   const vxRef=useRef(900),vyRef=useRef(900);
+  // Alive grid FX refs
+  const fxBeams=useRef([]);
+  const fxExplosions=useRef([]);
+  const fxParticles=useRef([]);
+  const fxFloats=useRef([]);
+  const fxHeat=useRef({});
+  const fxScan=useRef(0);
+  const fxTick=useRef(0);
 
   // Core state
   const [pixels,setPixels]=useState({});
@@ -479,6 +487,28 @@ export default function App(){
     }
   },[]);
 
+  // Spawn canvas-native FX for alive grid
+  const spawnFX=useCallback((gx,gy,color,rgb,isRaid=false)=>{
+    const c=cvs.current;if(!c)return;
+    const eC=CELL*zoomRef.current;
+    const sx=(gx-vxRef.current)*eC,sy=(gy-vyRef.current)*eC;
+    const cx2=sx+eC/2,cy2=sy+eC/2;
+    const idx=gy*GW+gx;fxHeat.current[idx]=1.0;
+    const n=isRaid?10:5;
+    for(let i=0;i<n;i++){
+      const a=Math.random()*Math.PI*2,s=isRaid?(1.5+Math.random()*2.5):(0.5+Math.random()*1.5);
+      fxParticles.current.push({x:cx2,y:cy2,vx:Math.cos(a)*s,vy:Math.sin(a)*s-0.5,life:1,size:isRaid?2.5:1.5,r:rgb[0],g:rgb[1],b:rgb[2],grav:0.05});
+    }
+    if(isRaid){
+      fxExplosions.current.push({x:cx2,y:cy2,er:0,life:1,cr:rgb[0],cg:rgb[1],cb:rgb[2]});
+      fxFloats.current.push({x:cx2,y:cy2-eC,vy:-0.7,text:"⚔",life:1,color});
+      for(let i=0;i<3;i++){
+        const a=Math.random()*Math.PI*2,len=eC*(2+Math.random()*3);
+        fxBeams.current.push({x1:cx2,y1:cy2,x2:cx2+Math.cos(a)*len,y2:cy2+Math.sin(a)*len,life:1,color});
+      }
+    }
+  },[]);
+
   const spawnShockwave=useCallback((color,gx,gy)=>{
     const c=cvs.current;if(!c)return;
     const rc=c.getBoundingClientRect();
@@ -569,12 +599,16 @@ export default function App(){
     localStorage.setItem("pow_fort_sectors_season",String(currentSeasonNum));
   },[loading,unlockedSectors.length,currentSeasonNum]);
 
-  // Fast tick for remote claim/raid ripple animations
+  // Fast tick for remote claim/raid ripple animations + alive grid FX
   useEffect(()=>{
     let raf;const tick=()=>{
-      if(remoteAnimRef.current.length>0||mmFlashRef.current.length>0){
+      // Always tick if we have active FX, or remote animations
+      const hasFX=fxParticles.current.length>0||fxBeams.current.length>0||fxExplosions.current.length>0||fxFloats.current.length>0||Object.keys(fxHeat.current).length>0;
+      if(remoteAnimRef.current.length>0||mmFlashRef.current.length>0||hasFX){
         setAnimTick(t=>t+1);
       }
+      // Always tick for territory pulse and scanline
+      setAnimTick(t=>t+1);
       raf=requestAnimationFrame(tick);
     };
     raf=requestAnimationFrame(tick);
@@ -640,6 +674,10 @@ export default function App(){
         trackHeatmap(payload.new.idx);
         const teamColor=TM[payload.new.team_id]?.color||"#00F5FF";
         remoteAnimRef.current.push({idx:payload.new.idx,color:teamColor,type:"claim",ts:Date.now()});
+        // Alive FX for remote claim
+        const gx2=payload.new.idx%GW,gy2=Math.floor(payload.new.idx/GW);
+        const rgb=[parseInt(teamColor.slice(1,3),16),parseInt(teamColor.slice(3,5),16),parseInt(teamColor.slice(5,7),16)];
+        spawnFX(gx2,gy2,teamColor,rgb,false);
         const mx=Math.floor((payload.new.idx%GW)/MMS),my=Math.floor(Math.floor(payload.new.idx/GW)/MMS);
         mmFlashRef.current.push({mx,my,color:teamColor,ts:Date.now()});
         // Track claims per minute
@@ -687,6 +725,13 @@ export default function App(){
           return myActive;
         });
         setPixels(prev=>({...prev,[payload.new.idx]:dbRowToPixel(payload.new)}));trackHeatmap(payload.new.idx);
+        // Alive FX for remote raid
+        if(payload.old?.team_id!==payload.new?.team_id){
+          const rc=TM[payload.new.team_id]?.color||"#FF4400";
+          const gx3=payload.new.idx%GW,gy3=Math.floor(payload.new.idx/GW);
+          const rgb3=[parseInt(rc.slice(1,3),16),parseInt(rc.slice(3,5),16),parseInt(rc.slice(5,7),16)];
+          spawnFX(gx3,gy3,rc,rgb3,true);
+        }
         // Queue remote raid animation (red flash)
         if(payload.old?.team_id!==payload.new?.team_id){
           remoteAnimRef.current.push({idx:payload.new.idx,color:"#FF4400",type:"raid",ts:Date.now()});
@@ -1390,6 +1435,70 @@ export default function App(){
         ctx.fillRect(sx2,sy2,CELL,CELL);
       }
     });
+
+    // ── ALIVE GRID FX ──────────────────────────────────────────────────────────
+    fxTick.current++;
+    // Decay heat
+    Object.keys(fxHeat.current).forEach(k=>{fxHeat.current[k]=Math.max(0,fxHeat.current[k]-0.025);if(fxHeat.current[k]<=0)delete fxHeat.current[k];});
+    // Energy beams
+    for(let i=fxBeams.current.length-1;i>=0;i--){
+      const b=fxBeams.current[i];b.life-=0.07;
+      if(b.life<=0){fxBeams.current.splice(i,1);continue;}
+      ctx.strokeStyle=b.color+(Math.floor(b.life*180).toString(16).padStart(2,"0"));
+      ctx.lineWidth=b.life*1.5;ctx.shadowColor=b.color;ctx.shadowBlur=3;
+      ctx.beginPath();ctx.moveTo(b.x1,b.y1);ctx.lineTo(b.x2,b.y2);ctx.stroke();
+      ctx.shadowBlur=0;
+    }
+    // Explosion rings
+    for(let i=fxExplosions.current.length-1;i>=0;i--){
+      const ex=fxExplosions.current[i];ex.er+=2;ex.life-=0.05;
+      if(ex.life<=0){fxExplosions.current.splice(i,1);continue;}
+      ctx.strokeStyle=`rgba(${ex.cr},${ex.cg},${ex.cb},${ex.life*0.8})`;
+      ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(ex.x,ex.y,ex.er,0,Math.PI*2);ctx.stroke();
+    }
+    // Particles
+    for(let i=fxParticles.current.length-1;i>=0;i--){
+      const p=fxParticles.current[i];p.x+=p.vx;p.y+=p.vy;p.vy+=p.grav;p.life-=0.03;
+      if(p.life<=0){fxParticles.current.splice(i,1);continue;}
+      ctx.fillStyle=`rgba(${p.r},${p.g},${p.b},${p.life})`;
+      ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+    }
+    // Floating texts
+    for(let i=fxFloats.current.length-1;i>=0;i--){
+      const ft=fxFloats.current[i];ft.y+=ft.vy;ft.life-=0.025;
+      if(ft.life<=0){fxFloats.current.splice(i,1);continue;}
+      ctx.font=`bold ${8+ft.life*3}px monospace`;ctx.textAlign="center";
+      ctx.fillStyle=`rgba(0,0,0,${ft.life*0.5})`;ctx.fillText(ft.text,ft.x+1,ft.y+1);
+      ctx.fillStyle=ft.color+(Math.floor(ft.life*255).toString(16).padStart(2,"0"));ctx.fillText(ft.text,ft.x,ft.y);
+    }
+    // Scanline sweep (subtle CRT feel)
+    fxScan.current=(fxScan.current+0.6)%CH;
+    ctx.fillStyle="rgba(0,200,255,0.012)";ctx.fillRect(0,fxScan.current,CW,1.5);
+    // Territory pulse — breathing glow on YOUR border pixels
+    if(active&&at){
+      const pulseT=fxTick.current*0.04;
+      for(let dy=0;dy<effVH;dy++){for(let dx=0;dx<effVW;dx++){
+        const gx2=vx+dx,gy2=vy+dy;const idx=gy2*GW+gx2;
+        const px2=pixels[idx];if(!px2||px2.t!==active)continue;
+        const hasN=pixels[(gy2-1)*GW+gx2]?.t===active;const hasS=pixels[(gy2+1)*GW+gx2]?.t===active;
+        const hasW=pixels[gy2*GW+(gx2-1)]?.t===active;const hasE=pixels[gy2*GW+(gx2+1)]?.t===active;
+        if(hasN&&hasS&&hasW&&hasE){
+          // Interior shimmer
+          const shim=Math.sin(pulseT*2+gx2*0.5+gy2*0.4)*0.5+0.5;
+          ctx.fillStyle=`rgba(255,255,255,${shim*0.05})`;ctx.fillRect(dx*eC+1,dy*eC+1,eC-3,eC-3);
+        }else{
+          // Border pulse
+          const pulse2=0.6+0.4*Math.sin(pulseT*3+gx2*0.4+gy2*0.3);
+          const[r2,g2,b2]=[parseInt(at.color.slice(1,3),16),parseInt(at.color.slice(3,5),16),parseInt(at.color.slice(5,7),16)];
+          ctx.shadowColor=at.color;ctx.shadowBlur=3;
+          if(!hasN){ctx.fillStyle=`rgba(${r2},${g2},${b2},${pulse2*0.7})`;ctx.fillRect(dx*eC,dy*eC,eC,1);}
+          if(!hasS){ctx.fillStyle=`rgba(${r2},${g2},${b2},${pulse2*0.5})`;ctx.fillRect(dx*eC,dy*eC+eC-1,eC,1);}
+          if(!hasW){ctx.fillStyle=`rgba(${r2},${g2},${b2},${pulse2*0.7})`;ctx.fillRect(dx*eC,dy*eC,1,eC);}
+          if(!hasE){ctx.fillStyle=`rgba(${r2},${g2},${b2},${pulse2*0.5})`;ctx.fillRect(dx*eC+eC-1,dy*eC,1,eC);}
+          ctx.shadowBlur=0;
+        }
+      }}
+    }
   },[pixels,shields,pending,active,mode,vx,vy,unlockedSet,sectorFills,showPriceMap,showHeatmap,heatmapTick,miniSeason,animTick,surgeMode,fortifiedSectors,effCell,effVW,effVH,dailyChallenge]);
 
   // ── MINIMAP ────────────────────────────────────────────────────────────────
@@ -1646,7 +1755,16 @@ export default function App(){
     const cost=calcCost(pending);const freeUsed=(!isRaid)?Math.min(freePixels,Math.floor(cost)):0;
     const toClaim=new Set(pending); // declare BEFORE use
     const now=Date.now();const next={...pixels};const newShields={...shields};
-    pending.forEach(idx=>{next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;});
+    pending.forEach(idx=>{
+      const gx2=idx%GW,gy2=Math.floor(idx/GW);
+      const prev=pixels[idx];
+      next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;
+      // Spawn alive FX
+      const fd=TM[active];if(fd){
+        const rgb=[parseInt(fd.color.slice(1,3),16),parseInt(fd.color.slice(3,5),16),parseInt(fd.color.slice(5,7),16)];
+        spawnFX(gx2,gy2,fd.color,rgb,isRaid||!!prev);
+      }
+    });
     if(bonus>0){let added=0;for(let dy=0;dy<VH&&added<bonus;dy++)for(let dx=0;dx<VW&&added<bonus;dx++){const idx=(vy+dy)*GW+(vx+dx);const sx=Math.floor((vx+dx)/SECTOR),sy=Math.floor((vy+dy)/SECTOR);if(unlockedSet.has(sectorKey(sx,sy))&&!next[idx]){next[idx]={t:active,at:now};added++;}}}
     setPixels(next);setMyPixels(p=>p+pending.size+bonus);setShields(newShields);
     try{localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
