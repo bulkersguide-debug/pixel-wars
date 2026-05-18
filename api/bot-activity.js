@@ -144,6 +144,7 @@ export default async function handler(req, res) {
       .eq("season_num", seasonNum);
 
     let claimedTotal = 0, raidedTotal = 0, activeBots = 0;
+    const activeBotList = [];
 
     for (let i = 0; i < bots.length; i++) {
       const bot = bots[i];
@@ -156,6 +157,7 @@ export default async function handler(req, res) {
 
       activeBots++;
       const fandom = getFandomForBot(bot.username);
+      activeBotList.push({ username: bot.username, fandom });
       const zone = getHomeZone(i);
       const personality = getBotPersonality(i);
 
@@ -256,6 +258,9 @@ export default async function handler(req, res) {
       await new Promise(r => setTimeout(r, 50));
     }
 
+    // Update bot presence so they appear online in the game
+    await updateBotPresence(activeBotList, bots);
+
     const elapsed = Date.now() - startTime;
     const summary = {
       success: true,
@@ -275,4 +280,26 @@ export default async function handler(req, res) {
     console.error("Bot activity error:", err);
     return res.status(500).json({ error: err.message, logs });
   }
+}
+
+// This function is called at the END of handler to update bot presence
+async function updateBotPresence(activeBotNames, allBots) {
+  const now = new Date().toISOString();
+  
+  // Upsert all active bots as online
+  if (activeBotNames.length > 0) {
+    const rows = activeBotNames.map(({ username, fandom }) => ({
+      username,
+      fandom,
+      last_seen: now,
+      is_online: true,
+    }));
+    await supabase.from("bot_presence").upsert(rows, { onConflict: "username" });
+  }
+
+  // Mark bots that haven't been seen in 2 hours as offline
+  await supabase
+    .from("bot_presence")
+    .update({ is_online: false })
+    .lt("last_seen", new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
 }
