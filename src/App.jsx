@@ -215,6 +215,23 @@ export default function App(){
   // New feature state
   const [onlineCount,setOnlineCount]=useState(1);
   const [botOnlineCount,setBotOnlineCount]=useState(0);
+
+  // Fluctuate bot online count every 2-5 minutes to look realistic
+  useEffect(()=>{
+    if(botOnlineCount===0)return;
+    const fluctuate=()=>{
+      // Vary by ±15% randomly, also factor in time of day
+      const hour=new Date().getHours();
+      // Peak hours (evening): 18-23, Low hours (night): 2-7
+      const timeMultiplier=hour>=18&&hour<=23?1.15:hour>=2&&hour<=7?0.75:1.0;
+      const base=Math.round(botOnlineCount*timeMultiplier);
+      const variance=Math.floor(base*0.15);
+      const fluctuated=base+Math.floor((Math.random()-0.5)*2*variance);
+      setBotOnlineCount(Math.max(20,fluctuated));
+    };
+    const iv=setInterval(fluctuate,Math.random()*180000+120000); // every 2-5 min
+    return()=>clearInterval(iv);
+  },[botOnlineCount]);
   const [showHeatmap,setShowHeatmap]=useState(false);
   const [heatmapTick,setHeatmapTick]=useState(0);
   const [animTick,setAnimTick]=useState(0);
@@ -1002,8 +1019,7 @@ export default function App(){
       setUser(session?.user||null);
       if(session?.user){
         loadProfile(session.user.id);
-        // Reload pixels from Supabase after login to prevent disappearing pixels on refresh
-              }
+      }
       else setProfile(null);
     });
     return()=>subscription.unsubscribe();
