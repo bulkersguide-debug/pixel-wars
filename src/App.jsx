@@ -653,11 +653,20 @@ export default function App(){
     const ch=supabase.channel("online-users",{config:{presence:{key:Math.random().toString(36).slice(2)}}});
     ch.on("presence",{event:"sync"},()=>{
       const st=ch.presenceState();
-      setOnlineCount(Object.keys(st).length||1);
-      // Count per fandom
-      const byFandom={};
-      Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
-      setOnlineByFandom(byFandom);
+      const realPlayers=Object.keys(st).length||1;
+      // Add online bots to the count
+      supabase.from("bot_presence").select("username,fandom",{count:"exact"}).eq("is_online",true)
+        .then(({data,count})=>{
+          const botCount=count||0;
+          setOnlineCount(realPlayers+botCount);
+          // Add bot fandoms to online by fandom
+          const byFandom={};
+          Object.values(st).forEach(arr=>arr.forEach(p=>{if(p.fandom)byFandom[p.fandom]=(byFandom[p.fandom]||0)+1;}));
+          (data||[]).forEach(b=>{if(b.fandom)byFandom[b.fandom]=(byFandom[b.fandom]||0)+1;});
+          setOnlineByFandom(byFandom);
+        }).catch(()=>{
+          setOnlineCount(realPlayers);
+        });
     }).subscribe(async(status)=>{if(status==="SUBSCRIBED")await ch.track({t:Date.now(),fandom:null});});
     presenceRef.current=ch;
   }
