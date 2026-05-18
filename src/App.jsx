@@ -672,9 +672,9 @@ export default function App(){
         const teamColor=TM[payload.new.team_id]?.color||"#00F5FF";
         remoteAnimRef.current.push({idx:payload.new.idx,color:teamColor,type:"claim",ts:Date.now()});
         // Alive FX for remote claim
-        const gx2=payload.new.idx%GW,gy2=Math.floor(payload.new.idx/GW);
-        const rgb=[parseInt(teamColor.slice(1,3),16),parseInt(teamColor.slice(3,5),16),parseInt(teamColor.slice(5,7),16)];
-        spawnFX(gx2,gy2,teamColor,rgb,false);
+        const gxClaim=payload.new.idx%GW,gyClaim=Math.floor(payload.new.idx/GW);
+        const rgbClaim=[parseInt(teamColor.slice(1,3),16),parseInt(teamColor.slice(3,5),16),parseInt(teamColor.slice(5,7),16)];
+        spawnFX(gxClaim,gyClaim,teamColor,rgbClaim,false);
         const mx=Math.floor((payload.new.idx%GW)/MMS),my=Math.floor(Math.floor(payload.new.idx/GW)/MMS);
         mmFlashRef.current.push({mx,my,color:teamColor,ts:Date.now()});
         // Track claims per minute
@@ -683,9 +683,9 @@ export default function App(){
         setClaimsLastMin(claimsLogRef.current.length);
         // Floating war text on grid
         const teamName=TM[payload.new.team_id]?.name||"?";
-        const gx2=payload.new.idx%GW,gy2=Math.floor(payload.new.idx/GW);
-        const screenX=((gx2-vxRef.current)/VW)*100;
-        const screenY=((gy2-vyRef.current)/VH)*100;
+        const gxF=payload.new.idx%GW,gyF=Math.floor(payload.new.idx/GW);
+        const screenX=((gxF-vxRef.current)/VW)*100;
+        const screenY=((gyF-vyRef.current)/VH)*100;
         if(screenX>0&&screenX<100&&screenY>0&&screenY<100){
           const ftId=Date.now()+Math.random();
           setFloatingTexts(f=>[...f,{id:ftId,text:`🏴 ${teamName}`,color:teamColor,x:screenX,y:screenY}].slice(-8));
