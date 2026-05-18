@@ -212,14 +212,28 @@ export default async function handler(req, res) {
         }
       } else {
         // CLAIM: build in home zone with some spread
-        const spread = personality === "explorer" ? 200 : 80;
+        // First get unlocked sectors
+        const { data: unlockedSectors } = await supabase
+          .from("sectors")
+          .select("sx,sy")
+          .eq("season_num", seasonNum);
+        
+        const unlockedSet = new Set((unlockedSectors||[]).map(s=>`${s.sx},${s.sy}`));
+        
+        // If no sectors unlocked yet, use center 4
+        if (unlockedSet.size === 0) {
+          unlockedSet.add("9,9");unlockedSet.add("10,9");
+          unlockedSet.add("9,10");unlockedSet.add("10,10");
+        }
+
+        const spread = personality === "explorer" ? 100 : 60;
         const claimCount = personality === "builder" ? 
           6 + Math.floor(Math.random() * 6) : 
           2 + Math.floor(Math.random() * 5);
 
         const claimRows = [];
         const now = Date.now();
-        const attempts = claimCount * 4;
+        const attempts = claimCount * 8;
 
         for (let attempt = 0; attempt < attempts && claimRows.length < claimCount; attempt++) {
           const gx = Math.max(0, Math.min(GW - 1,
@@ -230,9 +244,10 @@ export default async function handler(req, res) {
           ));
           const idx = gy * GW + gx;
 
-          // Check sector is valid
+          // Only claim in unlocked sectors
           const sx = Math.floor(gx / SECTOR), sy = Math.floor(gy / SECTOR);
           if (sx >= 20 || sy >= 20) continue;
+          if (!unlockedSet.has(`${sx},${sy}`)) continue;
 
           claimRows.push({
             idx,
