@@ -683,9 +683,8 @@ export default function App(){
         setClaimsLastMin(claimsLogRef.current.length);
         // Floating war text on grid
         const teamName=TM[payload.new.team_id]?.name||"?";
-        const gxF=payload.new.idx%GW,gyF=Math.floor(payload.new.idx/GW);
-        const screenX=((gxF-vxRef.current)/VW)*100;
-        const screenY=((gyF-vyRef.current)/VH)*100;
+        const screenX=((gxClaim-vxRef.current)/VW)*100;
+        const screenY=((gyClaim-vyRef.current)/VH)*100;
         if(screenX>0&&screenX<100&&screenY>0&&screenY<100){
           const ftId=Date.now()+Math.random();
           setFloatingTexts(f=>[...f,{id:ftId,text:`🏴 ${teamName}`,color:teamColor,x:screenX,y:screenY}].slice(-8));
