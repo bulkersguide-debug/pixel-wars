@@ -78,6 +78,8 @@ const DISCORD_CHANNEL="1504550948541042819";
 const DISCORD_WIDGET=`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`;
 const DISCORD_INVITE="https://discord.gg/2e23msEa";
 const DISCORD_WEBHOOK="https://discord.com/api/webhooks/1505216663786623178/zgC0xopUlfOex7rIIcRos4SxMQrTvtj8-Gjl4cvoqyEukuOP3a-xl9ekt7iIPIj_dBAb";
+const DISCORD_ANNOUNCEMENTS="https://discord.com/api/webhooks/1506311246100562081/zkss7j-PAnDmyt8SdE6n_MpkqrPTXhfryS4h_GGGW3g0uyy9v5JFAvjTjM1gU5awK3dk";
+const DISCORD_FEED="https://discord.com/api/webhooks/1506312098534133792/bPBEDm7MURiotSV1us95UYW7wF97Lf6uMqW3Z3h3-C3E9gmM3T_sdH1zMA9fBZmAQ9Re";
 
 // Browser fingerprint for guest abuse prevention
 const getFingerprint=()=>{
@@ -86,13 +88,15 @@ const getFingerprint=()=>{
   return Math.abs(h).toString(36);
 };
 const _webhookLastSent={};
-const postToDiscord=async(embed)=>{
-  const key=embed.title||"default";
+// channel: "announcements" | "feed" | "war" (default)
+const postToDiscord=async(embed,channel="war")=>{
+  const key=(embed.title||"default")+channel;
   const now=Date.now();
   if(_webhookLastSent[key]&&now-_webhookLastSent[key]<30000)return; // 30s debounce per event type
   _webhookLastSent[key]=now;
+  const url=channel==="announcements"?DISCORD_ANNOUNCEMENTS:channel==="feed"?DISCORD_FEED:DISCORD_WEBHOOK;
   try{
-    await fetch(DISCORD_WEBHOOK,{
+    await fetch(url,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({embeds:[embed]})
@@ -905,11 +909,11 @@ export default function App(){
   const proposeAlliance=async(targetId)=>{if(!active||!isOnline)return;if(isAllied(targetId)){pushToast("Already allied!","#00FFAA",3000);return;}await dbProposeAlliance(active,targetId,currentSeasonNum);pushToast(`🤝 Alliance proposed to ${TM[targetId]?.name}!`,"#00FFAA",4000);setShowAllianceModal(false);};
   const acceptAlliance=async(allianceId)=>{await dbUpdateAlliance(allianceId,"active");setAlliances(prev=>prev.map(a=>a.id===allianceId?{...a,status:"active"}:a));pushToast("🤝 Alliance ACCEPTED!","#00FFAA",4000);};
   const betrayAlliance=async(allianceId,partnerName)=>{if(!confirm(`BETRAY ${partnerName}?`))return;await dbUpdateAlliance(allianceId,"betrayed");setAlliances(prev=>prev.map(a=>a.id===allianceId?{...a,status:"betrayed"}:a));pushToast(`💀 BETRAYAL! Alliance with ${partnerName} broken!`,"#FF4400",6000);setFeed(f=>[{id:Date.now(),icon:"💀",team:TM[active]?.name||"?",msg:`BETRAYED ${partnerName}!`,color:"#FF4400",ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isBetrayal:true},...f].slice(0,40));
-    postToDiscord({title:`💀 ALLIANCE BETRAYED`,description:`**${TM[active]?.name||active}** has **betrayed** their alliance with **${partnerName}**!\n\nThe backstab heard across the grid. Trust no one.`,color:0xFF0000,fields:[{name:"Traitor",value:TM[active]?.name||active,inline:true},{name:"Betrayed",value:partnerName,inline:true}],footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()});
+    postToDiscord({title:`💀 ALLIANCE BETRAYED`,description:`**${TM[active]?.name||active}** has **betrayed** their alliance with **${partnerName}**!\n\nThe backstab heard across the grid. Trust no one.`,color:0xFF0000,fields:[{name:"Traitor",value:TM[active]?.name||active,inline:true},{name:"Betrayed",value:partnerName,inline:true}],footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()},"announcements");
   };
   const declareWar=async(targetId)=>{if(!active||!isOnline)return;if(isAllied(targetId)){pushToast("Break the alliance first!","#FF4400",3000);return;}const already=wars.some(w=>w.attacker===active&&w.defender===targetId);if(already){pushToast("Already at war!","#FF4400",3000);return;}await dbDeclareWar(active,targetId,currentSeasonNum);pushToast(`⚔️ WAR DECLARED on ${TM[targetId]?.name}!`,"#FF4400",6000);setShowWarModal(false);
     const att=TM[active],def=TM[targetId];
-    postToDiscord({title:`⚔️ WAR DECLARED`,description:`**${att?.name||active}** has declared war on **${def?.name||targetId}**!\n\nThe battle for territory begins now. Rally your fandom!`,color:0xFF4400,fields:[{name:"Attacker",value:att?.name||active,inline:true},{name:"Defender",value:def?.name||targetId,inline:true}],footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()});
+    postToDiscord({title:`⚔️ WAR DECLARED`,description:`**${att?.name||active}** has declared war on **${def?.name||targetId}**!\n\nThe battle for territory begins now. Rally your fandom!`,color:0xFF4400,fields:[{name:"Attacker",value:att?.name||active,inline:true},{name:"Defender",value:def?.name||targetId,inline:true}],footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()},"announcements");
   };
   const sanitizeChat=(text)=>{
     return text.replace(/<[^>]*>/g,"").replace(/https?:\/\/[^\s]{0,200}/g,"[link]").trim().slice(0,200);
@@ -944,7 +948,7 @@ export default function App(){
     setSeason(ns);setPixels({});setShields({});setMyPixels(0);setUnlockedSectors(INIT_SECTORS);setAlliances([]);setWars([]);
     if(isOnline)setupRealtime(ns.num);
     pushToast(`🎉 SEASON ${ns.num} STARTED!`,"#FFD700",6000);setShowSeasonEnd(false);
-    postToDiscord({title:`🏆 SEASON ${ns.num} HAS BEGUN!`,description:`A new season of **Pixels of War** has started!\n\nThe grid is reset. Territory is up for grabs. Which fandom will dominate this season?`,color:0xFFD700,fields:[{name:"Season",value:`#${ns.num}`,inline:true},{name:"Duration",value:"~90 days",inline:true}],url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()});
+    postToDiscord({title:`🏆 SEASON ${ns.num} HAS BEGUN!`,description:`A new season of **Pixels of War** has started!\n\nThe grid is reset. Territory is up for grabs. Which fandom will dominate this season?`,color:0xFFD700,fields:[{name:"Season",value:`#${ns.num}`,inline:true},{name:"Duration",value:"~90 days",inline:true}],url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()},"announcements");
   };
 
   useEffect(()=>{const add=()=>{const t1=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];let t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];while(t2===t1)t2=SIM_TEAMS[randInt(0,SIM_TEAMS.length-1)];const acts=["claimed","raided","shielded","renewed"];const action=acts[randInt(0,acts.length-1)];const px=randInt(1,60);const icon={"claimed":"🏴","raided":"⚔️","shielded":"🛡️","renewed":"♻️"}[action];setFeed(f=>[{id:Date.now()+Math.random(),icon,team:t1,msg:action==="claimed"?`claimed ${px}px`:action==="raided"?`RAIDED ${t2}`:action==="renewed"?`renewed ${px}px`:`shielded territory`,color:tc(t1),ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"})},...f].slice(0,40));};add();const iv=setInterval(add,randInt(2500,5500));return()=>clearInterval(iv);},[]);
@@ -1888,7 +1892,7 @@ export default function App(){
     sample.forEach(idx=>spawnParticles(t.color,idx%GW,Math.floor(idx/GW),isRaid?14:9,isRaid));
     if(claimArr.length>0){const mid=claimArr[Math.floor(claimArr.length/2)];spawnShockwave(t.color,mid%GW,Math.floor(mid/GW));}
     if(isRaid){triggerFlash("#FF0000",true);pushToast(`⚔️ RAID! ${toClaim.size}px conquered!`,"#FF4400",4000);
-      if(toClaim.size>=20){const raider=TM[active];postToDiscord({title:`⚔️ MASSIVE RAID!`,description:`**${raider?.name||active}** just raided **${toClaim.size} pixels** in one strike!\n\nThis is war. Join the battle now.`,color:0xFF4400,fields:[{name:"Raider",value:raider?.name||active,inline:true},{name:"Pixels Stolen",value:`${toClaim.size}px`,inline:true}],url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()});}
+      if(toClaim.size>=20){const raider=TM[active];postToDiscord({title:`⚔️ MASSIVE RAID!`,description:`**${raider?.name||active}** just raided **${toClaim.size} pixels** in one strike!\n\nThis is war. Join the battle now.`,color:0xFF4400,fields:[{name:"Raider",value:raider?.name||active,inline:true},{name:"Pixels Stolen",value:`${toClaim.size}px`,inline:true}],url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War • pixelsofwar.com"},timestamp:new Date().toISOString()},"feed");}
     }else{triggerFlash(t.color);spawnConfetti(t.color,Math.min(30,toClaim.size+10));}
     if(freeUsed>0)pushToast(`🎁 ${freeUsed} free pixels used!`,"#FFD700",3000);
     if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);spawnConfetti(t.color,40);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
@@ -2408,7 +2412,7 @@ export default function App(){
             url:"https://www.pixelsofwar.com",
             footer:{text:"Pixels of War Live Battle"},
             timestamp:new Date().toISOString()
-          });
+          },"announcements");
           // Reset arena
           setTimeout(()=>{
             const endsAt=Date.now()+86400000;
@@ -2863,7 +2867,7 @@ export default function App(){
           spawnParticles(myFaction.color,vx+Math.floor(effVW/2),vy+Math.floor(effVH/2),25,true);
           triggerFlash(myFaction.color,true);
           pushToast(`⚔️ FACTION RAID! ${myFaction.name} stole ${targets.length}px from enemy factions! (${newGold}💰 left)`,"#FF4400",5000);
-          postToDiscord({title:`⚔️ FACTION RAID — ${myFaction.name}!`,description:`**${TM[active]?.name}** launched a Faction Raid for the **${myFaction.name}** (${myFaction.icon})!\n\nStole **${targets.length} pixels** from enemy factions.\n\n**Current Standings:**\n${factionStandings.map((f,i)=>`${["🥇","🥈","🥉"][i]} ${f.icon} ${f.name}: ${f.pixels.toLocaleString()}px (${Math.round(f.pixels/totalPx*100)}%)`).join("\n")}`,color:parseInt(myFaction.color.slice(1),16),url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War World War"},timestamp:new Date().toISOString()});
+          postToDiscord({title:`⚔️ FACTION RAID — ${myFaction.name}!`,description:`**${TM[active]?.name}** launched a Faction Raid for the **${myFaction.name}** (${myFaction.icon})!\n\nStole **${targets.length} pixels** from enemy factions.\n\n**Current Standings:**\n${factionStandings.map((f,i)=>`${["🥇","🥈","🥉"][i]} ${f.icon} ${f.name}: ${f.pixels.toLocaleString()}px (${Math.round(f.pixels/totalPx*100)}%)`).join("\n")}`,color:parseInt(myFaction.color.slice(1),16),url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War World War"},timestamp:new Date().toISOString()},"feed");
         };
 
         return(
@@ -3551,7 +3555,7 @@ export default function App(){
           <button onClick={()=>{
             setPeaceVote(v=>({...v,votes:(v.votes||0)+1}));
             pushToast("🕊️ You voted FOR peace!","#00F5FF",3000);
-            postToDiscord({title:"🕊️ PEACE VOTE — Community Decides!",description:`**${TM[peaceVote.proposer]?.name}** has proposed a 1-hour ceasefire!\n\nVote in the game or react to this message to show your support.\n\n✅ = FOR PEACE\n⚔️ = CONTINUE WAR`,color:0x00F5FF,url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War Peace System"},timestamp:new Date().toISOString()});
+            postToDiscord({title:"🕊️ PEACE VOTE — Community Decides!",description:`**${TM[peaceVote.proposer]?.name}** has proposed a 1-hour ceasefire!\n\nVote in the game or react to this message to show your support.\n\n✅ = FOR PEACE\n⚔️ = CONTINUE WAR`,color:0x00F5FF,url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War Peace System"},timestamp:new Date().toISOString()},"feed");
           }} style={{padding:"3px 10px",background:"rgba(0,245,255,.15)",border:"1px solid rgba(0,245,255,.4)",borderRadius:4,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00F5FF",fontWeight:900}}>✅ VOTE PEACE ({peaceVote.votes||0})</button>
           <button onClick={()=>setPeaceVote(null)} style={{padding:"3px 10px",background:"rgba(255,68,0,.1)",border:"1px solid rgba(255,68,0,.3)",borderRadius:4,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FF4400",fontWeight:900}}>⚔️ REJECT</button>
         </div>
@@ -3840,7 +3844,7 @@ export default function App(){
                   const vote={proposer:active,endsAt:Date.now()+3600000,votes:0};
                   setPeaceVote(vote);
                   pushToast("🕊️ Peace vote proposed! Other fandoms can accept or reject.","#00F5FF",5000);
-                  postToDiscord({title:"🕊️ PEACE VOTE PROPOSED",description:`**${TM[active]?.name}** has proposed a 1-hour ceasefire!\n\nAll fandoms can vote in the game. React with ✅ to support peace or ⚔️ to continue war.`,color:0x00F5FF,url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War Peace System"},timestamp:new Date().toISOString()});
+                  postToDiscord({title:"🕊️ PEACE VOTE PROPOSED",description:`**${TM[active]?.name}** has proposed a 1-hour ceasefire!\n\nAll fandoms can vote in the game. React with ✅ to support peace or ⚔️ to continue war.`,color:0x00F5FF,url:"https://www.pixelsofwar.com",footer:{text:"Pixels of War Peace System"},timestamp:new Date().toISOString()},"feed");
                 }} style={{flex:1,padding:"10px",background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.25)",borderRadius:7,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#00F5FF"}}>🕊️ PEACE</button>}
               </div>}
               {/* Share buttons — always visible when fandom selected */}
