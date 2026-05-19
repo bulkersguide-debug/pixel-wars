@@ -76,7 +76,7 @@ const RARITY_COLOR={COMMON:"#aaa",UNCOMMON:"#00CC44",RARE:"#0088FF",EPIC:"#AA00F
 const DISCORD_ID="1504550947295072328";
 const DISCORD_CHANNEL="1504550948541042819";
 const DISCORD_WIDGET=`https://discord.com/widget?id=${DISCORD_ID}&theme=dark`;
-const DISCORD_INVITE="https://discord.gg/4Da2avYyPF";
+const DISCORD_INVITE="https://discord.gg/2e23msEa";
 const DISCORD_WEBHOOK="https://discord.com/api/webhooks/1505216663786623178/zgC0xopUlfOex7rIIcRos4SxMQrTvtj8-Gjl4cvoqyEukuOP3a-xl9ekt7iIPIj_dBAb";
 
 // Browser fingerprint for guest abuse prevention
@@ -2960,7 +2960,7 @@ export default function App(){
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{window.open("https://discord.gg/4Da2avYyPF","_blank");setShowCanvasChallenge(false);}} style={{flex:1,padding:"11px",background:"rgba(88,101,242,.2)",border:"1px solid rgba(88,101,242,.4)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#5865F2",fontWeight:900}}>📢 JOIN DISCORD TO VOTE</button>
+              <button onClick={()=>{window.open("https://discord.gg/2e23msEa","_blank");setShowCanvasChallenge(false);}} style={{flex:1,padding:"11px",background:"rgba(88,101,242,.2)",border:"1px solid rgba(88,101,242,.4)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#5865F2",fontWeight:900}}>📢 JOIN DISCORD TO VOTE</button>
               <button onClick={()=>{
                 if(!active){
                   setShowCanvasChallenge(false);
