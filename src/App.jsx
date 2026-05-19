@@ -49,7 +49,7 @@ const CAT=[
   {cat:"🎌 Anime",sub:"Shonen",t:["Naruto","One Piece","Dragon Ball Z","Bleach","My Hero Academia","Demon Slayer","Jujutsu Kaisen","Chainsaw Man","One Punch Man"]},
   {cat:"🎌 Anime",sub:"Dark",t:["Attack on Titan","Death Note","Fullmetal Alchemist: Brotherhood","Neon Genesis Evangelion","Berserk"]},
   {cat:"🎌 Anime",sub:"Romance & Fun",t:["Haikyuu!!","Blue Lock","Spy x Family","Bocchi the Rock","Kaguya-sama"]},
-  {cat:"🎌 Anime",sub:"Ghibli",t:["Spirited Away","Princess Mononoke","My Neighbor Totoro","Howl's Moving Castle"]},
+  {cat:"🎌 Anime",sub:"Magical Worlds",t:["Spirited Away","Princess Mononoke","My Neighbor Totoro","Howl's Moving Castle"]},
   {cat:"🎵 Music",sub:"Hip-Hop",t:["Drake","Travis Scott","Kendrick Lamar","Eminem","Tyler, the Creator","Post Malone","The Weeknd","SZA"]},
   {cat:"🎵 Music",sub:"K-Pop",t:["BTS","BLACKPINK","Stray Kids","Aespa","NewJeans","IVE","TWICE","NCT 127","ATEEZ","(G)I-DLE","ENHYPEN","TXT"]},
   {cat:"🎵 Music",sub:"Pop",t:["Taylor Swift","Billie Eilish","Ariana Grande","Dua Lipa","Olivia Rodrigo","Bruno Mars","Sabrina Carpenter"]},
@@ -3117,6 +3117,31 @@ export default function App(){
             </div>
           </div>
 
+          {/* Champion prize banner */}
+          <div style={{background:"linear-gradient(135deg,rgba(255,215,0,.08),rgba(255,45,120,.06))",border:"1px solid rgba(255,215,0,.25)",borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+              <span style={{fontSize:24}}>🏆</span>
+              <div>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#FFD700",letterSpacing:1}}>SEASON {season.num} CHAMPION</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.4)",marginTop:2}}>Season ends in <span style={{color:seasonDaysLeft<=7?"#FF4400":"#FFD700",fontWeight:900}}>{seasonDaysLeft} days</span></div>
+              </div>
+            </div>
+            <div style={{fontFamily:"'Rajdhani',sans-serif",fontSize:12,color:"rgba(255,255,255,.65)",lineHeight:1.5,marginBottom:10}}>
+              The fandom controlling the most territory when Season {season.num} ends becomes the first <strong style={{color:"#FFD700"}}>Pixels of War Champion</strong> — immortalized in the Hall of Fame forever.
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {[{icon:"👑",text:"Champion crown badge"},{icon:"🏅",text:"Hall of Fame entry"},{icon:"📢",text:"Announced to all"},{icon:"🎁",text:"Season 2 bonus pixels"}].map((p,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,215,0,.06)",border:"1px solid rgba(255,215,0,.15)",borderRadius:6,padding:"4px 8px"}}>
+                  <span style={{fontSize:10}}>{p.icon}</span>
+                  <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"rgba(255,255,255,.5)"}}>{p.text}</span>
+                </div>
+              ))}
+            </div>
+            {board[0]&&<div style={{marginTop:10,fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.3)"}}>
+              🔥 Currently leading: <span style={{color:board[0].color,fontWeight:900}}>{board[0].name}</span> with {board[0].count} pixels
+            </div>}
+          </div>
+
           {/* Top 20 leaderboard */}
           <div style={{marginBottom:16}}>
             {board.slice(0,20).map((t,i)=>{
@@ -3228,6 +3253,7 @@ export default function App(){
             <span style={{color:isOnline?"#00FF88":"#FF4400"}}>{isOnline?"LIVE":"OFFLINE"}</span>
             <span style={{color:(onlineCount+botOnlineCount)>1?"#00FF88":"rgba(0,255,136,.4)",fontWeight:(onlineCount+botOnlineCount)>1?900:400,animation:(onlineCount+botOnlineCount)>1?"pulse 1.5s infinite":undefined}}>· {(onlineCount+botOnlineCount)>1?`⚔️ ${onlineCount+botOnlineCount} WARRIORS ONLINE`:`🟢 ${onlineCount+botOnlineCount} online`}</span>
             {totalPlayers>0&&<span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#2a2a4a"}}>· {totalPlayers} joined</span>}
+            <span style={{color:seasonDaysLeft<=7?"#FF4400":"rgba(255,215,0,.5)",fontWeight:seasonDaysLeft<=7?900:400,animation:seasonDaysLeft<=7?"pulse 1s infinite":undefined}}>· {seasonDaysLeft<=7?`🔥 ${seasonDaysLeft}d LEFT!`:`🏆 ${seasonDaysLeft}d to champion`}</span>
           </div>
           <button onClick={()=>navigate("/fandoms")} style={{marginTop:3,background:"rgba(0,245,255,.06)",border:"1px solid rgba(0,245,255,.2)",borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#00F5FF",letterSpacing:1}}>🔍 FANDOMS</button>
           <a href="/how-to-play.html" style={{marginTop:3,display:"inline-block",background:"rgba(200,255,0,.06)",border:"1px solid rgba(200,255,0,.2)",borderRadius:4,padding:"2px 8px",fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1,textDecoration:"none"}}>❓ HOW TO PLAY</a>
@@ -4018,7 +4044,7 @@ export default function App(){
               <div style={{borderBottom:"1px solid rgba(255,255,255,.06)",marginBottom:8}}/>
             </div>}
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#2a2a4a",marginBottom:4}}>TERRITORY RANKINGS</div>
-            {board.length===0?<div style={{fontSize:8,color:"#1a1a2a",fontFamily:"'Share Tech Mono',monospace",paddingTop:6}}>No territory yet</div>
+            {board.length===0?<div style={{fontSize:8,color:"#1a1a2a",fontFamily:"'Share Tech Mono',monospace",paddingTop:6}}>Be the first to claim this sector!</div>
             :board.map((t,i)=>{const acc=CAT_ACCENT[t.cat]||"#00F5FF";const rank=getRank(t.count);const trendUp=t.trend>0;const trendDown=t.trend<0;return(
               <div key={t.id} onClick={()=>setActive(t.id)} style={{marginBottom:3,padding:"5px 6px",background:"#09091a",borderRadius:5,border:`1px solid ${acc}18`,cursor:"pointer",position:"relative",overflow:"hidden"}}>
                 <div style={{position:"absolute",left:0,top:0,bottom:0,width:2,background:`linear-gradient(180deg,${t.color},${acc})`}}/>
