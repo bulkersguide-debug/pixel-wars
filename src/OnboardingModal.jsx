@@ -114,7 +114,7 @@ function TrophyVisual(){
   );
 }
 
-export default function OnboardingModal({onClose}){
+export default function OnboardingModal({onComplete,onSkip}){
   const[step,setStep]=useState(0);
   const s=STEPS[step];
   const isLast=step===STEPS.length-1;
@@ -122,10 +122,15 @@ export default function OnboardingModal({onClose}){
   const handleCTA=()=>{
     if(isLast){
       localStorage.setItem("pow_onboarded","1");
-      onClose();
+      if(onComplete)onComplete(null);
     }else{
       setStep(s=>s+1);
     }
+  };
+
+  const handleSkip=()=>{
+    localStorage.setItem("pow_onboarded","1");
+    if(onSkip)onSkip();
   };
 
   return(
@@ -163,7 +168,7 @@ export default function OnboardingModal({onClose}){
         </button>
 
         {/* Skip */}
-        {!isLast&&<button onClick={()=>{localStorage.setItem("pow_onboarded","1");onClose();}} style={{display:"block",width:"100%",marginTop:10,background:"none",border:"none",color:"rgba(255,255,255,.2)",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,letterSpacing:1}}>SKIP INTRO</button>}
+        {!isLast&&<button onClick={handleSkip} style={{display:"block",width:"100%",marginTop:10,background:"none",border:"none",color:"rgba(255,255,255,.2)",cursor:"pointer",fontFamily:"'Share Tech Mono',monospace",fontSize:9,letterSpacing:1}}>SKIP INTRO</button>}
       </div>
     </div>
   );
