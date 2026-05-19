@@ -2962,7 +2962,11 @@ export default function App(){
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>{window.open("https://discord.gg/4Da2avYyPF","_blank");setShowCanvasChallenge(false);}} style={{flex:1,padding:"11px",background:"rgba(88,101,242,.2)",border:"1px solid rgba(88,101,242,.4)",borderRadius:8,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:9,color:"#5865F2",fontWeight:900}}>📢 JOIN DISCORD TO VOTE</button>
               <button onClick={()=>{
-                if(!active){pushToast("Select a fandom first!","#FF4400",2000);return;}
+                if(!active){
+                  setShowCanvasChallenge(false);
+                  pushToast("🎨 Select a fandom below first, then start painting!","#FF2D78",4000);
+                  return;
+                }
                 if(dailyChallenge){setVx(Math.max(0,Math.min(GW-effVW,dailyChallenge.sx*SECTOR-10)));setVy(Math.max(0,Math.min(GH-effVH,dailyChallenge.sy*SECTOR-10)));}
                 setShowCanvasChallenge(false);
                 pushToast("🎨 Start painting! Screenshot your art and share on Discord!","#FF2D78",5000);
