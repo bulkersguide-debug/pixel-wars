@@ -346,7 +346,14 @@ export default function App(){
   const [referralCount,setReferralCount]=useState(0);
   const [isMobile,setIsMobile]=useState(()=>typeof window!=="undefined"&&window.innerWidth<768);
   const [mobileTab,setMobileTab]=useState("GAME");
-  const [showOnboarding,setShowOnboarding]=useState(()=>!localStorage.getItem("pow_onboarded"));
+  const [showOnboarding,setShowOnboarding]=useState(false);
+  useEffect(()=>{
+    // Show onboarding after 1s delay so game is fully loaded
+    if(!localStorage.getItem("pow_onboarded")){
+      const t=setTimeout(()=>setShowOnboarding(true),1000);
+      return()=>clearTimeout(t);
+    }
+  },[]);
   const [countdownStr,setCountdownStr]=useState("");
 
   const [pixelHistory,setPixelHistory]=useState(null);
@@ -2332,7 +2339,7 @@ export default function App(){
       </div>}
 
       {/* RESET MODAL */}
-      {showReset&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}} onClick={e=>e.target===e.currentTarget&&setShowReset(false)}>
+      {showReset&&(profile?.role==="admin"||profile?.role==="moderator")&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,backdropFilter:"blur(10px)"}} onClick={e=>e.target===e.currentTarget&&setShowReset(false)}>
         <div style={{background:"#09091c",border:"1px solid rgba(255,60,60,.4)",borderRadius:16,padding:"28px 26px",width:360,maxWidth:"94vw",textAlign:"center",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>
           <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
           <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,color:"#ff6b6b",letterSpacing:2,marginBottom:8}}>RESET GRID?</div>
@@ -2604,7 +2611,7 @@ export default function App(){
 
           {/* Motivational message */}
           <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)",marginBottom:20,lineHeight:1.7}}>
-            {weeklyStats.pixels===0?"🪖 No territory yet — claim your first pixels this week!":
+            {weeklyStats.pixels===0?"⚔️ No territory yet — claim your first pixels and start your conquest!":
              weeklyStats.pixels-weeklyStats.prevPixels>50?"🔥 Massive week! Your fandom is dominating.":
              weeklyStats.pixels-weeklyStats.prevPixels>0?"⚔️ Growing strong. Keep raiding and claiming.":
              weeklyStats.pixels-weeklyStats.prevPixels<0?"🛡️ You lost ground. Time to fight back!":
