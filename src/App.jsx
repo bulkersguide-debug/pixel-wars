@@ -2009,7 +2009,7 @@ export default function App(){
     .eq("user_id",session.user.id)
     .eq("is_used",false)
     .order("purchased_at",{ascending:true});
-  console.log("loadMyPowerups result:",data,error);
+
   setMyPowerups(data||[]);
 };
 
