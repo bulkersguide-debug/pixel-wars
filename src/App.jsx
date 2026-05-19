@@ -2611,7 +2611,7 @@ export default function App(){
 
           {/* Motivational message */}
           <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:10,color:"rgba(255,255,255,.4)",marginBottom:20,lineHeight:1.7}}>
-            {weeklyStats.pixels===0?"⚔️ No territory yet — claim your first pixels and start your conquest!":
+            {weeklyStats.pixels===0?"⚔️ No fandom controls the map yet — be the first to claim territory!":
              weeklyStats.pixels-weeklyStats.prevPixels>50?"🔥 Massive week! Your fandom is dominating.":
              weeklyStats.pixels-weeklyStats.prevPixels>0?"⚔️ Growing strong. Keep raiding and claiming.":
              weeklyStats.pixels-weeklyStats.prevPixels<0?"🛡️ You lost ground. Time to fight back!":
@@ -3404,7 +3404,7 @@ export default function App(){
             <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 8px",background:"rgba(88,101,242,.1)",border:"1px solid rgba(88,101,242,.3)",borderRadius:6,cursor:"pointer"}} onClick={()=>supabase?.auth.signOut()}>
               {profile?.avatar_url&&<img src={profile.avatar_url} style={{width:18,height:18,borderRadius:"50%"}} alt="avatar"/>}
               <span style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:"#7289DA",maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{profile?.username||"Player"}</span>
-              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00"}}>{profile?.free_pixels||0}px free</span>
+              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00"}}>{profile?.free_pixels>0?`${profile.free_pixels}px free`:"🎁 Claim free pixel"}</span>
             </div>
           )}
           {event&&<div style={{display:"flex",alignItems:"center",gap:5,background:rgba(event.color,.1),border:`1px solid ${rgba(event.color,.4)}`,borderRadius:7,padding:"4px 10px",animation:"pulse 2s infinite"}}>
@@ -4147,7 +4147,7 @@ export default function App(){
 
           <div onClick={gatedOpenDaily} style={{margin:"4px 5px 0",padding:"4px 8px",background:"rgba(255,215,0,.04)",border:"1px solid rgba(255,215,0,.12)",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
             <span style={{fontSize:12}}>🔥</span>
-            <div><div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#FFD700"}}>{streakData.days}d streak</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{alreadyClaimedToday?"✅ Claimed":`🎁 ${freePixels}px free`}</div></div>
+            <div><div style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:"#FFD700"}}>{streakData.days}d streak</div><div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#5a5a5a"}}>{alreadyClaimedToday?"✅ Claimed":freePixels>0?`🎁 ${freePixels}px free`:"🎁 Claim free pixel"}</div></div>
           </div>
           <div onClick={()=>{if(!requireAuth("fandom"))return;navigate("/request-fandom");}} style={{margin:"4px 5px 0",padding:"6px 8px",background:"rgba(200,255,0,.08)",border:"2px solid rgba(200,255,0,.4)",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,flexShrink:0}}>
             <span style={{fontSize:11}}>➕</span>
