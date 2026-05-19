@@ -414,6 +414,8 @@ export default function App(){
   // ── STRIPE CHECKOUT ──────────────────────────────────────────────────────────
   const STRIPE_PK="pk_live_51TXp5DJ6WZdD3UBmyp9194J1r8WvXbcUCmU6Nlhw5vRWL8M5d4y46LrH98qZoLyhdCLzHrl6Bx0tcU9VPTObcjYJ0058NAhaZF";
   const [paymentLoading,setPaymentLoading]=useState(null);
+  const [myPowerups,setMyPowerups]=useState([]);
+  const [activatingPowerup,setActivatingPowerup]=useState(null);
 
   const startCheckout=useCallback(async(productId)=>{
     if(paymentLoading)return;
@@ -449,14 +451,18 @@ export default function App(){
     const product=params.get("product");
     if(payment==="success"){
       const names={trial:"Trial Pack",small:"Small Bundle",medium:"Medium Bundle",large:"Large Bundle",mega:"Mega Bundle",whale:"Whale Pack 👑",season_pass:"Season Pass 🏆",starter:"Starter Pack 🎁"};
-      pushToast(`✅ Payment successful! ${names[product]||"Purchase"} activated. Pixels added to your account!`,"#00FF88",8000);
-      // Clean URL
+      const isPowerupProduct=(product||"").startsWith("powerup_");
+      if(isPowerupProduct){
+        pushToast(`✅ Power-up purchased! Check your inventory to activate it.`,"#00FF88",8000);
+      }else{
+        pushToast(`✅ Payment successful! ${names[product]||"Purchase"} activated. Pixels added to your account!`,"#00FF88",8000);
+      }
       window.history.replaceState({},"","/");
-      // Re-sync pixels from Supabase after a short delay
       setTimeout(()=>{
         if(user?.id){
           supabase.from("profiles").select("free_pixels").eq("id",user.id).single()
             .then(({data})=>{if(data?.free_pixels!=null){syncFreePixels(data.free_pixels);}});
+          loadMyPowerups();
         }
       },2000);
     }else if(payment==="cancelled"){
@@ -1023,8 +1029,9 @@ export default function App(){
       setUser(session?.user||null);
       if(session?.user){
         loadProfile(session.user.id);
+        setTimeout(()=>loadMyPowerups(),1000);
       }
-      else setProfile(null);
+      else{setProfile(null);setMyPowerups([]);}
     });
     return()=>subscription.unsubscribe();
   },[]);
@@ -1973,6 +1980,40 @@ export default function App(){
       pushToast("❌ Payment error: "+err.message,"#FF4400",4000);
     }finally{
       setPaymentLoading(null);
+    }
+  };
+
+  // ── POWERUP INVENTORY ─────────────────────────────────────────────────────
+  const loadMyPowerups=async()=>{
+    if(!user?.id||!supabase)return;
+    const{data}=await supabase
+      .from("active_powerups")
+      .select("*")
+      .eq("user_id",user.id)
+      .eq("is_used",false)
+      .order("purchased_at",{ascending:true});
+    setMyPowerups(data||[]);
+  };
+
+  const activatePowerup=async(row)=>{
+    if(activatingPowerup)return;
+    if(!active){pushToast("⚠️ Select a fandom first!","#FFD700",3000);return;}
+    const puId=row.powerup_type.replace("powerup_","");
+    const pu=POWERUPS.find(p=>p.id===puId);
+    if(!pu){pushToast("❌ Unknown powerup type","#FF4400",3000);return;}
+    setActivatingPowerup(row.id);
+    try{
+      const{error}=await supabase
+        .from("active_powerups")
+        .update({is_used:true,used_at:new Date().toISOString()})
+        .eq("id",row.id);
+      if(error)throw error;
+      setMyPowerups(prev=>prev.filter(p=>p.id!==row.id));
+      await executePowerup(pu);
+    }catch(err){
+      pushToast("❌ Activation failed: "+err.message,"#FF4400",4000);
+    }finally{
+      setActivatingPowerup(null);
     }
   };
 
@@ -3761,6 +3802,35 @@ export default function App(){
                     {!hasSeasonPass&&<button onClick={()=>{setShowPaywall(true);setPaywallTab("pass");}} style={{flex:1,padding:"8px",background:"rgba(255,215,0,.08)",border:"1px solid rgba(255,215,0,.3)",borderRadius:6,cursor:"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,color:"#FFD700",fontWeight:900}}>🏆 PASS</button>}
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:6}}>
+                  {/* MY POWERUPS INVENTORY */}
+                  {myPowerups.length>0&&<div style={{gridColumn:"1/-1",marginBottom:4}}>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:2,color:"#C8FF00",marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
+                      <div style={{width:6,height:6,borderRadius:"50%",background:"#C8FF00",animation:"pulse .8s infinite"}}/>
+                      MY POWERUPS ({myPowerups.length})
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:5,marginBottom:8}}>
+                    {myPowerups.map(row=>{
+                      const puId=row.powerup_type.replace("powerup_","");
+                      const pu=POWERUPS.find(p=>p.id===puId)||{icon:"⚡",name:row.powerup_type,color:"#C8FF00",desc:""};
+                      const isActivating=activatingPowerup===row.id;
+                      return(
+                        <div key={row.id} style={{background:`rgba(${pu.color==="unknown"?"200,255,0":pu.color.slice(1).match(/../g).map(h=>parseInt(h,16)).join(",")},0.12)`,border:`2px solid ${pu.color||"#C8FF00"}`,borderRadius:8,padding:"10px",position:"relative",overflow:"hidden"}}>
+                          <div style={{position:"absolute",top:4,right:6,fontFamily:"'Orbitron',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1}}>OWNED</div>
+                          <div style={{fontSize:22,marginBottom:3}}>{pu.icon}</div>
+                          <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:pu.color,marginBottom:2}}>{pu.name}</div>
+                          <div style={{fontSize:8,color:"#7a7aaa",marginBottom:6}}>{pu.desc}</div>
+                          <button
+                            onClick={()=>activatePowerup(row)}
+                            disabled={isActivating||!!activatingPowerup}
+                            style={{width:"100%",padding:"6px 0",background:isActivating?"#1a1a2e":`linear-gradient(90deg,${pu.color},${pu.color}aa)`,border:"none",borderRadius:5,cursor:isActivating?"not-allowed":"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:isActivating?"#666":"#05050f",letterSpacing:1}}
+                          >{isActivating?"⏳ ACTIVATING...":"⚡ ACTIVATE"}</button>
+                        </div>
+                      );
+                    })}
+                    </div>
+                    <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:8}}/>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:7,letterSpacing:2,color:"#2a2a4a",marginBottom:6}}>BUY MORE</div>
+                  </div>}
                   {POWERUPS.map(pu=>(
                     <div key={pu.id} onClick={()=>{if(!requireAuth("powerup"))return;usePowerup(pu);}} style={{background:rgba(pu.color,.07),border:`1px solid ${rgba(pu.color,.3)}`,borderRadius:8,padding:"10px",cursor:"pointer"}}>
                       <div style={{fontSize:22,marginBottom:3}}>{pu.icon}</div>
@@ -3958,6 +4028,34 @@ export default function App(){
           <div style={{flex:1,overflowY:"auto",padding:"3px 5px 8px"}}>
             {mode==="SHOP"?(
               <><div style={{fontFamily:"'Orbitron',monospace",fontSize:10,fontWeight:900,letterSpacing:3,color:"#C8FF00",marginBottom:7}}>💥 POWER-UP SHOP</div>
+              {myPowerups.length>0&&<>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,letterSpacing:2,color:"#C8FF00",marginBottom:5,display:"flex",alignItems:"center",gap:6}}>
+                  <div style={{width:7,height:7,borderRadius:"50%",background:"#C8FF00",animation:"pulse .8s infinite"}}/>
+                  MY INVENTORY ({myPowerups.length})
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(132px,1fr))",gap:5,marginBottom:10}}>
+                {myPowerups.map(row=>{
+                  const puId=row.powerup_type.replace("powerup_","");
+                  const pu=POWERUPS.find(p=>p.id===puId)||{icon:"⚡",name:row.powerup_type,color:"#C8FF00",desc:"",rarity:"OWNED"};
+                  const isActivating=activatingPowerup===row.id;
+                  return(
+                    <div key={row.id} style={{background:rgba(pu.color,.12),border:`2px solid ${pu.color}`,borderRadius:8,padding:"10px",position:"relative",transition:"all .15s"}}>
+                      <div style={{position:"absolute",top:4,right:5,fontFamily:"'Share Tech Mono',monospace",fontSize:7,color:"#C8FF00",letterSpacing:1}}>READY</div>
+                      <div style={{fontSize:20,marginBottom:4}}>{pu.icon}</div>
+                      <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:pu.color,marginBottom:2}}>{pu.name}</div>
+                      <div style={{fontSize:9,color:"#7a7aaa",lineHeight:1.4,marginBottom:6}}>{pu.desc}</div>
+                      <button
+                        onClick={()=>activatePowerup(row)}
+                        disabled={isActivating||!!activatingPowerup}
+                        style={{width:"100%",padding:"6px 0",background:isActivating?"#1a1a2e":`linear-gradient(90deg,${pu.color},${pu.color}bb)`,border:"none",borderRadius:5,cursor:isActivating?"not-allowed":"pointer",fontFamily:"'Orbitron',monospace",fontSize:8,fontWeight:900,color:isActivating?"#666":"#05050f",letterSpacing:1,transition:"all .15s"}}
+                      >{isActivating?"⏳...":"⚡ ACTIVATE"}</button>
+                    </div>
+                  );
+                })}
+                </div>
+                <div style={{height:1,background:"rgba(255,255,255,0.06)",marginBottom:8}}/>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,letterSpacing:2,color:"#2a2a4a",marginBottom:6}}>BUY MORE</div>
+              </>}
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(132px,1fr))",gap:5}}>
                 {POWERUPS.map(pu=>(
                   <div key={pu.id} className="pubtn" onClick={()=>{if(!requireAuth("powerup"))return;usePowerup(pu);}} style={{background:rgba(pu.color,.07),border:`1px solid ${rgba(pu.color,.3)}`,borderRadius:8,padding:"10px",cursor:"pointer",transition:"all .15s",position:"relative"}}>
