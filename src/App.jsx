@@ -1570,13 +1570,18 @@ export default function App(){
   };
   const rs=(x1,y1,x2,y2)=>{const s=new Set(),now=Date.now();for(let gy=Math.min(y1,y2);gy<=Math.max(y1,y2);gy++)for(let gx=Math.min(x1,x2);gx<=Math.max(x1,x2);gx++){const idx=gy*GW+gx;const sx=Math.floor(gx/SECTOR),sy=Math.floor(gy/SECTOR);if(!unlockedSet.has(sectorKey(sx,sy)))continue;const isShielded=shields[idx]&&shields[idx]>now;if(mode==="RAID"&&pixels[idx]&&isAllied(pixels[idx].t))continue;if(mode==="BUILD"?!pixels[idx]:(pixels[idx]&&pixels[idx].t!==active&&!isShielded))s.add(idx);}return s;};
   const panRef=useRef(null);
+  const [pixelPopup,setPixelPopup]=useState(null); // {x,y,owner,fandom,claimedAt,total}
 
   const onMD=(e)=>{
-    // If no fandom selected — pan the map
-    if(!active||mode==="SHOP"){
+    // Right click (button=2) or middle click (button=1) → pan
+    if(e.button===1||e.button===2){
+      e.preventDefault();
       panRef.current={x:e.clientX,y:e.clientY};
       return;
     }
+    // Left click (button=0) → claim/select
+    setPixelPopup(null);
+    if(!active||mode==="SHOP")return;
     const g=mouseToGrid(e);if(!g)return;
     const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);
     if(!unlockedSet.has(sectorKey(sx,sy))){pushToast("🔒 Locked! Fill the center sectors first.","#FF4400",3000);return;}
@@ -1586,8 +1591,31 @@ export default function App(){
     const ok=mode==="BUILD"?!pixels[g.idx]:(pixels[g.idx]&&pixels[g.idx].t!==active&&!isShielded&&!allyBlock);
     setPending(ok?new Set([g.idx]):new Set());
   };
+
+  // Show pixel ownership popup on left click (no drag)
+  const onMC=(e)=>{
+    if(e.button!==0)return;
+    if(!drag||pending.size===0){
+      const g=mouseToGrid(e);
+      if(!g)return;
+      const px=pixels[g.idx];
+      if(!px?.t)return;
+      const rc=cvs.current.getBoundingClientRect();
+      const popX=e.clientX-rc.left;
+      const popY=e.clientY-rc.top;
+      const team=TM[px.t];
+      const ageMs=Date.now()-(px.at||Date.now());
+      const ageDays=Math.floor(ageMs/86400000);
+      const ageHrs=Math.floor((ageMs%86400000)/3600000);
+      const ageStr=ageDays>0?`${ageDays}d ${ageHrs}h ago`:`${ageHrs}h ago`;
+      const myPxCount=Object.values(pixels).filter(p=>p?.t===px.t).length;
+      setPixelPopup({x:popX,y:popY,team,teamId:px.t,claimedAt:ageStr,total:myPxCount,isEnemy:px.t!==active});
+      setTimeout(()=>setPixelPopup(null),4000);
+    }
+  };
+
   const onMM_h=(e)=>{
-    // Pan map if no fandom selected
+    // Pan if right/middle button held
     if(panRef.current){
       const dx=Math.round((panRef.current.x-e.clientX)/effCell);
       const dy=Math.round((panRef.current.y-e.clientY)/effCell);
@@ -1597,7 +1625,9 @@ export default function App(){
       }
       return;
     }
-    const g=mouseToGrid(e);if(g){setHov(pixels[g.idx]?TM[pixels[g.idx].t]:null);const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);setHovSector({sx,sy,unlocked:unlockedSet.has(sectorKey(sx,sy)),fill:sectorFills[sectorKey(sx,sy)]||0});}if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}
+    const g=mouseToGrid(e);
+    if(g){setHov(pixels[g.idx]?TM[pixels[g.idx].t]:null);const sx=Math.floor(g.gx/SECTOR),sy=Math.floor(g.gy/SECTOR);setHovSector({sx,sy,unlocked:unlockedSet.has(sectorKey(sx,sy)),fill:sectorFills[sectorKey(sx,sy)]||0});}
+    if(drag&&orig){const go=mouseToGrid(e);if(go)setPending(rs(orig.x,orig.y,go.gx,go.gy));}
   };
   const triggerFlash=(color,shake=false)=>{setFlashColor(color);setTimeout(()=>setFlashColor(null),300);if(shake){setShakeCanvas(true);setTimeout(()=>setShakeCanvas(false),500);}};
   const isFortified=(sx,sy)=>fortifiedSectors.some(([fx,fy])=>fx===sx&&fy===sy);
@@ -1674,7 +1704,8 @@ export default function App(){
     setConfirmPayload({count:pending.size,cost,freeUsed,isRaid,bonus,teamName:t.name,teamColor:t.color,modeLabel:isRaid?"⚔️ RAID":"🏴 CLAIM",adjCount});
     setShowConfirm(true);
   };
-  const onMU=()=>{
+  const onMU=(e)=>{
+    if(e.button===1||e.button===2){panRef.current=null;return;}
     panRef.current=null;
     setDrag(false);
     if(surgeMode&&pending.size>0){
@@ -1724,7 +1755,7 @@ export default function App(){
     }
     setOrig(null);
   };
-  const onML=()=>{panRef.current=null;setHov(null);setHovSector(null);if(drag){setDrag(false);if(pending.size>0)requestClaim();}};
+  const onML=()=>{panRef.current=null;setPixelPopup(null);setHov(null);setHovSector(null);if(drag){setDrag(false);if(pending.size>0)requestClaim();}};
 
   // ── AUTH GATE ─────────────────────────────────────────────────────────────
   const requireAuth=(reason="join")=>{
@@ -1862,6 +1893,16 @@ export default function App(){
     if(freeUsed>0)pushToast(`🎁 ${freeUsed} free pixels used!`,"#FFD700",3000);
     if(bonus>0){setLastCombo({count:bonus,color:t.color});setTimeout(()=>setLastCombo(null),3000);spawnConfetti(t.color,40);pushToast(`🔥 COMBO! +${bonus} FREE!`,"#FFD700",4000);}
     else pushToast(`🏴 ${toClaim.size}px for ${t.name}! €${(cost-freeUsed).toFixed(2)}`,"#00F5FF",3000);
+    // Auto-share prompt after milestone claims
+    const totalMyPx=Object.values(next).filter(p=>p?.t===active).length;
+    const milestones=[10,50,100,250,500,1000];
+    const hitMilestone=milestones.find(m=>totalMyPx>=m&&totalMyPx-toClaim.size<m);
+    if(hitMilestone){
+      setTimeout(()=>{
+        pushToast(`🎉 ${hitMilestone} pixels milestone! Share your territory?`,"#FFD700",6000);
+        setShowShare(true);
+      },1500);
+    }
     setFeed(f=>[{id:Date.now(),icon:isRaid?"⚔️":"🏴",team:t.name,msg:`${isRaid?"RAIDED":"claimed"} ${toClaim.size}px (€${cost.toFixed(2)})`,color:t.color,ts:new Date().toLocaleTimeString("en",{hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"}),isMe:true},...f].slice(0,40));
   };
 
@@ -3539,7 +3580,7 @@ export default function App(){
               <canvas ref={cvs} width={CW} height={CH}
                 className={gridFullscreen?"pow-canvas-fs":""}
                 style={gridFullscreen?{}:{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:"40vw",touchAction:"none",cursor:active&&mode!=="SHOP"?"crosshair":"grab"}}
-                onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML}
+                onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onClick={onMC} onContextMenu={e=>e.preventDefault()}
                 onDragStart={e=>e.preventDefault()}
                 onDoubleClick={()=>setGridFullscreen(f=>!f)}
                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}/>
@@ -3779,7 +3820,7 @@ export default function App(){
           <div style={{padding:"5px 5px 0",flexShrink:0}}>
             <div style={{border:`2px solid ${at?rgba(at.color,.5):rgba(modeColor,.35)}`,borderRadius:6,overflow:"hidden",lineHeight:0,cursor:active&&mode!=="SHOP"?"crosshair":"grab",position:"relative",animation:shakeCanvas?"shake .4s ease":undefined,boxShadow:`0 0 30px ${rgba(at?.color||modeColor,.12)},0 0 60px ${rgba(at?.color||modeColor,.06)},inset 0 0 30px rgba(0,0,0,.3)`}}>
               <canvas ref={cvs} width={CW} height={CH} style={{width:"100%",display:"block",imageRendering:"pixelated",maxHeight:isMobile?"45vw":"38vh",touchAction:"none"}}
-                onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onDragStart={e=>e.preventDefault()}
+                onMouseDown={onMD} onMouseMove={onMM_h} onMouseUp={onMU} onMouseLeave={onML} onClick={onMC} onContextMenu={e=>e.preventDefault()} onDragStart={e=>e.preventDefault()}
                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}/>
               <div style={{position:"absolute",top:5,left:5,background:rgba(modeColor,.12),border:`1px solid ${rgba(modeColor,.4)}`,borderRadius:4,padding:"2px 7px",fontFamily:"'Orbitron',monospace",fontSize:7,color:modeColor,pointerEvents:"none",letterSpacing:2}}>
                 {mode==="BUILD"?"🏗 BUILD":mode==="RAID"?"⚔️ RAID":"💥 SHOP"}
@@ -3794,6 +3835,16 @@ export default function App(){
                 <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:6,color:"#3a3a5a",textAlign:"center",padding:"2px 0"}}>MINIMAP</div>
               </div>
               {hov&&<div style={{position:"absolute",bottom:5,right:102,background:rgba(hov.color,.15),border:`1px solid ${hov.color}`,borderRadius:4,padding:"2px 7px",fontFamily:"'Share Tech Mono',monospace",fontSize:9,color:hov.color,pointerEvents:"none"}}>{hov.name}{hov.id&&isAllied(hov.id)?" 🤝":""}</div>}
+              {pixelPopup&&<div style={{position:"absolute",left:Math.min(pixelPopup.x,CW-180),top:Math.max(0,pixelPopup.y-110),background:"rgba(4,4,14,.95)",border:`2px solid ${pixelPopup.team?.color||"#00F5FF"}`,borderRadius:8,padding:"10px 12px",zIndex:50,pointerEvents:"none",minWidth:160,boxShadow:`0 0 20px ${rgba(pixelPopup.team?.color||"#00F5FF",.3)}`}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                  <div style={{width:10,height:10,borderRadius:2,background:pixelPopup.team?.color,boxShadow:`0 0 6px ${pixelPopup.team?.color}`}}/>
+                  <span style={{fontFamily:"'Orbitron',monospace",fontSize:9,fontWeight:900,color:pixelPopup.team?.color}}>{pixelPopup.team?.name||"Unknown"}</span>
+                </div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.5)",marginBottom:3}}>📍 {pixelPopup.claimedAt}</div>
+                <div style={{fontFamily:"'Share Tech Mono',monospace",fontSize:8,color:"rgba(255,255,255,.4)",marginBottom:6}}>🏴 {pixelPopup.total} pixels total</div>
+                {pixelPopup.isEnemy&&active&&<div style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:"#FF4400",letterSpacing:1,borderTop:"1px solid rgba(255,68,0,.2)",paddingTop:5}}>⚔ SWITCH TO RAID MODE TO STEAL</div>}
+                {!pixelPopup.isEnemy&&<div style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:"#00FF88",letterSpacing:1,borderTop:"1px solid rgba(0,255,136,.2)",paddingTop:5}}>✅ YOUR TERRITORY</div>}
+              </div>}
               {!active&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(4,4,8,.85))",padding:"16px 12px 6px",pointerEvents:"none",textAlign:"center"}}>
                 <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,letterSpacing:3,color:"rgba(0,245,255,.4)"}}>⚔ SELECT A FANDOM BELOW</div>
               </div>}
