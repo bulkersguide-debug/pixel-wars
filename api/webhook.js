@@ -34,6 +34,19 @@ async function verifyStripeSignature(payload, sigHeader, secret) {
   }
 }
 
+// Maps productId → human-readable powerup name for Discord notifications
+const POWERUP_NAMES = {
+  powerup_bomb:     "💣 Cluster Bomb",
+  powerup_storm:    "🌩️ Pixel Storm",
+  powerup_fortress: "🏰 Fortress",
+  powerup_snipe:    "🎯 Sniper",
+  powerup_airdrop:  "📦 Airdrop",
+  powerup_nuke:     "☢️ Nuke",
+  powerup_renew:    "🛡️ Renewal Shield",
+  powerup_double:   "🎲 Double or Nothing",
+  powerup_surge:    "⚡ Surge",
+};
+
 export default async function handler(req, res) {
   console.log("Webhook called:", req.method);
 
@@ -50,11 +63,9 @@ export default async function handler(req, res) {
   const rawBody = await getRawBody(req);
   const payload = rawBody.toString("utf8");
 
-  // Verify signature
   const valid = await verifyStripeSignature(payload, sig || "", webhookSecret);
   if (!valid) {
     console.error("Invalid webhook signature");
-    // During testing, log but don't block
     console.log("Sig received:", sig?.slice(0, 50));
   }
 
@@ -74,86 +85,168 @@ export default async function handler(req, res) {
     console.log("Amount:", session.amount_total);
     console.log("Customer email:", session.customer_details?.email);
 
-    const { productId, userId, discordUsername, fandom, pixels, isSeasonPass, isWhale } = session.metadata || {};
+    const {
+      productId, userId, discordUsername, fandom,
+      pixels, isPowerup, isSeasonPass, isWhale
+    } = session.metadata || {};
+
     const totalPixels = parseInt(pixels) || 0;
+    console.log(`Processing: ${discordUsername}, product: ${productId}, isPowerup: ${isPowerup}, userId: ${userId}`);
 
-    console.log(`Processing: ${discordUsername}, product: ${productId}, pixels: ${totalPixels}, userId: ${userId}`);
+    if (!userId || userId === "guest") {
+      console.log("Guest purchase or no userId — skipping");
+      return res.status(200).json({ received: true });
+    }
 
-    // Grant pixels to user — check for duplicate first
-    if (userId && userId !== "guest") {
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    // ─── POWERUP BRANCH ──────────────────────────────────────────────────────
+    if (isPowerup === "true") {
+      console.log(`⚡ Powerup purchase detected: ${productId}`);
+
       try {
-        const supabase = createClient(
-          process.env.SUPABASE_URL,
-          process.env.SUPABASE_SERVICE_ROLE_KEY
-        );
-
-        // Check if this session was already processed
+        // Deduplicate — check if this session was already processed
         const { data: existing } = await supabase
-          .from("purchases")
+          .from("active_powerups")
           .select("id")
           .eq("stripe_session_id", session.id)
           .single();
 
         if (existing) {
-          console.log("⚠️ Session already processed — skipping duplicate grant");
+          console.log("⚠️ Powerup already activated for this session — skipping");
           return res.status(200).json({ received: true });
         }
 
-        // Get current pixels
-        const { data: profile, error: fetchErr } = await supabase
-          .from("profiles")
-          .select("free_pixels")
-          .eq("id", userId)
-          .single();
+        // Insert powerup as ready-to-use (is_used: false)
+        const { error: powerupErr } = await supabase
+          .from("active_powerups")
+          .insert({
+            user_id: userId,
+            discord_username: discordUsername,
+            powerup_type: productId,           // e.g. "powerup_nuke"
+            stripe_session_id: session.id,
+            purchased_at: new Date().toISOString(),
+            is_used: false,
+          });
 
-        if (fetchErr) {
-          console.error("Error fetching profile:", fetchErr);
+        if (powerupErr) {
+          console.error("Error inserting powerup:", JSON.stringify(powerupErr));
         } else {
-          console.log("Current pixels:", profile?.free_pixels);
-          const newPixelCount = (profile?.free_pixels || 0) + totalPixels;
-          const updateData = { free_pixels: newPixelCount };
-          if (isWhale === "true") updateData.role = "vip";
-
-          const { error: updateErr } = await supabase
-            .from("profiles")
-            .update(updateData)
-            .eq("id", userId);
-
-          if (updateErr) {
-            console.error("Error updating pixels:", updateErr);
-          } else {
-            console.log(`✅ Updated pixels to ${newPixelCount} for ${discordUsername}`);
-          }
+          console.log(`✅ Powerup ${productId} activated for ${discordUsername}`);
         }
 
-        // Record purchase — use upsert to handle duplicates
-        const { error: insertErr } = await supabase
+        // Record in purchases table for revenue tracking
+        const { error: purchaseErr } = await supabase
           .from("purchases")
           .upsert({
             user_id: userId,
             discord_username: discordUsername,
             product_id: productId,
-            pixels_granted: totalPixels,
+            pixels_granted: 0,
             amount_eur: session.amount_total / 100,
             stripe_session_id: session.id,
             fandom: fandom || "none",
             created_at: new Date().toISOString(),
           }, { onConflict: "stripe_session_id", ignoreDuplicates: true });
 
-        if (insertErr) {
-          console.error("Error inserting purchase:", JSON.stringify(insertErr));
+        if (purchaseErr) {
+          console.error("Error recording powerup purchase:", JSON.stringify(purchaseErr));
         } else {
-          console.log("✅ Purchase recorded in database");
+          console.log("✅ Powerup purchase recorded");
         }
 
+        // Discord notification
+        const powerupLabel = POWERUP_NAMES[productId] || productId;
+        await fetch("https://discord.com/api/webhooks/1505216663786623178/zgC0xopUlfOex7rIIcRos4SxMQrTvtj8-Gjl4cvoqyEukuOP3a-xl9ekt7iIPIj_dBAb", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            embeds: [{
+              title: "⚡ POWER-UP PURCHASED — PIXELS OF WAR",
+              description: `**${discordUsername}** just bought **${powerupLabel}**\n\n💶 **€${(session.amount_total / 100).toFixed(2)}** received\n🎮 Power-up is ready to use in-game`,
+              color: 0xFF6B00,
+              timestamp: new Date().toISOString(),
+              footer: { text: "Pixels of War Payment System" },
+            }],
+          }),
+        }).catch(err => console.error("Discord webhook error:", err));
+
       } catch (err) {
-        console.error("Supabase error:", err.message);
+        console.error("Powerup processing error:", err.message);
       }
-    } else {
-      console.log("Guest purchase or no userId — skipping pixel grant");
+
+      return res.status(200).json({ received: true });
     }
 
-    // Discord notification
+    // ─── PIXEL / REGULAR PURCHASE BRANCH ────────────────────────────────────
+    try {
+      // Check for duplicate
+      const { data: existing } = await supabase
+        .from("purchases")
+        .select("id")
+        .eq("stripe_session_id", session.id)
+        .single();
+
+      if (existing) {
+        console.log("⚠️ Session already processed — skipping duplicate grant");
+        return res.status(200).json({ received: true });
+      }
+
+      // Get current pixels
+      const { data: profile, error: fetchErr } = await supabase
+        .from("profiles")
+        .select("free_pixels")
+        .eq("id", userId)
+        .single();
+
+      if (fetchErr) {
+        console.error("Error fetching profile:", fetchErr);
+      } else {
+        console.log("Current pixels:", profile?.free_pixels);
+        const newPixelCount = (profile?.free_pixels || 0) + totalPixels;
+        const updateData = { free_pixels: newPixelCount };
+        if (isWhale === "true") updateData.role = "vip";
+
+        const { error: updateErr } = await supabase
+          .from("profiles")
+          .update(updateData)
+          .eq("id", userId);
+
+        if (updateErr) {
+          console.error("Error updating pixels:", updateErr);
+        } else {
+          console.log(`✅ Updated pixels to ${newPixelCount} for ${discordUsername}`);
+        }
+      }
+
+      // Record purchase
+      const { error: insertErr } = await supabase
+        .from("purchases")
+        .upsert({
+          user_id: userId,
+          discord_username: discordUsername,
+          product_id: productId,
+          pixels_granted: totalPixels,
+          amount_eur: session.amount_total / 100,
+          stripe_session_id: session.id,
+          fandom: fandom || "none",
+          created_at: new Date().toISOString(),
+        }, { onConflict: "stripe_session_id", ignoreDuplicates: true });
+
+      if (insertErr) {
+        console.error("Error inserting purchase:", JSON.stringify(insertErr));
+      } else {
+        console.log("✅ Purchase recorded in database");
+      }
+
+    } catch (err) {
+      console.error("Supabase error:", err.message);
+    }
+
+    // Discord notification for pixel purchase
     try {
       await fetch("https://discord.com/api/webhooks/1505216663786623178/zgC0xopUlfOex7rIIcRos4SxMQrTvtj8-Gjl4cvoqyEukuOP3a-xl9ekt7iIPIj_dBAb", {
         method: "POST",
@@ -161,7 +254,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           embeds: [{
             title: "💰 NEW PURCHASE — PIXELS OF WAR",
-            description: `**${discordUsername}** bought **${(productId||"").replace(/_/g," ").toUpperCase()}**\n\n✅ **${totalPixels} pixels** granted\n💶 **€${(session.amount_total/100).toFixed(2)}** received${isWhale==="true"?"\n👑 WHALE PACK — VIP role granted!":""}${isSeasonPass==="true"?"\n🏆 SEASON PASS activated!":""}`,
+            description: `**${discordUsername}** bought **${(productId || "").replace(/_/g, " ").toUpperCase()}**\n\n✅ **${totalPixels} pixels** granted\n💶 **€${(session.amount_total / 100).toFixed(2)}** received${isWhale === "true" ? "\n👑 WHALE PACK — VIP role granted!" : ""}${isSeasonPass === "true" ? "\n🏆 SEASON PASS activated!" : ""}`,
             color: 0xC8FF00,
             timestamp: new Date().toISOString(),
             footer: { text: "Pixels of War Payment System" },
