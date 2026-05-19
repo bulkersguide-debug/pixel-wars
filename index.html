@@ -62,7 +62,48 @@
     </style>
   </head>
   <body>
+    <!-- SEO content block — visible to Google, hidden once React loads -->
+    <div id="seo-hero" style="position:absolute;top:0;left:0;width:100%;background:#040408;color:#e0e8ff;font-family:sans-serif;padding:40px 24px;z-index:0;">
+      <h1 style="font-size:2rem;margin-bottom:12px;color:#00F5FF;">Pixels of War — Fandom Territory Battle Game</h1>
+      <p style="font-size:1.1rem;margin-bottom:24px;max-width:640px;line-height:1.6;">Choose your fandom. Claim pixels. Expand your territory. Fight for the top ranking. Season 1 is live and free to play.</p>
+
+      <h2 style="font-size:1.3rem;margin-bottom:10px;color:#C8FF00;">How to Play</h2>
+      <ol style="margin-left:20px;margin-bottom:24px;line-height:2;">
+        <li>Pick your fandom — Gaming, Anime, or Music</li>
+        <li>Claim free pixels every day and place them on the map</li>
+        <li>Expand your territory, defend it from raids, and climb the leaderboard</li>
+        <li>The fandom with the most pixels at the end of the season wins</li>
+      </ol>
+
+      <h2 style="font-size:1.3rem;margin-bottom:10px;color:#C8FF00;">Which Fandoms Can Join?</h2>
+      <p style="margin-bottom:24px;line-height:1.6;max-width:640px;">Any fandom can join. Current fandoms include Naruto, BTS, BLACKPINK, Fortnite, Valorant, Attack on Titan, Taylor Swift, Minecraft, One Piece, Drake, Demon Slayer, Jujutsu Kaisen, and many more. New fandoms are added every season.</p>
+
+      <h2 style="font-size:1.3rem;margin-bottom:10px;color:#C8FF00;">Is it Free?</h2>
+      <p style="margin-bottom:24px;line-height:1.6;max-width:640px;">Yes. Every player gets free pixels daily just by logging in. You can earn more by completing missions, watching ads, and maintaining daily streaks. Pixel bundles and power-ups are available to accelerate your progress.</p>
+
+      <h2 style="font-size:1.3rem;margin-bottom:10px;color:#C8FF00;">How Do Rankings Work?</h2>
+      <p style="margin-bottom:24px;line-height:1.6;max-width:640px;">Fandoms are ranked by total pixels claimed on the map. Pixels decay after 60 days if not renewed, so active communities hold territory longer. Season 1 lasts 90 days — the top fandom at the end wins the season trophy.</p>
+
+      <h2 style="font-size:1.3rem;margin-bottom:10px;color:#C8FF00;">What Are Power-Ups?</h2>
+      <p style="line-height:1.6;max-width:640px;">Power-ups give you strategic advantages — drop a Nuke to wipe enemy territory, use a Fortress to shield your pixels, launch a Pixel Storm to instantly claim 50 empty tiles, or Snipe a single enemy pixel. Power-ups are purchased once and activated whenever you choose.</p>
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Hide SEO block once React has mounted
+      document.addEventListener("DOMContentLoaded",function(){
+        var seo=document.getElementById("seo-hero");
+        if(seo){
+          var observer=new MutationObserver(function(){
+            if(document.getElementById("root").children.length>0){
+              seo.style.display="none";
+              observer.disconnect();
+            }
+          });
+          observer.observe(document.getElementById("root"),{childList:true});
+        }
+      });
+    </script>
   </body>
 </html>
