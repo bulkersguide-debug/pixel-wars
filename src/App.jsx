@@ -458,10 +458,12 @@ export default function App(){
         pushToast(`✅ Payment successful! ${names[product]||"Purchase"} activated. Pixels added to your account!`,"#00FF88",8000);
       }
       window.history.replaceState({},"","/");
+      // Clear any pending powerup localStorage
+      localStorage.removeItem("pow_pending_powerup");
       setTimeout(()=>{
         if(user?.id){
-          supabase.from("profiles").select("free_pixels").eq("id",user.id).single()
-            .then(({data})=>{if(data?.free_pixels!=null){syncFreePixels(data.free_pixels);}});
+          // Reload full profile — picks up season pass, pixels, role changes
+          loadProfile(user.id);
           loadMyPowerups();
         }
       },2000);
@@ -1044,6 +1046,12 @@ export default function App(){
       if(data.free_pixels!=null){
         setFreePixels(data.free_pixels);
         localStorage.setItem("pow_free",String(data.free_pixels));
+      }
+      // Load season pass from Supabase — source of truth
+      if(data.has_season_pass){
+        const passData={season:1,activatedAt:data.season_pass_activated_at||new Date().toISOString()};
+        setHasSeasonPass(passData);
+        localStorage.setItem("pow_season_pass",JSON.stringify(passData));
       }
     }
     // Re-save push subscription on login if already granted
@@ -2012,6 +2020,7 @@ export default function App(){
         .eq("id",row.id);
       if(error)throw error;
       setMyPowerups(prev=>prev.filter(p=>p.id!==row.id));
+      localStorage.removeItem("pow_pending_powerup");
       await executePowerup(pu);
     }catch(err){
       pushToast("❌ Activation failed: "+err.message,"#FF4400",4000);
