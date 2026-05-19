@@ -209,6 +209,7 @@ export default async function handler(req, res) {
         const newPixelCount = (profile?.free_pixels || 0) + totalPixels;
         const updateData = { free_pixels: newPixelCount };
         if (isWhale === "true") updateData.role = "vip";
+        if (isSeasonPass === "true") updateData.has_season_pass = true;
 
         const { error: updateErr } = await supabase
           .from("profiles")
