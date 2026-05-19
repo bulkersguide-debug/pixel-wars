@@ -1,37 +1,68 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
-  <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#040408" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Pixels of War" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- ── SEO / OG ── -->
-  <title>Pixels of War — Fandom Territory Battle</title>
-  <meta name="description" content="Claim pixels for your fandom. Raid enemies. Form alliances. Dominate the grid." />
-  <meta property="og:title" content="⚔️ Pixels of War — Fandom Territory Battle" />
-  <meta property="og:description" content="BTS vs BLACKPINK vs Naruto vs Fortnite. Pick your fandom. Claim pixels. Dominate the grid." />
-  <meta property="og:image" content="https://www.pixelsofwar.com/og-image.png" />
-  <meta property="og:url" content="https://www.pixelsofwar.com" />
-  <meta property="og:type" content="website" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="⚔️ Pixels of War" />
-  <meta name="twitter:description" content="Fandom territory war. Pick your side. Claim pixels. Raid enemies." />
-  <meta name="twitter:image" content="https://www.pixelsofwar.com/og-image.png" />
+    <!-- Primary SEO -->
+    <title>Pixels of War — Fandom Pixel Battle &amp; Territory War Game</title>
+    <meta name="description" content="Join Pixels of War — a live fandom territory battle where players place pixels, claim sectors, defend their favorite fandoms, and climb seasonal rankings. Free to play." />
+    <meta name="keywords" content="pixel war game, fandom game, territory battle, pixel battle, anime game, BTS game, Naruto game, fandom territory, pixel map game, r/place game" />
+    <meta name="author" content="Pixels of War" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://www.pixelsofwar.com/" />
 
-  <!-- ── FAVICON ── -->
-  <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="shortcut icon" href="/favicon.ico" />
-</head>
-<body>
-  <div id="root"></div>
-  <script defer src="https://cloud.umami.is/script.js" data-website-id="86ed4442-a0b7-4c7c-a98a-a93162382d35"></script>
-  <script type="module" src="/src/main.jsx"></script>
-</body>
+    <!-- Open Graph (Facebook, Discord, WhatsApp) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.pixelsofwar.com/" />
+    <meta property="og:title" content="Pixels of War — Fandom Territory Battle" />
+    <meta property="og:description" content="Claim territory for your fandom, one pixel at a time. Choose your side. Place pixels. Dominate the map. Season 1 is live." />
+    <meta property="og:image" content="https://www.pixelsofwar.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="Pixels of War" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://www.pixelsofwar.com/" />
+    <meta name="twitter:title" content="Pixels of War — Fandom Territory Battle" />
+    <meta name="twitter:description" content="Claim territory for your fandom, one pixel at a time. Free to play. Season 1 is live." />
+    <meta name="twitter:image" content="https://www.pixelsofwar.com/og-image.png" />
+
+    <!-- Theme -->
+    <meta name="theme-color" content="#00F5FF" />
+    <meta name="msapplication-TileColor" content="#040408" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "VideoGame",
+      "name": "Pixels of War",
+      "description": "A live fandom territory battle where players place pixels, claim sectors, and fight for dominance on a shared pixel map.",
+      "url": "https://www.pixelsofwar.com",
+      "genre": ["Strategy", "Multiplayer", "Browser Game"],
+      "playMode": "MultiPlayer",
+      "applicationCategory": "Game",
+      "operatingSystem": "Web Browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      }
+    }
+    </script>
+
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{background:#040408;color:#e0e8ff;font-family:'Rajdhani',sans-serif}
+      #root{min-height:100vh}
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
