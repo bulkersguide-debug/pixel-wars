@@ -1985,15 +1985,18 @@ export default function App(){
 
   // ── POWERUP INVENTORY ─────────────────────────────────────────────────────
   const loadMyPowerups=async()=>{
-    if(!user?.id||!supabase)return;
-    const{data}=await supabase
-      .from("active_powerups")
-      .select("*")
-      .eq("user_id",user.id)
-      .eq("is_used",false)
-      .order("purchased_at",{ascending:true});
-    setMyPowerups(data||[]);
-  };
+  if(!supabase)return;
+  const{data:{session}}=await supabase.auth.getSession();
+  if(!session?.user?.id)return;
+  const{data,error}=await supabase
+    .from("active_powerups")
+    .select("*")
+    .eq("user_id",session.user.id)
+    .eq("is_used",false)
+    .order("purchased_at",{ascending:true});
+  console.log("loadMyPowerups result:",data,error);
+  setMyPowerups(data||[]);
+};
 
   const activatePowerup=async(row)=>{
     if(activatingPowerup)return;
