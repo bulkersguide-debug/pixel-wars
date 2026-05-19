@@ -63,14 +63,14 @@ const slugify=(n)=>n.toLowerCase().replace(/[^a-z0-9\s]/g,"").replace(/\s+/g,"-"
 const streakReward=(d)=>{if(d===1)return{px:1,bonus:null};if(d===2)return{px:1,bonus:null};if(d===3)return{px:2,bonus:null};if(d===4)return{px:3,bonus:null};if(d===5)return{px:5,bonus:"🔥 5-Day Warrior!"};if(d===6)return{px:5,bonus:null};if(d===7)return{px:10,bonus:"🏆 Week Legend!"};if(d%30===0)return{px:30,bonus:"👑 Month Champion!"};if(d%14===0)return{px:15,bonus:"💎 Fortnight Fighter!"};if(d%7===0)return{px:10,bonus:"⚡ Weekly Veteran!"};return{px:5,bonus:null};};
 const POWERUPS=[
   {id:"bomb",icon:"💣",name:"CLUSTER BOMB",desc:"Destroy 8×8 unshielded enemy zone",price:10,color:"#FF4400",rarity:"RARE"},
-  {id:"storm",icon:"⚡",name:"PIXEL STORM",desc:"Claim 50 random empty pixels",price:15,color:"#FFCC00",rarity:"EPIC"},
+  {id:"storm",icon:"⚡",name:"PIXEL STORM",desc:"Claim 50 random empty pixels instantly",price:15,color:"#FFCC00",rarity:"EPIC"},
   {id:"fortress",icon:"🛡️",name:"FORTRESS",desc:"Shield last 30 pixels for 1 hour",price:8,color:"#00AAFF",rarity:"UNCOMMON"},
   {id:"snipe",icon:"🎯",name:"SNIPER",desc:"Steal 1 unshielded enemy pixel",price:3,color:"#FF2D78",rarity:"COMMON"},
-  {id:"airdrop",icon:"🪂",name:"AIRDROP",desc:"Claim 15×15 zone in viewport",price:25,color:"#C8FF00",rarity:"LEGENDARY"},
-  {id:"nuke",icon:"☢️",name:"NUKE",desc:"Wipe 20×20 unshielded zone",price:50,color:"#FF0000",rarity:"LEGENDARY"},
-  {id:"renew",icon:"♻️",name:"RENEWAL SHIELD",desc:"Renew 50 decaying pixels",price:5,color:"#00FFAA",rarity:"UNCOMMON"},
-  {id:"double",icon:"✨",name:"DOUBLE OR NOTHING",desc:"Gamble — 2× or 0×",price:5,color:"#BB88FF",rarity:"UNCOMMON"},
-  {id:"surge",icon:"⚡",name:"SURGE",desc:"Drag connected pixels — lose them if disconnected!",price:6,color:"#FF2D78",rarity:"RARE"},
+  {id:"airdrop",icon:"🪂",name:"AIRDROP",desc:"Claim full 15×15 zone in viewport",price:25,color:"#C8FF00",rarity:"LEGENDARY"},
+  {id:"nuke",icon:"☢️",name:"NUKE",desc:"Wipe 20×20 unshielded enemy zone",price:25,color:"#FF0000",rarity:"LEGENDARY"},
+  {id:"renew",icon:"♻️",name:"RENEWAL SHIELD",desc:"Refresh 50 decaying pixels — reset their timer",price:5,color:"#00FFAA",rarity:"UNCOMMON"},
+  {id:"double",icon:"✨",name:"DOUBLE OR NOTHING",desc:"50/50 gamble — win 2× your last claim or lose it all",price:5,color:"#BB88FF",rarity:"UNCOMMON"},
+  {id:"surge",icon:"⚡",name:"SURGE",desc:"Instantly claim 30 pixels connected to your territory",price:6,color:"#FF2D78",rarity:"RARE"},
 ];
 const RARITY_COLOR={COMMON:"#aaa",UNCOMMON:"#00CC44",RARE:"#0088FF",EPIC:"#AA00FF",LEGENDARY:"#FFD700"};
 const DISCORD_ID="1504550947295072328";
@@ -1907,7 +1907,7 @@ export default function App(){
   };
 
   // ── POWER-UPS ──────────────────────────────────────────────────────────────
-  const usePowerup=async(pu)=>{
+  const executePowerup=async(pu)=>{
     const next={...pixels};const newShields={...shields};const now=Date.now();const toDelete=[];const toUpsert=[];
     if(pu.id==="bomb"){const ex=randInt(vx,vx+100),ey=randInt(vy,vy+60);let d=0;for(let dy=0;dy<8;dy++)for(let dx=0;dx<8;dx++){const idx=(ey+dy)*GW+(ex+dx);if(next[idx]&&next[idx].t!==active&&!(shields[idx]&&shields[idx]>now)&&!isAllied(next[idx].t)){toDelete.push(idx);delete next[idx];delete newShields[idx];d++;}}spawnShockwave("#FF4400",ex+4,ey+4);spawnParticles("#FF4400",ex+4,ey+4,20,true);triggerFlash("#FF4400",true);pushToast(`💣 BOMB! Destroyed ${d} pixels!`,"#FF4400",5000);}
     else if(pu.id==="storm"){let cl=0;for(let dy=0;dy<VH&&cl<50;dy++)for(let dx=0;dx<VW&&cl<50;dx++){const idx=(vy+dy)*GW+(vx+dx);const sx=Math.floor((vx+dx)/SECTOR),sy=Math.floor((vy+dy)/SECTOR);if(unlockedSet.has(sectorKey(sx,sy))&&!next[idx]){next[idx]={t:active,at:now};newShields[idx]=now+24*60*60*1000;toUpsert.push(idx);cl++;}}spawnParticles(TM[active]?.color||"#FFCC00",vx+VW/2,vy+VH/2,30,true);triggerFlash("#FFCC00");pushToast(`⚡ STORM! ${cl}px claimed!`,"#FFCC00",5000);}
@@ -1918,13 +1918,11 @@ export default function App(){
     else if(pu.id==="renew"){let r=0;const myPx=Object.entries(next).filter(([,v])=>v?.t===active).sort((a,b)=>a[1].at-b[1].at).slice(0,50);myPx.forEach(([k])=>{if(next[k]){next[k]={...next[k],at:now};toUpsert.push(parseInt(k));r++;}});pushToast(`♻️ RENEWED ${r} pixels!`,"#00FFAA",5000);triggerFlash("#00FFAA");}
     else if(pu.id==="double"){const win=Math.random()>.5;pushToast(win?"✨ WIN! Bonus territory!":"✨ LOST 💀","#BB88FF",5000);triggerFlash("#BB88FF",win);}
     else if(pu.id==="surge"){
-      // Surge mode — player drags pixels, they only stick if connected to own territory
       setSurgeMode(true);setSurgePixels(new Set());
       pushToast("⚡ SURGE ACTIVE! Drag pixels connected to your territory — release to claim. Disconnected pixels vanish!","#FF2D78",5000);
       triggerFlash("#FF2D78");
-      // Auto-cancel after 15 seconds
       setTimeout(()=>{setSurgeMode(false);setSurgePixels(new Set());},15000);
-      return; // don't execute normal powerup flow
+      return;
     }
     else if(pu.id==="goldraid"){
       // War Chest gold raid — spend 20 gold to steal 20 random enemy pixels
@@ -1940,6 +1938,38 @@ export default function App(){
     setPixels(next);setShields(newShields);try{localStorage.setItem("pow_shields",JSON.stringify(newShields));}catch{}
     trackMission("powerup",1);
     if(isOnline){if(toDelete.length)await dbDeletePixels(toDelete,ACTIVE_SEASON_NUM);if(toUpsert.length)await dbUpsertPixels(new Set(toUpsert),active,ACTIVE_SEASON_NUM);}else{try{localStorage.setItem("pw2k_v2",JSON.stringify(next));}catch{}}
+  };
+
+  const usePowerup=async(pu)=>{
+    if(!requireAuth("powerup"))return;
+    setPaymentLoading(pu.id);
+    try{
+      const res=await fetch("/api/create-checkout",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          productId:`powerup_${pu.id}`,
+          userId:user?.id,
+          discordUsername:user?.user_metadata?.full_name||user?.user_metadata?.name||"player",
+          fandom:active,
+          name:pu.name,
+          description:pu.desc,
+          amount:Math.round(pu.price*100),
+          metadata:{type:"powerup",powerupId:pu.id,userId:user?.id,fandom:active}
+        })
+      });
+      const{url,error}=await res.json();
+      if(error)throw new Error(error);
+      if(url){
+        localStorage.setItem("pow_pending_powerup",JSON.stringify({id:pu.id,fandom:active,ts:Date.now()}));
+        window.open(url,"_blank","noopener");
+        pushToast(`💳 Complete payment to activate ${pu.name}!`,"#FFD700",6000);
+      }
+    }catch(err){
+      pushToast("❌ Payment error: "+err.message,"#FF4400",4000);
+    }finally{
+      setPaymentLoading(null);
+    }
   };
 
   const resetGrid=async()=>{if(isOnline)await dbClearSeason(currentSeasonNum);setPixels({});setShields({});setMyPixels(0);setFreePixels(0);setStreakData({days:0,last:"",total:0});setDailyInfo(null);setPending(new Set());setActive(null);setUnlockedSectors(INIT_SECTORS);setAlliances([]);setWars([]);try{["pw2k","pw2k_v2","pow_shields","pow_free","pow_streak","pow_sectors"].forEach(k=>localStorage.removeItem(k));}catch{}pushToast("🔄 Grid reset!","#00F5FF",3000);setShowReset(false);};
